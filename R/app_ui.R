@@ -3,15 +3,36 @@
 #' @param request Internal parameter for `{shiny}`.
 #'     DO NOT REMOVE.
 #' @import shiny
+#' @import shinythemes
+#' @import shinyWidgets
+#' @import shinydashboard
+#' @import ggplot2
+#' @import tidyr
+#' @import dplyr
+#' @import reshape2
 #' @noRd
 app_ui <- function(request) {
   tagList(
     # Leave this function for adding external resources
     golem_add_external_resources(),
     # Your application UI logic
-    fluidPage(
-      h1("Qploidy")
-    )
+    navbarPage("Qploidy",
+               theme = shinythemes::shinytheme("flatly"),
+               tabPanel("Upload data",
+                        mod_upload_ui("upload_1")),
+               navbarMenu("Data interpolation",
+                          tabPanel("Reference", "Summary tab contents..."),
+                          tabPanel("Graphics", "Summary tab contents...")
+               ),
+               tabPanel("All individuals",
+                        mod_all_ui("all_1")
+               ),
+               tabPanel("Single individual",
+                        mod_single_ui("single_1")
+               )
+
+    ),
+
   )
 }
 

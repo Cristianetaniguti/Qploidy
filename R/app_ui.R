@@ -18,6 +18,9 @@ app_ui <- function(request) {
     # Your application UI logic
     navbarPage("Qploidy",
                theme = shinythemes::shinytheme("flatly"),
+               tabPanel("About", value = "about",
+                        includeMarkdown(system.file("about.Rmd", package = "Qploidy")),
+               ),
                tabPanel("Upload data",
                         mod_upload_ui("upload_1")),
                navbarMenu("Data interpolation",

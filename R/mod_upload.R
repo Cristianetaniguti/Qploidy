@@ -12,18 +12,16 @@ mod_upload_ui <- function(id){
   tagList(
     fluidRow(
       column(12,
-             radioButtons(ns("load"), label = h3("Choose data set"),
-                          choices = list("PennCNV first try" = "PennCNV_first",
-                                         "Axiom CNV Sumary tool" = "Axiom_CNV",
-                                         "PennCNV second try" = "PennCNV_second",
-                                         "In house logR and BAF - diploids" = "in_house_diploids",
-                                         "In house logR and BAF - tetraploids" = "in_house_tetraploids",
-                                         "In house logR and BAF - others" = "in_house_others",
-                                         "In house logR and BAF - tetra model - diploids" = "in_house_tetra_diploids",
-                                         "In house logR and BAF - tetra model - tetraploids" = "in_house_tetra_tetraploids",
-                                         "In house logR and BAF - tetra model - others" = "in_house_tetra_others",
-                                         "In house logR and BAF - tetra model - potato" = "potato"),
-                          selected = "PennCNV_first"),
+             fileInput("load_summary", label = "Upload Axiom summary file"), hr(),
+             p("or"),
+             fileInput("load_baf", label = "Upload BAF file"),
+             fileInput("load_logR", label = "Upload logR file"), hr(),
+             p("or"),
+             radioButtons(ns("example"), label = "Choose example data set",
+                          choices = list("Roses Texas" = "roses_texas",
+                                         "Roses France" = "roses_france",
+                                         "Potatoes Texas" = "potatoes"),
+                          selected = "roses_texas"),
       )
     )
 
@@ -35,46 +33,83 @@ mod_upload_ui <- function(id){
 #' @noRd
 mod_upload_server <- function(input, output, session, data, parent_session){
   ns <- session$ns
-  data <- eventReactive(input$load, {
-    # Read file from PennCNV
-    if(input$load == "PennCNV_first"){
-      baf <- vroom("data/joint_logR_BAF/baf.txt")
-      logR <- vroom("data/joint_logR_BAF/logR.txt")
-      # Read file from Axiom CNV Summary Tool
-    } else if(input$load == "Axiom_CNV"){
-      logR <- vroom("data/Axiom_graph_results/logR2.txt")
-      baf <- vroom("data/Axiom_graph_results/baf3.txt")
-      # Read file from PennCNV second try
-    } else if(input$load == "PennCNV_second") {
-      logR <- vroom("data/script_second_round/logR.txt")
-      baf <- vroom("data/script_second_round/baf.txt")
-    } else if(input$load == "in_house_diploids"){
-      logR <- vroom("data/interpolation_results/logR_diploids_filt.txt")
-      baf <- vroom("data/interpolation_results/baf_diploids_filt.txt")
-    } else if(input$load == "in_house_tetraploids"){
-      logR <- vroom("data/interpolation_results/logR_tetra_filt.txt")
-      baf <- vroom("data/interpolation_results/baf_tetra_filt.txt")
-    } else if(input$load == "in_house_others"){
-      logR <- vroom("data/interpolation_results/logR_others_filt.txt")
-      baf <- vroom("data/interpolation_results/baf_others_filt.txt")
-    } else if(input$load == "in_house_tetra_diploids"){
-      logR <- vroom("data/interpolation_results/logR_tetra_diploids_filt2.txt")
-      baf <- vroom("data/interpolation_results/baf_tetra_diploids_filt2.txt")
-    } else if(input$load == "in_house_tetra_tetraploids"){
-      logR <- vroom("data/interpolation_results/logR_tetra_tetra_filt.txt")
-      baf <- vroom("data/interpolation_results/baf_tetra_tetra_filt.txt")
-    } else if(input$load == "in_house_tetra_others"){
-      logR <- vroom("data/interpolation_results/logR_tetra_others_filt.txt")
-      baf <- vroom("data/interpolation_results/baf_tetra_others_filt.txt")
-    } else if(input$load == "potato"){
-      logR <- vroom("data/interpolation_results/logR_tetra_potato_filt_genos2.txt")
-      baf <- vroom("data/interpolation_results/baf_tetra_potato_filt_genos2.txt")
-    }
-    data <- list(logR, baf)
-    data
+
+  # Reset buttons
+  values <- reactiveValues(
+    upload_state_summary = 0,
+    upload_state_baf = 0,
+    upload_state_logr = 0,
+  )
+
+  observeEvent(input$reset_all, {
+    values$upload_state_summary = 0
+    values$upload_state_baf = 0
+    values$upload_state_logr = 0
   })
 
-  return(list(data = reactive(data())))
+  observeEvent(input$submit_summary, {
+    values$upload_state_summary <- 'uploaded'
+    values$upload_state_summary <- 0
+  })
+
+  observeEvent(input$submit_logr_baf, {
+    values$upload_state_baf <- 'uploaded'
+    values$upload_state_baf <- 0
+  })
+
+  input_summary <- reactive({
+    if(values$upload_state_summary == 0){
+      return(NULL)
+    } else if (values$upload_state_summary == "uploaded"){
+      validate(
+        need(!is.null(input$load_summary), "Upload summary file before submit")
+      )
+      summary <- vroom(input$load_summary$datapath)
+
+      return(summary)
+    }
+  })
+
+  input_logr_baf <- reactive({
+    if(values$upload_state_logr_baf == 0 | values$upload_state_summary != 0){
+      return(NULL)
+    } else if (values$upload_state_logr_baf == "uploaded"){
+      validate(
+        need(!is.null(input$load_logr) | !is.null(input$load_baf), "Upload both logR and BAF files before submit")
+      )
+      logR <- vroom(input$load_logR$datapath)
+      baf <- vroom(input$load_baf$datapath)
+
+      return(list(logR, baf))
+    }
+  })
+
+  loadExample <- reactive({
+    if(is.null(input_logr_baf()) &
+       is.null(input_summary())){
+      if(input$example == "roses_texas"){
+        baf <- vroom(system.file("baf_roses_texas.txt", package = "Qploidy"))
+        logR <- vroom(system.file("logr_roses_texas.txt", package = "Qploidy"))
+      } else if(input$example == "roses_france"){
+        logR <- vroom(system.file("baf_roses_texas.txt", package = "Qploidy"))
+        baf <- vroom(system.file("logr_roses_texas.txt", package = "Qploidy"))
+      } else if(input$example == "potatoes") {
+        logR <- vroom(system.file("baf_roses_texas.txt", package = "Qploidy"))
+        baf <- vroom(system.file("logr_roses_texas.txt", package = "Qploidy"))
+      }
+      data <- list(logR, baf)
+      data
+    } else NULL
+  })
+
+  logR_BAF = reactive({
+    if(is.null(input_logr_baf()))
+      return(loadExample())
+    else return(input_logr_baf())
+  })
+
+  return(list(summary = reactive(input_summary()),
+              logR_BAF = reactive(logR_BAF())))
 }
 
 ## To be copied in the UI

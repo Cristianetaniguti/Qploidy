@@ -1,8 +1,8 @@
 #' Run the Shiny Application
 #'
 #' @param ... arguments to pass to golem_opts.
-#' See `?golem::get_golem_options` for more details.
-#' @inheritParams shiny::shinyApp
+#' See `?get_golem_options` for more details.
+#' @inheritParams shinyApp
 #'
 #' @export
 #' @importFrom shiny shinyApp

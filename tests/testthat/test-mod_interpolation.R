@@ -13,19 +13,34 @@ testServer(
     expect_true(
       grepl("test", ns("test"))
     )
-    # Here are some examples of tests you can
-    # run on your module
-    # - Testing the setting of inputs
-    # session$setInputs(x = 1)
-    # expect_true(input$x == 1)
-    # - If ever your input updates a reactiveValues
-    # - Note that this reactiveValues must be passed
-    # - to the testServer function via args = list()
-    # expect_true(r$x == 1)
-    # - Testing output
-    # expect_true(inherits(output$tbl$html, "html"))
+
+    session$setInputs(summary = list(datapath = system.file("fitpoly_input.txt", package = "Qploidy")),
+                      refs = paste0("Tetra_", 1:50),
+                      ploidy = 4,
+                      n.cores = 1)
+
+    input <- list()
+    input$summary$datapath <- system.file("fitpoly_input.txt", package = "Qploidy")
+    input$refs <- paste0("Tetra_", 1:50)
+    input$ploidy <- 4
+    input$n.cores <- 1
+
+    fitpoly_input <- vroom(input$summary$datapath)
+    refs_fitpoly_inputs <- as.data.frame(fitpoly_input[which(fitpoly_input$SampleName %in% input$refs),])
+
+    library(fitPoly)
+    out <- sample(1:1000, 1)
+    saveMarkerModels(ploidy= input$ploidy,
+                     data=refs_fitpoly_inputs,
+                     p.threshold=0.1,
+                     filePrefix= paste0("fitpoly_out_",out),
+                     ncores=input$n.cores)
+
+    scores <- vroom(paste0("fitpoly_out_",out, "_scores.dat"))
+    expect_true(input$x == 1)
+
 })
- 
+
 test_that("module ui works", {
   ui <- mod_interpolation_ui(id = "test")
   golem::expect_shinytaglist(ui)
@@ -35,4 +50,4 @@ test_that("module ui works", {
     expect_true(i %in% names(fmls))
   }
 })
- 
+

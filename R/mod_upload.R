@@ -11,64 +11,47 @@ mod_upload_ui <- function(id){
   ns <- NS(id)
   tagList(
     fluidRow(
-      column(12,
-             fileInput("load_summary", label = "Upload Axiom summary file"), hr(),
-             p("or"),
-             fileInput("load_baf", label = "Upload BAF file"),
-             fileInput("load_logR", label = "Upload logR file"), hr(),
-             p("or"),
-             radioButtons(ns("example"), label = "Choose example data set",
-                          choices = list("Roses Texas" = "roses_texas",
-                                         "Roses France" = "roses_france",
-                                         "Potatoes Texas" = "potatoes"),
-                          selected = "roses_texas"),
-      )
-    )
 
+      column(12,
+             radioButtons(ns("example_data"), label = "Choose example data set",
+                          choices = c("Roses Texas" = "roses_texas",
+                                      "Roses France" = "roses_france",
+                                      "Potatoes Texas" = "potatoes"),
+                          selected = "roses_texas")
+      )
+
+    )
   )
 }
 
 #' upload Server Functions
 #'
+#' @import vroom
+#'
 #' @noRd
-mod_upload_server <- function(input, output, session, data, parent_session){
+mod_upload_server <- function(input, output, session, parent_session){
   ns <- session$ns
 
   # Reset buttons
   values <- reactiveValues(
     upload_state_summary = 0,
-    upload_state_baf = 0,
-    upload_state_logr = 0,
+    upload_state_logr_baf = 0
   )
 
   observeEvent(input$reset_all, {
     values$upload_state_summary = 0
-    values$upload_state_baf = 0
-    values$upload_state_logr = 0
+    values$upload_state_logr_baf = 0
   })
 
   observeEvent(input$submit_summary, {
     values$upload_state_summary <- 'uploaded'
-    values$upload_state_summary <- 0
   })
 
   observeEvent(input$submit_logr_baf, {
-    values$upload_state_baf <- 'uploaded'
-    values$upload_state_baf <- 0
+    values$upload_state_logr_baf <- 'uploaded'
   })
 
-  input_summary <- reactive({
-    if(values$upload_state_summary == 0){
-      return(NULL)
-    } else if (values$upload_state_summary == "uploaded"){
-      validate(
-        need(!is.null(input$load_summary), "Upload summary file before submit")
-      )
-      summary <- vroom(input$load_summary$datapath)
 
-      return(summary)
-    }
-  })
 
   input_logr_baf <- reactive({
     if(values$upload_state_logr_baf == 0 | values$upload_state_summary != 0){
@@ -87,28 +70,36 @@ mod_upload_server <- function(input, output, session, data, parent_session){
   loadExample <- reactive({
     if(is.null(input_logr_baf()) &
        is.null(input_summary())){
-      if(input$example == "roses_texas"){
-        baf <- vroom(system.file("baf_roses_texas.txt", package = "Qploidy"))
-        logR <- vroom(system.file("logr_roses_texas.txt", package = "Qploidy"))
-      } else if(input$example == "roses_france"){
+      print(input$example_data)
+      if(input$example_data == "roses_texas"){
+        baf <- vroom(system.file("baf_sub_roses_texas.txt", package = "Qploidy"))
+        logR <- vroom(system.file("logr_sub_roses_texas.txt", package = "Qploidy"))
+        summary <- vroom(system.file("fitpoly_input.txt", package = "Qploidy"))
+      } else if(input$example_data == "roses_france"){
         logR <- vroom(system.file("baf_roses_texas.txt", package = "Qploidy"))
         baf <- vroom(system.file("logr_roses_texas.txt", package = "Qploidy"))
-      } else if(input$example == "potatoes") {
+      } else if(input$example_data == "potatoes") {
         logR <- vroom(system.file("baf_roses_texas.txt", package = "Qploidy"))
         baf <- vroom(system.file("logr_roses_texas.txt", package = "Qploidy"))
       }
-      data <- list(logR, baf)
+      data <- list(logR, baf, summary)
       data
     } else NULL
   })
 
   logR_BAF = reactive({
-    if(is.null(input_logr_baf()))
-      return(loadExample())
-    else return(input_logr_baf())
+    if(is.null(input_logr_baf())){
+      return(loadExample()[1:2])
+    } else return(input_logr_baf())
   })
 
-  return(list(summary = reactive(input_summary()),
+  summary = reactive({
+    if(is.null(input_summary())){
+      return(loadExample()[[3]])
+    } else return(input_summary())
+  })
+
+  return(list(summary = reactive(summary()),
               logR_BAF = reactive(logR_BAF())))
 }
 

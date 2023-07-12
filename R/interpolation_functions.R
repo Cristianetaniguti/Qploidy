@@ -1,4 +1,6 @@
-# Create logR
+#' Create logR
+#'
+#' @export
 get_logR <- function(theta_subject, R_subject, centers_theta, mod, ploidy){
   pos <- vector()
   centers_theta <- sort(centers_theta, decreasing = F)
@@ -24,7 +26,9 @@ get_logR <- function(theta_subject, R_subject, centers_theta, mod, ploidy){
   return(logR)
 }
 
-# To create logR in parallel
+#' To create logR in parallel
+#'
+#' @export
 get_logR_par <- function(par_all_item, ploidy =2){
   logRs_diplo <- list()
   for(i in 1:nrow(par_all_item[[1]])){
@@ -43,8 +47,9 @@ get_logR_par <- function(par_all_item, ploidy =2){
 # clusters_filt[[1]]$plot
 # ploidy <- 4
 
-# Create BAF
-# According to Wang 2007
+#' Create BAF According to Wang 2007
+#'
+#' @export
 get_baf <- function(theta_subject, R_subject, centers_theta, ploidy){
   pos <- vector()
   centers_theta <- sort(centers_theta, decreasing = F)
@@ -78,7 +83,9 @@ get_baf <- function(theta_subject, R_subject, centers_theta, ploidy){
   return(baf)
 }
 
-# To create baf in parallel
+#' To create baf in parallel
+#'
+#' @export
 get_baf_par <- function(par_all_item, ploidy=2){
   baf <- list()
   for(i in 1:nrow(par_all_item[[1]])){
@@ -91,7 +98,9 @@ get_baf_par <- function(par_all_item, ploidy=2){
 }
 
 
-# Clusterization using fitpoly
+#' Clusterization using fitpoly
+#'
+#' @export
 par_fitpoly_interpolation <- function(scores_temp, ploidy, plot=TRUE){
 
   plot_data_split <- split(scores_temp, scores_temp$geno)
@@ -99,9 +108,12 @@ par_fitpoly_interpolation <- function(scores_temp, ploidy, plot=TRUE){
   scores_temp$geno <- as.factor(scores_temp$geno)
 
   centers <- lapply(plot_data_split, function(x) apply(x[,3:4], 2, mean))
-  if(length(centers) != ploidy + 1 | any(sapply(plot_data_split, nrow) < 3)) {
-    p <- ggplot(scores_temp, aes(x=theta, y=R, color = geno))  +
-      geom_point()
+  if(length(centers) != ploidy + 1 | any(sapply(plot_data_split, nrow) < 2)) {
+    if(plot){
+      p <- ggplot(scores_temp, aes(x=theta, y=R, color = geno))  +
+        geom_point()
+    } else p <- NULL
+
     return(list(mod=NULL,
                 probe_name = unique(scores_temp$mks),
                 plot=p))
@@ -128,4 +140,31 @@ par_fitpoly_interpolation <- function(scores_temp, ploidy, plot=TRUE){
                 plot = p,
                 probe_name = unique(scores_temp$mks)))
   }
+}
+
+
+#' Interpolation plot
+#'
+#' @export
+plot_one_marker <- function(scores_temp, ploidy){
+  plot_data_split <- split(scores_temp, scores_temp$geno)
+  scores_temp$geno <- as.factor(scores_temp$geno)
+
+  centers <- lapply(plot_data_split, function(x) apply(x[,3:4], 2, mean))
+  if(length(centers) != ploidy + 1 | any(sapply(plot_data_split, nrow) < 3)) {
+
+    p <- ggplot(scores_temp, aes(x=theta, y=R, color = geno))  +
+      geom_point() + ggtitle(paste0("Marker:", unique(scores_temp$mks))) + theme_bw()
+
+  } else {
+    centers_df <- data.frame(do.call(rbind, centers))
+    centers_df <- cbind(centers_df, cluster = 1:(ploidy + 1))
+
+    p <- ggplot(scores_temp, aes(x=theta, y=R, color = geno))  +
+      geom_point() +
+      geom_point(data = centers_df, aes(x= theta, y = R), color = "black") +
+      geom_line(data = centers_df, aes(x= theta, y = R), color = "black") + theme_bw() +
+      ggtitle(paste0("Marker:", unique(scores_temp$mks)))
+  }
+  return(p)
 }

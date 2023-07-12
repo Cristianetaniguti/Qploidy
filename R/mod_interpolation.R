@@ -151,6 +151,25 @@ mod_interpolation_server <- function(id){
       }
     )
 
+    fitpoly_scores <- reactive({
+      if(is.null(input$load_scores)){
+        scores <- vroom("fitpoly_out_2780_scores.dat")
+      } else {
+        scores <- vroom(input$load_scores$datapath)
+      }
+      scores
+    })
+
+    filters <- reactive({
+      n.na <- fitpoly_scores() %>% group_by(MarkerName) %>% summarize(n.na = (sum(is.na(geno))/length(geno))*100)
+      rm.mks <- n.na$MarkerName[which(n.na$n.na > 25)]
+      scores_filt <- fitpoly_scores()[-which(fitpoly_scores()$MarkerName %in% rm.mks),]
+
+      theta_all <- (atan2(as.numeric(refs_fitpoly()$Y), as.numeric(refs_fitpoly()$X)))/(pi/2)
+
+
+    })
+
   })
 }
 

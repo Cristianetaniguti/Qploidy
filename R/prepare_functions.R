@@ -29,7 +29,7 @@ clean_summary <- function(summary_df){
 summary_to_fitpoly <- function(cleaned_summary, ind.names, geno.pos){
   R_all <- cleaned_summary$A_probes[,-1] + cleaned_summary$B_probes[,-1]
   theta_all <- cleaned_summary$B_probes[,-1]/(cleaned_summary$B_probes[,-1] + cleaned_summary$A_probes[,-1])
-
+  #theta_all <- as.data.frame((atan2(as.matrix(cleaned_summary$B_probes[,-1]), as.matrix(cleaned_summary$A_probes[,-1])))/(pi/2))
   probes_names <-  cleaned_summary$A_probes[,1]
   probes_names <- gsub("-A","", as.vector(probes_names$probeset_id))
 
@@ -50,10 +50,13 @@ summary_to_fitpoly <- function(cleaned_summary, ind.names, geno.pos){
   ids <- ind.names[,2][match(fitpoly_input$SampleName, ind.names[,1])]
   fitpoly_input$SampleName <- ids
 
-  geno.pos <- as.data.frame(geno.pos)
+  ids <- ind.names[,2][match(colnames(R_all), ind.names[,1])]
+  colnames(R_all) <- ids
 
-  new.id <- paste0(geno.pos[,2], "_", geno.pos[,3])
-  fitpoly_input$MarkerName <- new.id[match(fitpoly_input$MarkerName, geno.pos[,1])]
+  ids <- ind.names[,2][match(colnames(theta_all), ind.names[,1])]
+  colnames(theta_all) <- ids
 
-  return(fitpoly_input)
+  colnames(theta_all)[1] <- colnames(R_all)[1] <- "MarkerName"
+
+  return(list(fitpoly_input = fitpoly_input, R= R_all, theta = theta_all))
 }

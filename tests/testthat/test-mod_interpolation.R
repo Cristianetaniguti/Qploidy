@@ -45,13 +45,15 @@ testServer(
 
     ind.names <- vroom(input$load_ind_names$datapath)
 
-    fitpoly_input <- summary_to_fitpoly(cleaned_summary = cleaned_summary, ind.names, geno.pos)
-    R_all <- fitpoly_input[[2]]
-    theta_all <- fitpoly_input[[3]]
-    fitpoly_input <- fitpoly_input[[1]]
+    R_theta <- get_R_theta(cleaned_summary, ind.names)
 
-    expect_equal(round(sum(fitpoly_input$X),0), 239122013)
-    expect_equal(round(sum(fitpoly_input$ratio),0), 82728)
+    R_all <- R_theta[[1]]
+    theta_all <- R_theta[[2]]
+
+    fitpoly_input <- summary_to_fitpoly(R_all, theta_all)
+
+    expect_equal(round(sum(fitpoly_input$X),0), 1187)
+    expect_equal(round(sum(fitpoly_input$ratio),0), 82226)
 
     # Export file for fitpoly
     fitpoly_input_sele <- fitpoly_input %>% filter(SampleName %in% input$refs)

@@ -18,38 +18,30 @@ clean_summary <- function(summary_df){
   return(list(A_probes=A_probes, B_probes = B_probes))
 }
 
-
-#' Convert Summary file to fitpoly format
+#' Get R and theta values from summary file with option to do standard normalization by plate and markers
 #'
-#' @param cleaned_summary list with A and B intensities
-#' @param ind.names data.frame first column with the plate name and second with sample name
+#' @param cleaned_summary summary object from clean_summary function. List with A and B intensities.
+#' @param ind.names data.frame with individual names correspondence
+#' @param sd.normalization logical. If TRUE performs standard normalization
+#' @param atan logical. If TRUE calculates the theta using atan2
 #'
-#' @importFrom tidyr pivot_longer
 #' @export
-summary_to_fitpoly <- function(cleaned_summary, ind.names, geno.pos){
+get_R_theta <- function(cleaned_summary, ind.names, sd.normalization = TRUE, atan = FALSE){
   R_all <- cleaned_summary$A_probes[,-1] + cleaned_summary$B_probes[,-1]
-  theta_all <- cleaned_summary$B_probes[,-1]/(cleaned_summary$B_probes[,-1] + cleaned_summary$A_probes[,-1])
-  #theta_all <- as.data.frame((atan2(as.matrix(cleaned_summary$B_probes[,-1]), as.matrix(cleaned_summary$A_probes[,-1])))/(pi/2))
+  if(atan){
+    theta_all <- as.data.frame((atan2(as.matrix(cleaned_summary$B_probes[,-1]), as.matrix(cleaned_summary$A_probes[,-1])))/(pi/2))
+  }  else {
+    theta_all <- cleaned_summary$B_probes[,-1]/(cleaned_summary$B_probes[,-1] + cleaned_summary$A_probes[,-1])
+  }
+
   probes_names <-  cleaned_summary$A_probes[,1]
   probes_names <- gsub("-A","", as.vector(probes_names$probeset_id))
-
-  X_all <- cbind(MarkerName = probes_names, cleaned_summary$A_probes[,-1])
-  Y_all <- cbind(MarkerName = probes_names, cleaned_summary$B_probes[,-1])
 
   R_all <- cbind(MarkerName = probes_names, R_all)
   theta_all <- cbind(MarkerName = probes_names, theta_all)
 
-  R <- pivot_longer(R_all, cols = 2:ncol(R_all), values_to = "R", names_to = "SampleName")
-  theta <- pivot_longer(theta_all, cols = 2:ncol(theta_all), values_to = "ratio", names_to = "SampleName")
-  X <- pivot_longer(X_all, cols = 2:ncol(X_all), values_to = "X", names_to = "SampleName")
-  Y <- pivot_longer(Y_all, cols = 2:ncol(Y_all), values_to = "Y", names_to = "SampleName")
-
-  fitpoly_input <- cbind(X, Y = Y[,3], R = R_all[,3], ratio = theta_all[,3])
-
+  array.id <- colnames(R_all)
   ind.names <- as.data.frame(ind.names)
-  ids <- ind.names[,2][match(fitpoly_input$SampleName, ind.names[,1])]
-  fitpoly_input$SampleName <- ids
-
   ids <- ind.names[,2][match(colnames(R_all), ind.names[,1])]
   colnames(R_all) <- ids
 
@@ -58,5 +50,44 @@ summary_to_fitpoly <- function(cleaned_summary, ind.names, geno.pos){
 
   colnames(theta_all)[1] <- colnames(R_all)[1] <- "MarkerName"
 
-  return(list(fitpoly_input = fitpoly_input, R= R_all, theta = theta_all))
+  # R Quantile normalization
+  if(sd.normalization){
+    R_melt <- pivot_longer(R_all, cols = -1, names_to = "ind", values_to = "R")
+
+    exp <- sapply(strsplit(array.id[-1], "-"), "[[", 4)
+    exp <- sapply(strsplit(exp, "_"), "[[", 1)
+
+    array_ids <- data.frame(array=exp, inds = ids[-1])
+    R_melt$array <- array_ids$array[match(R_melt$ind, array_ids$inds)]
+
+    R_z <- R_melt %>% group_by(MarkerName, array) %>% mutate(zscore = (R-mean(R))/sd(R))
+    R_all <- pivot_wider(R_z[,c(1,2,5)], names_from = ind, values_from = zscore)
+  }
+
+  return(list(R_all=R_all, theta_all = theta_all))
+}
+
+#' Convert Summary file to fitpoly format
+#'
+#' @param R_all data.frame with R values
+#' @param theta_all data.frame with theta values
+#' @param ind.names data.frame first column with the plate name and second with sample name
+#'
+#' @importFrom tidyr pivot_longer
+#' @export
+summary_to_fitpoly <- function(R_all, theta_all){
+  Y_all <- R_all[,-1]*theta_all[,-1]
+  X_all <- R_all[,-1] - Y_all
+
+  X_all <- cbind(MarkerName= R_all[,1], X_all)
+  Y_all <- cbind(MarkerName = R_all[,1], Y_all)
+
+  R <- pivot_longer(R_all, cols = 2:ncol(R_all), values_to = "R", names_to = "SampleName")
+  theta <- pivot_longer(theta_all, cols = 2:ncol(theta_all), values_to = "ratio", names_to = "SampleName")
+  X <- pivot_longer(X_all, cols = 2:ncol(X_all), values_to = "X", names_to = "SampleName")
+  Y <- pivot_longer(Y_all, cols = 2:ncol(Y_all), values_to = "Y", names_to = "SampleName")
+
+  fitpoly_input <- cbind(X, Y = Y[,3], R = R[,3], ratio = theta[,3])
+
+  return(fitpoly_input)
 }

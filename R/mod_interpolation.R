@@ -110,7 +110,12 @@ mod_interpolation_server <- function(id){
     loadExample <- reactive({
       if(is.null(input_summary())){
         if(input$example_data == "roses_texas"){
-          summary <- vroom(system.file("fitpoly_input.txt", package = "Qploidy"))
+          summary <- vroom(system.file("summary_example.txt", package = "Qploidy"))
+          cleaned_summary <- clean_summary(summary_df = summary)
+          ind.names <- system.file("ind.names_example.txt", package = "Qploidy")
+          geno.pos <- system.file("geno.pos_example.txt", package = "Qploidy")
+          fitpoly_input <- summary_to_fitpoly(cleaned_summary = cleaned_summary, ind.names, geno.pos)
+          return(fitpoly_input)
         } else if(input$example_data == "roses_france"){
           summary <- vroom(system.file("fitpoly_input.txt", package = "Qploidy"))
         } else if(input$example_data == "potatoes") {
@@ -121,7 +126,7 @@ mod_interpolation_server <- function(id){
     })
 
     summary <- reactive({
-      if(!is.null(input_summary())) return(input_summary()) else return(loadExample())
+      if(!is.null(input_summary())) return(input_summary()[[1]]) else return(loadExample()[[1]])
     })
 
     observe({
@@ -143,7 +148,8 @@ mod_interpolation_server <- function(id){
     output$down_fitpoly <- downloadHandler(
       filename = function() {
         # Use the selected dataset as the suggested file name
-        paste0("reference_samples.txt")
+        temp <- sample(1:1000, 1)
+        paste0("reference_samples_",temp, ".txt")
       },
       content = function(file) {
         # Write the dataset to the `file` that will be downloaded
@@ -153,19 +159,39 @@ mod_interpolation_server <- function(id){
 
     fitpoly_scores <- reactive({
       if(is.null(input$load_scores)){
-        scores <- vroom("fitpoly_out_2780_scores.dat")
+        scores <- vroom(system.file("fitpoly_out_2780_scores.dat", package = "Qploidy"))
       } else {
         scores <- vroom(input$load_scores$datapath)
       }
       scores
     })
 
-    filters <- reactive({
-      n.na <- fitpoly_scores() %>% group_by(MarkerName) %>% summarize(n.na = (sum(is.na(geno))/length(geno))*100)
+    filter_na <- reactive({
+      n.na <- scores %>% group_by(MarkerName) %>% summarize(n.na = (sum(is.na(geno))/length(geno))*100)
       rm.mks <- n.na$MarkerName[which(n.na$n.na > 25)]
-      scores_filt <- fitpoly_scores()[-which(fitpoly_scores()$MarkerName %in% rm.mks),]
+      missing.data <- length(rm.mks)
+      scores_filt <- scores[-which(scores$MarkerName %in% rm.mks),]
 
-      theta_all <- (atan2(as.numeric(refs_fitpoly()$Y), as.numeric(refs_fitpoly()$X)))/(pi/2)
+      keep.mks <- match(paste0(scores_filt$MarkerName, "_",scores_filt$SampleName),
+                        paste0(fitpoly_input_sele$MarkerName, "_", fitpoly_input_sele$SampleName))
+
+      fitpoly_input_filt <- fitpoly_input_sele[keep.mks,]
+      theta <- fitpoly_input_filt$ratio
+      R <- fitpoly_input_filt$R
+
+      rm.na <- which(is.na(scores_filt$geno))
+      if(length(rm.na) > 0){
+        R[rm.na] <- NA
+        theta[rm.na] <- NA
+      }
+
+      data_interpolation <- data.frame(mks = fitpoly_input_filt$MarkerName,
+                                       ind = fitpoly_input_filt$SampleName,
+                                       R = R,
+                                       theta = theta,
+                                       geno = scores_filt$geno)
+
+      lst_interpolation <- split(data_interpolation, data_interpolation$mks)
 
 
     })

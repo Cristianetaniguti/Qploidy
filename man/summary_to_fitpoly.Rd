@@ -4,10 +4,12 @@
 \alias{summary_to_fitpoly}
 \title{Convert Summary file to fitpoly format}
 \usage{
-summary_to_fitpoly(cleaned_summary, ind.names, geno.pos)
+summary_to_fitpoly(R_all, theta_all)
 }
 \arguments{
-\item{cleaned_summary}{list with A and B intensities}
+\item{R_all}{data.frame with R values}
+
+\item{theta_all}{data.frame with theta values}
 
 \item{ind.names}{data.frame first column with the plate name and second with sample name}
 }

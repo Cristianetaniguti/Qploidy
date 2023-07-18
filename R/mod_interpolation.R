@@ -97,11 +97,14 @@ mod_interpolation_server <- function(id){
         cleaned_summary <- clean_summary(summary_df = summary)
 
         ind.names <- vroom(input$load_ind_names$datapath)
-        geno.pos <- vroom(input$load_geno_pos$datapath)
 
-        fitpoly_input <- summary_to_fitpoly(cleaned_summary = cleaned_summary, ind.names, geno.pos)
+        R_theta <- get_R_theta(cleaned_summary, ind.names)
+        R_all <- R_theta[[1]]
+        theta_all <- R_theta[[2]]
 
-        fitpoly_input
+        fitpoly_input <- summary_to_fitpoly(R_all, theta_all)
+
+        return(list(fitpoly_input=fitpoly_input, R_all=R_all, theta_all=theta_all))
       } else {
         NULL
       }
@@ -113,15 +116,17 @@ mod_interpolation_server <- function(id){
           summary <- vroom(system.file("summary_example.txt", package = "Qploidy"))
           cleaned_summary <- clean_summary(summary_df = summary)
           ind.names <- system.file("ind.names_example.txt", package = "Qploidy")
-          geno.pos <- system.file("geno.pos_example.txt", package = "Qploidy")
-          fitpoly_input <- summary_to_fitpoly(cleaned_summary = cleaned_summary, ind.names, geno.pos)
+          R_theta <- get_R_theta(cleaned_summary, ind.names)
+          R_all <- R_theta[[1]]
+          theta_all <- R_theta[[2]]
+          fitpoly_input <- summary_to_fitpoly(R_all, theta_all)
           return(fitpoly_input)
         } else if(input$example_data == "roses_france"){
-          summary <- vroom(system.file("fitpoly_input.txt", package = "Qploidy"))
+          cat("Developing")
         } else if(input$example_data == "potatoes") {
-          summary <- vroom(system.file("fitpoly_input.txt", package = "Qploidy"))
+          cat("Developing")
         }
-        summary
+        return(list(fitpoly_input=fitpoly_input, R_all=R_all, theta_all=theta_all))
       } else NULL
     })
 
@@ -166,16 +171,16 @@ mod_interpolation_server <- function(id){
       scores
     })
 
-    filter_na <- reactive({
-      n.na <- scores %>% group_by(MarkerName) %>% summarize(n.na = (sum(is.na(geno))/length(geno))*100)
+    lst_interpolation <- reactive({
+      n.na <- fitpoly_scores() %>% group_by(MarkerName) %>% summarize(n.na = (sum(is.na(geno))/length(geno))*100)
       rm.mks <- n.na$MarkerName[which(n.na$n.na > 25)]
       missing.data <- length(rm.mks)
-      scores_filt <- scores[-which(scores$MarkerName %in% rm.mks),]
+      scores_filt <- fitpoly_scores()[-which(fitpoly_scores()$MarkerName %in% rm.mks),]
 
       keep.mks <- match(paste0(scores_filt$MarkerName, "_",scores_filt$SampleName),
-                        paste0(fitpoly_input_sele$MarkerName, "_", fitpoly_input_sele$SampleName))
+                        paste0(refs_fitpoly()$MarkerName, "_", refs_fitpoly()$SampleName))
 
-      fitpoly_input_filt <- fitpoly_input_sele[keep.mks,]
+      fitpoly_input_filt <- refs_fitpoly()[keep.mks,]
       theta <- fitpoly_input_filt$ratio
       R <- fitpoly_input_filt$R
 
@@ -190,12 +195,26 @@ mod_interpolation_server <- function(id){
                                        R = R,
                                        theta = theta,
                                        geno = scores_filt$geno)
+      lst_interpolation <- split(data_interpolation(), data_interpolation()$mks)
 
-      lst_interpolation <- split(data_interpolation, data_interpolation$mks)
-
-
+      return(lst_interpolation)
     })
 
+    output$interpolation <- renderPlot({
+      plot_one_marker(lst_interpolation()[[input$int_marker]], ploidy = input$ploidy)
+    })
+
+    clusters <- reactive({
+      # Generate clusters
+      library(parallel)
+      clust <- makeCluster(input$n.cores)
+      clusterExport(clust, c("par_fitpoly_interpolation", "input"))
+      clusters <- parLapply(clust, lst_interpolation(), function(x) {
+        library(ggplot2)
+        par_fitpoly_interpolation(x, ploidy= input$ploidy, plot = FALSE)
+      })
+      stopCluster(clust)
+    })
   })
 }
 

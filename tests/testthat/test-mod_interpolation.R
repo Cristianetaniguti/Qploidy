@@ -32,7 +32,6 @@ testServer(
     input$load_summary$datapath <- system.file("summary_example.txt", package = "Qploidy")
     input$load_ind_names$datapath <- system.file("ind.names_example.txt", package = "Qploidy")
     input$load_geno_pos$datapath <- system.file("geno.pos_example.txt", package = "Qploidy")
-    input$fitpoly_scores$datapath <- system.file("fitpoly_out_2780_scores.dat", package = "Qploidy")
     input$refs <- paste0("Tetra_", 1:50)
     input$ploidy <- 4
     input$n.cores <- 1
@@ -58,9 +57,17 @@ testServer(
     # Export file for fitpoly
     fitpoly_input_sele <- fitpoly_input %>% filter(SampleName %in% input$refs)
 
+    # library(fitPoly)
+    # saveMarkerModels(ploidy=4,
+    #                  data=fitpoly_input_sele,
+    #                  p.threshold=0.9,
+    #                  filePrefix="tetraploids_refs_z",
+    #                  ncores=1)
+
     # After fitpoly
+    input$fitpoly_scores$datapath <- system.file("tetraploids_refs_z_scores.dat", package = "Qploidy")
     scores <- vroom(input$fitpoly_scores$datapath)
-    expect_equal(sum(scores$geno, na.rm = TRUE), 169607)
+    expect_equal(sum(scores$geno, na.rm = TRUE), 203403)
 
     # Filters
     n.na <- scores %>% group_by(MarkerName) %>% summarize(n.na = (sum(is.na(geno))/length(geno))*100)
@@ -170,6 +177,9 @@ testServer(
 
     expect_equal(sum(bafs_diplo_df[,-1]), 2628.072)
     expect_equal(round(sum(logRs_diplod_m[,-1]),0), -921)
+
+    vroom_write(bafs_diplo_df, file = "baf.example.txt")
+    vroom_write(logRs_diplod_m, file = "logR.example.txt")
 
     # geno.pos <- vroom(input$load_geno_pos$datapath)
     # geno.pos <- as.data.frame(geno.pos)

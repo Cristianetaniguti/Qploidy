@@ -1,0 +1,49 @@
+---
+title: "Code version"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Interpolation
+
+```{r}
+# Roses texas
+library(vroom)
+summaries_tetra <- vroom("C:/Users/Rose_Lab/Documents/Cris_temp/TAMU-RoseLab/standalone_apps/ploidy_estimation/data/Batch_tetra_second/AxiomGT1.summary.txt", skip = 213)
+summaries_diplo <- vroom("C:/Users/Rose_Lab/Documents/Cris_temp/TAMU-RoseLab/standalone_apps/ploidy_estimation/data/Batch1_second/AxiomGT1.summary.txt", skip = 168)
+summaries_others <- vroom("C:/Users/Rose_Lab/Documents/Cris_temp/TAMU-RoseLab/standalone_apps/ploidy_estimation/data/Batch_others_second/AxiomGT1.summary.txt", skip = 1080)
+
+ind.names <- read.csv("C:/Users/Rose_Lab/Documents/Cris_temp/TAMU-RoseLab/standalone_apps/ploidy_estimation/data/joint_logR_BAF/plate_names_up.csv")
+ind.names <- ind.names[,-c(1,2)]
+geno_pos <- read.table("C:/Users/Rose_Lab/Documents/Cris_temp/TAMU-RoseLab/standalone_apps/ploidy_estimation/data/mapfile.blast.txt", header = T)
+
+
+summaries_all <- cbind(summaries_tetra, summaries_diplo[,-1], summaries_others[,-1])
+cleaned_summary <- clean_summary(summary_df = summaries_all)
+R_theta <- get_R_theta(cleaned_summary = cleaned_summary, ind.names)
+R_all <- R_theta[[1]]
+theta_all <- R_theta[[2]]
+fitpoly_input <- summary_to_fitpoly(R_all, theta_all)
+
+tetra_ind <- colnames(summaries_tetra)[-1]
+tetra_ind <- ind.names$Sample_Name[match(tetra_ind, ind.names$Plate_Name)]
+
+fitpoly_input_sele <- fitpoly_input %>% filter(SampleName %in% tetra_ind)
+
+fitpoly_input_sele <- vroom("fitpoly_input_sele.txt")
+
+library(fitPoly)
+saveMarkerModels(ploidy=4,
+                 data=fitpoly_input_sele,
+                 p.threshold=0.9,
+                 filePrefix="tetraploids_refs_z",
+                 ncores=30)
+
+
+```
+
+
+

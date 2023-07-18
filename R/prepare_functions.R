@@ -25,6 +25,7 @@ clean_summary <- function(summary_df){
 #' @param sd.normalization logical. If TRUE performs standard normalization
 #' @param atan logical. If TRUE calculates the theta using atan2
 #'
+#' @importFrom tidyr pivot_longer
 #' @export
 get_R_theta <- function(cleaned_summary, ind.names, sd.normalization = TRUE, atan = FALSE){
   R_all <- cleaned_summary$A_probes[,-1] + cleaned_summary$B_probes[,-1]
@@ -35,7 +36,7 @@ get_R_theta <- function(cleaned_summary, ind.names, sd.normalization = TRUE, ata
   }
 
   probes_names <-  cleaned_summary$A_probes[,1]
-  probes_names <- gsub("-A","", as.vector(probes_names$probeset_id))
+  probes_names <- gsub("-A","", probes_names)
 
   R_all <- cbind(MarkerName = probes_names, R_all)
   theta_all <- cbind(MarkerName = probes_names, theta_all)

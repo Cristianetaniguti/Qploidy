@@ -22,7 +22,8 @@ get_logR <- function(theta_subject, R_subject, centers_theta, mod, ploidy){
     }
   }
   R_expected <- unlist(R_expected)
-  logR <- log(R_subject/R_expected, base = 2)
+  #logR <- log((R_subject)/(R_expected), base = 2)
+  logR <- log((R_subject+10)/(R_expected+10), base = 2) # avoiding negative number because of the z score normalization
   return(logR)
 }
 
@@ -151,7 +152,7 @@ plot_one_marker <- function(scores_temp, ploidy){
   scores_temp$geno <- as.factor(scores_temp$geno)
 
   centers <- lapply(plot_data_split, function(x) apply(x[,3:4], 2, mean))
-  if(length(centers) != ploidy + 1 | any(sapply(plot_data_split, nrow) < 3)) {
+  if(length(centers) != ploidy + 1 | any(sapply(plot_data_split, nrow) < 2)) {
 
     p <- ggplot(scores_temp, aes(x=theta, y=R, color = geno))  +
       geom_point() + ggtitle(paste0("Marker:", unique(scores_temp$mks))) + theme_bw()

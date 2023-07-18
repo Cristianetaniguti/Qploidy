@@ -20,7 +20,7 @@ testServer(
     session$setInputs(load_summary = list(datapath = system.file("summary_example.txt", package = "Qploidy")),
                       load_ind_names = list(datapath = system.file("ind.names_example.txt", package = "Qploidy")),
                       load_geno_pos = list(datapath = system.file("geno.pos_example.txt", package = "Qploidy")),
-                      fitpoly_scores = list(datapath = system.file("fitpoly_out_306_scores.txt", package = "Qploidy")),
+                      fitpoly_scores = list(datapath = system.file("tetraploids_refs_sub_z_models.dat", package = "Qploidy")),
                       load_baf = list(datapath = system.file("baf_sub_roses_texas.txt", package = "Qploidy")),
                       load_logR = list(datapath = system.file("logR_sub_roses_texas.txt", package = "Qploidy")),
                       refs = paste0("Tetra_", 1:50),
@@ -65,9 +65,9 @@ testServer(
     #                  ncores=1)
 
     # After fitpoly
-    input$fitpoly_scores$datapath <- system.file("tetraploids_refs_z_scores.dat", package = "Qploidy")
+    input$fitpoly_scores$datapath <- system.file("tetraploids_refs_sub_z_scores.dat", package = "Qploidy")
     scores <- vroom(input$fitpoly_scores$datapath)
-    expect_equal(sum(scores$geno, na.rm = TRUE), 203403)
+    expect_equal(sum(scores$geno, na.rm = TRUE), 203516)
 
     # Filters
     n.na <- scores %>% group_by(MarkerName) %>% summarize(n.na = (sum(is.na(geno))/length(geno))*100)
@@ -76,9 +76,9 @@ testServer(
     scores_filt <- scores[-which(scores$MarkerName %in% rm.mks),]
 
     keep.mks <- match(paste0(scores_filt$MarkerName, "_",scores_filt$SampleName),
-                      paste0(fitpoly_input_sele$MarkerName, "_", fitpoly_input_sele$SampleName))
+                      paste0(fitpoly_input$MarkerName, "_", fitpoly_input$SampleName))
 
-    fitpoly_input_filt <- fitpoly_input_sele[keep.mks,]
+    fitpoly_input_filt <- fitpoly_input[keep.mks,]
     theta <- fitpoly_input_filt$ratio
     R <- fitpoly_input_filt$R
 
@@ -98,18 +98,14 @@ testServer(
 
     # Generate clusters
     library(parallel)
+    ploidy <- input$ploidy
     clust <- makeCluster(input$n.cores)
-    clusterExport(clust, c("par_fitpoly_interpolation", "input"))
+    clusterExport(clust, c("par_fitpoly_interpolation", "ploidy"))
     clusters <- parLapply(clust, lst_interpolation, function(x) {
       library(ggplot2)
-      par_fitpoly_interpolation(x, ploidy= input$ploidy, plot = FALSE)
+      par_fitpoly_interpolation(x, ploidy= ploidy, plot = FALSE)
     })
     stopCluster(clust)
-
-    # Plot markers interpolation
-    p <- plot_one_marker(lst_interpolation[[50]], ploidy = 4)
-    # Discarded marker:
-    p <- plot_one_marker(lst_interpolation[[1]], ploidy = 4)
 
     # Filter by number of clusters
     rm.mks <- sapply(clusters, function(x) is.null(x$mod))
@@ -126,7 +122,15 @@ testServer(
     expect_equal(c(nrow(cleaned_summary[[1]]),
                    missing.data,
                    wrong_n_clusters,
-                   length(clusters_filt)), c(2379, 484, 1824, 71))
+                   length(clusters_filt)), c(2379, 293, 1347, 727))
+
+    mks <- names(clusters)
+    mks[which(rm.mks)] <- paste(mks[which(rm.mks)], "(discarded)")
+    # Plot markers interpolation
+    p <- plot_one_marker(lst_interpolation[[1]], ploidy = 4)
+    # Discarded marker:
+    p <- plot_one_marker(lst_interpolation[[2]], ploidy = 4)
+
 
     keep.mks <- names(clusters_filt)
     # Getting logR and BAF for entire dataset
@@ -149,9 +153,9 @@ testServer(
     }
 
     clust <- makeCluster(input$n.cores)
-    clusterExport(clust, c("get_logR", "get_logR_par", "input"))
+    clusterExport(clust, c("get_logR", "get_logR_par", "ploidy"))
     logRs_diplo <- parLapply(clust, par_all, function(x) {
-      get_logR_par(x, ploidy = input$ploidy)
+      get_logR_par(x, ploidy = ploidy)
     })
     stopCluster(clust)
 
@@ -162,9 +166,9 @@ testServer(
 
     # Get BAF
     clust <- makeCluster(input$n.cores)
-    clusterExport(clust, c("get_baf", "get_baf_par", "input"))
+    clusterExport(clust, c("get_baf", "get_baf_par", "ploidy"))
     bafs_diplo <- parLapply(clust, par_all, function(x) {
-      get_baf_par(x, ploidy = input$ploidy)
+      get_baf_par(x, ploidy = ploidy)
     })
     stopCluster(clust)
 
@@ -175,8 +179,8 @@ testServer(
     bafs_diplo_df <- as.data.frame(bafs_diplo_m)
     bafs_diplo_df <- cbind(mks=rownames(bafs_diplo_df), bafs_diplo_df)
 
-    expect_equal(sum(bafs_diplo_df[,-1]), 2628.072)
-    expect_equal(round(sum(logRs_diplod_m[,-1]),0), -921)
+    expect_equal(sum(bafs_diplo_df[,-1]), 25315.016)
+    expect_equal(round(sum(logRs_diplod_m[,-1]),0), 1819)
 
     vroom_write(bafs_diplo_df, file = "baf.example.txt")
     vroom_write(logRs_diplod_m, file = "logR.example.txt")

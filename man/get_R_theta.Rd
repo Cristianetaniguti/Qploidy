@@ -4,7 +4,7 @@
 \alias{get_R_theta}
 \title{Get R and theta values from summary file with option to do standard normalization by plate and markers}
 \usage{
-get_R_theta(cleaned_summary, ind.names, sd.normalization = TRUE, atan = FALSE)
+get_R_theta(cleaned_summary, ind.names, sd.normalization = FALSE, atan = FALSE)
 }
 \arguments{
 \item{cleaned_summary}{summary object from clean_summary function. List with A and B intensities.}

@@ -105,6 +105,9 @@ app_ui <- function(request) {
                               tabPanel("All individuals",
                                        mod_all_ui("all_1")
                               ),
+                              tabPanel("Compare",
+                                       mod_compare_ui("compare_1")
+                              ),
                               tabPanel("Single individual",
                                        mod_single_ui("single_1")
                               )

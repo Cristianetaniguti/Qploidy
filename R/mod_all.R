@@ -11,6 +11,13 @@ mod_all_ui <- function(id){
   ns <- NS(id)
   tagList(
     sidebarPanel(
+      fileInput(ns("load_logR"), label = "File input"),
+      fileInput(ns("load_baf"), label = "File input"),
+      radioButtons(ns("example_data"), label = "Choose example data set",
+                   choices = c("Roses Texas" = "roses_texas",
+                               "Roses France" = "roses_france",
+                               "Potatoes Texas" = "potatoes"),
+                   selected = "roses_texas"),
       sliderInput(ns("ploidys"), label = "select ploidy", min = 2, max = 8, value = c(2,5), step = 1),
       numericInput(ns("area"), label = "Total area", value = 0.75, step = 0.1),
       numericInput(ns("filter_diff"), label = "Minimum filter difference", value = 0, step = 0.01),
@@ -91,8 +98,45 @@ mod_all_ui <- function(id){
 #' all Server Functions
 #'
 #' @noRd
-mod_all_server <- function(input, output, session, data, parent_session){
+mod_all_server <- function(id){
+  moduleServer(id, function(input, output, session){
     ns <- session$ns
+
+    input_logR_baf <- reactive({
+      if(!is.null(input$load_logR) & !is.null(input$load_baf)){
+        logR <- vroom(input$load_logR$datapath)
+        baf <- vroom(input$load_baf$datapath)
+
+        return(list(logR, baf))
+      } else {
+        return(NULL)
+      }
+    })
+
+    loadExample <- reactive({
+      if(is.null(input_summary())){
+        if(input$example_data == "roses_texas"){
+          logR <- vroom(system.file("logR.example.txt", package = "Qploidy"))
+          baf <- vroom(system.file("baf.example.txt", package = "Qploidy"))
+          return(result)
+        } else if(input$example_data == "roses_france"){
+          cat("Developing")
+        } else if(input$example_data == "potatoes") {
+          cat("Developing")
+        }
+      } else {
+        return(NULL)
+      }
+    })
+
+    summary <- reactive({
+      if(is.null(input_summary())){
+        summary_df <- loadExample()
+      } else {
+        summary_df <- input_summary()
+      }
+      return(summary_df)
+    })
 
     observe({
       choices_names <- as.list(unique(colnames(data()[[1]])[-c(1:3)]))
@@ -538,6 +582,7 @@ mod_all_server <- function(input, output, session, data, parent_session){
         write.csv(est.ploidy.chr_plots()[[6]], file = file)
       }
     )
+  })
 }
 
 ## To be copied in the UI

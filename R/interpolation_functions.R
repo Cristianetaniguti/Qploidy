@@ -22,8 +22,8 @@ get_logR <- function(theta_subject, R_subject, centers_theta, mod, ploidy){
     }
   }
   R_expected <- unlist(R_expected)
-  #logR <- log((R_subject)/(R_expected), base = 2)
-  logR <- log((R_subject+10)/(R_expected+10), base = 2) # avoiding negative number because of the z score normalization
+  logR <- log((R_subject)/(R_expected), base = 2)
+  #logR <- log((R_subject+100)/(R_expected+100), base = 2) # avoiding negative number because of the z score normalization
   return(logR)
 }
 

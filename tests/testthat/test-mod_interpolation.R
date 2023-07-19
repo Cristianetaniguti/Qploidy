@@ -75,8 +75,8 @@ testServer(
     missing.data <- length(rm.mks)
     scores_filt <- scores[-which(scores$MarkerName %in% rm.mks),]
 
-    keep.mks <- match(paste0(scores_filt$MarkerName, "_",scores_filt$SampleName),
-                      paste0(fitpoly_input$MarkerName, "_", fitpoly_input$SampleName))
+    keep.mks <- which(fitpoly_input$MarkerName %in% scores_filt$MarkerName &
+                         fitpoly_input$SampleName %in% scores_filt$SampleName)
 
     fitpoly_input_filt <- fitpoly_input[keep.mks,]
     theta <- fitpoly_input_filt$ratio
@@ -182,14 +182,18 @@ testServer(
     expect_equal(sum(bafs_diplo_df[,-1]), 25315.016)
     expect_equal(round(sum(logRs_diplod_m[,-1]),0), 1819)
 
-    vroom_write(bafs_diplo_df, file = "baf.example.txt")
-    vroom_write(logRs_diplod_m, file = "logR.example.txt")
-
     # geno.pos <- vroom(input$load_geno_pos$datapath)
-    # geno.pos <- as.data.frame(geno.pos)
-    #
-    # new.id <- paste0(geno.pos[,2], "_", geno.pos[,3])
-    # fitpoly_input$MarkerName <- geno.pos[match(fitpoly_input$MarkerName, geno.pos[,1]),]
+    geno.pos <- vroom(system.file("geno.pos_example.txt", package = "Qploidy"))
+
+    chr <- geno.pos$Chr[match(bafs_diplo_df$mks,geno.pos$Name)]
+    pos <- geno.pos$Position[match(bafs_diplo_df$mks,geno.pos$Name)]
+
+    baf <- cbind(Name=bafs_diplo_df$mks, Chr = chr, Position = pos, bafs_diplo_df[,-1])
+    logR <- cbind(Name=logRs_diplod_m$mks, Chr = chr, Position = pos, logRs_diplod_m[,-1])
+
+    vroom_write(baf, file = "baf.example.txt")
+    vroom_write(logR, file = "logR.example.txt")
+
   })
 
 test_that("module ui works", {

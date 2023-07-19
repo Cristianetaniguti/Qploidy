@@ -30,11 +30,11 @@ clean_summary <- function(summary_df){
 #'
 #' @export
 get_R_theta <- function(cleaned_summary, ind.names, sd.normalization = TRUE, atan = FALSE){
-  R_all <- cleaned_summary$A_probes[,-1] + cleaned_summary$B_probes[,-1]
+  R_all <- as.data.frame(cleaned_summary$A_probes[,-1] + cleaned_summary$B_probes[,-1])
   if(atan){
     theta_all <- as.data.frame((atan2(as.matrix(cleaned_summary$B_probes[,-1]), as.matrix(cleaned_summary$A_probes[,-1])))/(pi/2))
   }  else {
-    theta_all <- cleaned_summary$B_probes[,-1]/(cleaned_summary$B_probes[,-1] + cleaned_summary$A_probes[,-1])
+    theta_all <- as.data.frame(cleaned_summary$B_probes[,-1]/(cleaned_summary$B_probes[,-1] + cleaned_summary$A_probes[,-1]))
   }
 
   probes_names <-  cleaned_summary$A_probes[,1]

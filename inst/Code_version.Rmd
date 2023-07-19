@@ -35,13 +35,16 @@ theta_all <- R_theta[[2]]
 
 fitpoly_input <- summary_to_fitpoly(R_all, theta_all)
 
-fitpoly_input_sele <- vroom("fitpoly_input_refs_roses_texas.txt")
+refs <- vroom("tetraploid_refs_roses_texas.txt", delim = "\t")
+refs$sample_name
+
+fitpoly_input_sele <- fitpoly_input[which(fitpoly_input$SampleName %in% refs$sample_name),]
 
 saveMarkerModels(ploidy=4,
                  data=fitpoly_input_sele,
                  p.threshold=0.9,
                  filePrefix="fitpoly_out_roses_texas",
-                 ncores=30)
+                 ncores=20)
 
 
 scores <- vroom("fitpoly_out_roses_texas_scores.dat")
@@ -152,9 +155,22 @@ colnames(bafs_diplo_m) <- colnames(logRs_diplod_m)[-1]
 bafs_diplo_df <- as.data.frame(bafs_diplo_m)
 bafs_diplo_df <- cbind(mks=rownames(bafs_diplo_df), bafs_diplo_df)
 
-vroom_write(bafs_diplo_df, file = "baf_roses_texas.txt")
-vroom_write(logRs_diplod_m, file = "logR_roses_texas.txt")
+# Add chr and pos info
+geno.pos <- vroom("geno.pos_roses_texas.txt")
 
+chr <- geno.pos$chr[match(bafs_diplo_df$mks,geno.pos$probes)]
+pos <- geno.pos$pos[match(bafs_diplo_df$mks,geno.pos$probes)]
+
+baf <- cbind(Name=bafs_diplo_df$mks, Chr = chr, Position = pos, bafs_diplo_df[,-1])
+logR <- cbind(Name=logRs_diplod_m$mks, Chr = chr, Position = pos, logRs_diplod_m[,-1])
+
+sum(is.nan(logR[,-c(1:3)]))
+
+baf <- baf[-which(is.na(baf$Chr) | baf$Chr == "0"),]
+logR <- logR[-which(is.na(logR$Chr)| baf$Chr == "0"),]
+
+vroom_write(baf, file = "baf_roses_texas.txt")
+vroom_write(logR, file = "logR_roses_texas.txt")
 
 ```
 

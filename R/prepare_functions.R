@@ -29,7 +29,7 @@ clean_summary <- function(summary_df){
 #' @importFrom dplyr mutate
 #'
 #' @export
-get_R_theta <- function(cleaned_summary, ind.names, sd.normalization = TRUE, atan = FALSE){
+get_R_theta <- function(cleaned_summary, ind.names, sd.normalization = FALSE, atan = FALSE){
   R_all <- as.data.frame(cleaned_summary$A_probes[,-1] + cleaned_summary$B_probes[,-1])
   if(atan){
     theta_all <- as.data.frame((atan2(as.matrix(cleaned_summary$B_probes[,-1]), as.matrix(cleaned_summary$A_probes[,-1])))/(pi/2))

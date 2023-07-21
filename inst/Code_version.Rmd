@@ -28,7 +28,7 @@ cleaned_summary <- clean_summary(summary_df = summary)
 
 ind.names <- vroom("ind.names_roses_texas.txt")
 
-R_theta <- get_R_theta(cleaned_summary, ind.names)
+R_theta <- get_R_theta(cleaned_summary, ind.names, sd.normalization = FALSE)
 
 R_all <- R_theta[[1]]
 theta_all <- R_theta[[2]]
@@ -43,7 +43,7 @@ fitpoly_input_sele <- fitpoly_input[which(fitpoly_input$SampleName %in% refs$sam
 saveMarkerModels(ploidy=4,
                  data=fitpoly_input_sele,
                  p.threshold=0.9,
-                 filePrefix="fitpoly_out_roses_texas",
+                 filePrefix="fitpoly_out_roses_texas2",
                  ncores=20)
 
 
@@ -104,14 +104,13 @@ colnames(filtered.markers) <- c("n.mk.start", "missing.data", "wrong_n_clusters"
 mks <- names(clusters)
 mks[which(rm.mks)] <- paste(mks[which(rm.mks)], "(discarded)")
 # Plot markers interpolation
-p <- plot_one_marker(lst_interpolation[[11]], ploidy = 4)
+p <- plot_one_marker(lst_interpolation[[1]], ploidy = 4)
 p
 
 keep.mks <- names(clusters_filt)
 # Getting logR and BAF for entire dataset
 R_filt <- R_all[match(keep.mks, R_all$MarkerName),]
 theta_filt <- theta_all[match(keep.mks, theta_all$MarkerName),]
-
 
 n.cores <- 20
 par <- rep(1:n.cores, each=round((nrow(R_filt)/n.cores)+1,0))[1:nrow(R_filt)]
@@ -156,7 +155,7 @@ bafs_diplo_df <- as.data.frame(bafs_diplo_m)
 bafs_diplo_df <- cbind(mks=rownames(bafs_diplo_df), bafs_diplo_df)
 
 # Add chr and pos info
-geno.pos <- vroom("geno.pos_roses_texas.txt")
+geno.pos <- vroom("geno.pos_roses_texas2.txt")
 
 chr <- geno.pos$chr[match(bafs_diplo_df$mks,geno.pos$probes)]
 pos <- geno.pos$pos[match(bafs_diplo_df$mks,geno.pos$probes)]
@@ -164,10 +163,10 @@ pos <- geno.pos$pos[match(bafs_diplo_df$mks,geno.pos$probes)]
 baf <- cbind(Name=bafs_diplo_df$mks, Chr = chr, Position = pos, bafs_diplo_df[,-1])
 logR <- cbind(Name=logRs_diplod_m$mks, Chr = chr, Position = pos, logRs_diplod_m[,-1])
 
-sum(is.nan(logR[,-c(1:3)]))
+sum(is.nan(as.matrix(logR[,-c(1:3)])))
 
 baf <- baf[-which(is.na(baf$Chr) | baf$Chr == "0"),]
-logR <- logR[-which(is.na(logR$Chr)| baf$Chr == "0"),]
+logR <- logR[-which(is.na(logR$Chr)| logR$Chr == "0"),]
 
 vroom_write(baf, file = "baf_roses_texas.txt")
 vroom_write(logR, file = "logR_roses_texas.txt")

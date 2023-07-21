@@ -101,19 +101,10 @@ app_ui <- function(request) {
                    tabPanel("Step 1 - data interpolation",
                             mod_interpolation_ui("interpolation_1")
                    ),
-                   navbarMenu("Step 2 - ploidy estimation",
-                              tabPanel("All individuals",
-                                       mod_all_ui("all_1")
-                              ),
-                              tabPanel("Compare",
-                                       mod_compare_ui("compare_1")
-                              ),
-                              tabPanel("Single individual",
-                                       mod_single_ui("single_1")
-                              )
-                   )
-
-        ),
+                   tabPanel("Step 2 - ploidy estimation",
+                            mod_all_ui("all_1")
+                            )
+        )
       )
     )
   )

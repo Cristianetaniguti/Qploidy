@@ -6,6 +6,13 @@
 \usage{
 area_estimate_ploidy_by_chr(data_sample, ploidys, area)
 }
+\arguments{
+\item{data_sample}{data.frame with BAF values and genomic position information}
+
+\item{ploidys}{range of ploidies to by tested}
+
+\item{area}{area around the expected peak to be considered}
+}
 \description{
 Estimate ploidy using area method
 }

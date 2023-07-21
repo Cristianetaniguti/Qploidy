@@ -10,9 +10,4 @@ app_server <- function(input, output, session) {
   mod_interpolation_server("interpolation_1")
 
   mod_all_server("all_1")
-
-  #
-  # callModule(mod_single_server,
-  #            "single_ui_1",
-  #            parent_session = session)
 }

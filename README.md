@@ -7,7 +7,7 @@
 
 <!-- badges: end -->
 
-The goal of Qploidy is to …
+The goal of Qploidy is to perform ploidy and aneuploid estimation using data from Axiom and Illumina array genotyping platforms. The package has a shiny interface to facilitate and provide graphics visualization of the two steps: i) Interpolation; ii) Ploidy estimation. 
 
 ## Installation
 
@@ -20,9 +20,15 @@ devtools::install_github("cristianetaniguti/Qploidy")
 
 ## How to use
 
+You can use Qploidy using its graphical interface by:
+
 ``` r
 library(Qploidy)
 run_app()
 ```
+
+Or you can also use its functions individually. Access furthers instructions for that in its tutorial:
+
+* [Interpolation and ploidy estimation - code version]()
 
 

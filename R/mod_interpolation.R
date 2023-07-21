@@ -31,10 +31,11 @@ mod_interpolation_ui <- function(id){
              ),
              box(width= 12, solidHeader = FALSE, collapsible = TRUE, collapsed = FALSE,  status="primary", title = "Or choose an example dataset", label = tags$b("Or choose an example dataset"),
                  radioButtons(ns("example_data"), label = "Choose example data set",
-                              choices = c("Roses Texas" = "roses_texas",
+                              choices = c("Example data" = "example_data",
+                                          "Roses Texas" = "roses_texas",
                                           "Roses France" = "roses_france",
                                           "Potatoes Texas" = "potatoes"),
-                              selected = "roses_texas")
+                              selected = "example_data")
              )
       ),
 
@@ -121,8 +122,8 @@ mod_interpolation_server <- function(id){
 
     input_summary <- reactive({
       if(!is.null(input$load_summary)){
-        summary <- vroom(input$load_summary$datapath)
-        ind.names <- vroom(input$load_ind_names$datapath)
+        summary <- vroom(input$load_summary$datapath, show_col_types = FALSE)
+        ind.names <- vroom(input$load_ind_names$datapath, show_col_types = FALSE)
 
         cleaned_summary <- clean_summary(summary_df = summary)
 
@@ -140,9 +141,9 @@ mod_interpolation_server <- function(id){
 
     loadExample <- reactive({
       if(is.null(input_summary())){
-        if(input$example_data == "roses_texas"){
-          summary <- vroom(system.file("summary_example.txt", package = "Qploidy"))
-          ind.names <- vroom(system.file("ind.names_example.txt", package = "Qploidy"))
+        if(input$example_data == "example_data"){
+          summary <- vroom(system.file("summary_example.txt", package = "Qploidy"), show_col_types = FALSE)
+          ind.names <- vroom(system.file("ind.names_example.txt", package = "Qploidy"), show_col_types = FALSE)
 
           cleaned_summary <- clean_summary(summary_df = summary)
 
@@ -152,6 +153,8 @@ mod_interpolation_server <- function(id){
           fitpoly_input <- summary_to_fitpoly(R_all, theta_all)
           result <- list(fitpoly_input=fitpoly_input, R_all=R_all, theta_all=theta_all)
           return(result)
+        } else if(input$example_data == "roses_texas"){
+          cat("Developing")
         } else if(input$example_data == "roses_france"){
           cat("Developing")
         } else if(input$example_data == "potatoes") {
@@ -201,9 +204,9 @@ mod_interpolation_server <- function(id){
 
     fitpoly_scores <- reactive({
       if(is.null(input$load_scores)){
-        scores <- vroom(system.file("tetraploids_refs_sub_z_scores.dat", package = "Qploidy"))
+        scores <- vroom(system.file("tetraploids_refs_sub_z_scores.dat", package = "Qploidy"), show_col_types = FALSE)
       } else {
-        scores <- vroom(input$load_scores$datapath)
+        scores <- vroom(input$load_scores$datapath, show_col_types = FALSE)
       }
       scores
     })
@@ -243,7 +246,6 @@ mod_interpolation_server <- function(id){
       clust <- makeCluster(input$n.cores)
       clusterExport(clust, c("par_fitpoly_interpolation"))
       clusters <- parLapply(clust, lst_interpolation()[[1]], function(x) {
-        library(ggplot2)
         par_fitpoly_interpolation(x, ploidy= ploidy_r , plot = FALSE)
       })
       stopCluster(clust)

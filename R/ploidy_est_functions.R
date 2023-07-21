@@ -1,6 +1,10 @@
 
 #' Estimate ploidy using area method
 #'
+#' @param data_sample data.frame with BAF values and genomic position information
+#' @param ploidys range of ploidies to by tested
+#' @param area area around the expected peak to be considered
+#'
 #' @export
 area_estimate_ploidy_by_chr <- function(data_sample, ploidys, area){
 
@@ -127,35 +131,70 @@ area_estimate_ploidy_by_chr <- function(data_sample, ploidys, area){
   return(est.ploidy.chr_df)
 }
 
+#' Generate plots for overall analysis
+#'
+#' @param est.ploidy.chr_df list of data.frames with ploidy estimation information
+#' @param filter_diff filter by difference on area proportion between first and second place
+#' @param filter_corr filter by correlation of observed and expected peak position
 #'
 #' @import tidyr
 #' @import dplyr
+#' @importFrom reshape2 melt
+#' @import ggplot2
 #' @importFrom ggpubr ggarrange
+#'
 #' @export
 plots_overall <- function(est.ploidy.chr_df, filter_diff=0, filter_corr=0){
   idx <- which(apply(est.ploidy.chr_df[[1]], 1, function(x) length(unique(x)) > 1))
   if(length(idx) > 0){
-    euploids <- list()
-    for(i in 1:length(est.ploidy.chr_df)){
-      euploids[[i]] <- est.ploidy.chr_df[[i]][-idx,]
+    ploidies <- est.ploidy.chr_df[[1]][-idx,]
+    if(is.null(dim(ploidies))) { # If only one individual
+      ploidies <- t(ploidies)
+      rownames(ploidies) <- rownames(est.ploidy.chr_df[[1]])[-idx]
     }
-
+    ploidies.prop <- est.ploidy.chr_df[[2]][-idx,]
+    if(is.null(dim(ploidies.prop))) { # If only one individual
+      ploidies.prop <- t(ploidies.prop)
+      rownames(ploidies.prop) <- rownames(est.ploidy.chr_df[[1]])[-idx]
+    }
+    ploidies.sd <- est.ploidy.chr_df[[4]][-idx,]
+    if(is.null(dim(ploidies.sd))) { # If only one individual
+      ploidies.sd <- t(ploidies.sd)
+      rownames(ploidies.sd) <- rownames(est.ploidy.chr_df[[1]])[-idx]
+    }
+    ploidies.corr <- est.ploidy.chr_df[[5]][-idx,]
+    if(is.null(dim(ploidies.corr))) { # If only one individual
+      ploidies.corr <- t(ploidies.corr)
+      rownames(ploidies.corr) <- rownames(est.ploidy.chr_df[[1]])[-idx]
+    }
+    ploidies.diff <- est.ploidy.chr_df[[3]][-idx,]
+    if(is.null(dim(ploidies.diff))) { # If only one individual
+      ploidies.diff <- t(ploidies.diff)
+      rownames(ploidies.diff) <- rownames(est.ploidy.chr_df[[1]])[-idx]
+    }
     # Graphics using only area method and aneuploidy individuals
-    data.names <- c("ploidy", "prop", "diff", "sd", "corr")
-    aneuploids <- list()
-    for(i in 1:length(est.ploidy.chr_df[-1])){
-      if(length(idx) > 1){
-        aneuploids_temp <- data.frame(ind = rownames(est.ploidy.chr_df[[i]][idx,]), est.ploidy.chr_df[[i]][idx,])
-      } else {
-        aneuploids_temp <- data.frame(ind = names(idx), t(est.ploidy.chr_df[[i]][idx,]))
-      }
-      aneuploids[[i]] <- pivot_longer(aneuploids_temp, cols = 2:ncol(aneuploids_temp), values_to = data.names[i])
-    }
+    aneuploids <- est.ploidy.chr_df[[1]][idx,]
+    aneuploids.prop <- est.ploidy.chr_df[[2]][idx,]
+    aneuploids.sd <- est.ploidy.chr_df[[4]][idx,]
+    aneuploids.corr <- est.ploidy.chr_df[[5]][idx,]
+    aneuploids.diff <- est.ploidy.chr_df[[3]][idx,]
 
-    names(aneuploids) <- data.names
+    if(is.vector(aneuploids)){
+      aneuploids <- data.frame(Var1 = rownames(est.ploidy.chr_df[[1]])[idx], Var2=names(aneuploids),melt(aneuploids, value.name = "ploidy"))
+      aneuploids.prop <- data.frame(Var1 = rownames(est.ploidy.chr_df[[1]])[idx], Var2=names(aneuploids.prop),melt(aneuploids.prop, value.name = "prop"))
+      aneuploids.sd <- data.frame(Var1 = rownames(est.ploidy.chr_df[[1]])[idx], Var2=names(aneuploids.sd),melt(aneuploids.sd, value.name = "sd"))
+      aneuploids.corr <- data.frame(Var1 = rownames(est.ploidy.chr_df[[1]])[idx], Var2=names(aneuploids.corr),melt(aneuploids.corr, value.name = "corr"))
+      aneuploids.diff <- data.frame(Var1 = rownames(est.ploidy.chr_df[[1]])[idx], Var2=names(aneuploids.diff),melt(aneuploids.diff, value.name = "diff"))
+    } else {
+      aneuploids <- melt(aneuploids, value.name = "ploidy")
+      aneuploids.prop <- melt(aneuploids.prop, value.name = "prop")
+      aneuploids.sd <- melt(aneuploids.sd, value.name = "sd")
+      aneuploids.corr <- melt(aneuploids.corr, value.name = "corr")
+      aneuploids.diff <- melt(aneuploids.diff, value.name = "diff")
+    }
 
     # Aneuploid table and samples list
-    main_ploidy <- aneuploids[[1]] %>% group_by(ind) %>% mutate(main_ploidy = mode(ploidy))
+    main_ploidy <- aneuploids %>% group_by(Var1) %>% mutate(main_ploidy = mode(ploidy))
 
     aneuploidy_df <- main_ploidy[-which(main_ploidy$ploidy == main_ploidy$main_ploidy),]
     colnames(aneuploidy_df) <- c("sample", "chromosome", "aneuploidy_ploidy", "main_ploidy")
@@ -163,27 +202,24 @@ plots_overall <- function(est.ploidy.chr_df, filter_diff=0, filter_corr=0){
     aneuploidy_list <- aneuploidy_list[order(aneuploidy_list$main_ploidy, aneuploidy_list$aneuploidy_ploidy, aneuploidy_list$chromosome),]
     aneuploid_text <- paste0("<br/>Main ploidy - ", aneuploidy_list$main_ploidy, "; ploidy - ", aneuploidy_list$aneuploidy_ploidy, "; in chromosome - ", aneuploidy_list$chromosome,":<br/>", aneuploidy_list$samples)
 
-    aneuploidy_all_weird <- unique(c(as.character(aneuploids$corr$ind)[which(aneuploids$corr$corr < filter_corr)],
-                                     as.character(aneuploids$diff$ind)[which(aneuploids$diff$diff < filter_diff)]))
+    aneuploidy_all_weird <- unique(c(as.character(aneuploids.corr$Var1)[which(aneuploids.corr$corr < filter_corr)],
+                                     as.character(aneuploids.diff$Var1)[which(aneuploids.diff$diff < filter_diff)]))
 
     if(length(aneuploidy_all_weird) == 0) aneuploidy_all_weird <- "Set filters"
 
     # Graphics
-    count <- table(aneuploids$ploidy$ploidy)
-    df_n <- data.frame(names(count), as.vector(count))
-    colnames(df_n) <- c("ploidy", "#individuals*#chrom")
-
+    df_n <- melt(table(aneuploids$ploidy), varnames = "ploidy", value.name = "#individuals*#chrom")
     df_n$ploidy <- as.factor(df_n$ploidy)
     p1 <- ggplot(df_n, aes(x = ploidy, y=`#individuals*#chrom`, fill =ploidy)) +
       geom_bar(stat="identity") +
       theme_bw()
 
-    df <- merge(aneuploids[[1]], aneuploids$prop, by = c(1,2))
-    df <- merge(df, aneuploids$sd, by = c(1,2))
-    df <- merge(df, aneuploids$corr, by = c(1,2))
-    df <- merge(df, aneuploids$diff, by = c(1,2))
+    df <- merge(aneuploids, aneuploids.prop, by = c(1,2))
+    df <- merge(df, aneuploids.sd, by = c(1,2))
+    df <- merge(df, aneuploids.corr, by = c(1,2))
+    df <- merge(df, aneuploids.diff, by = c(1,2))
 
-    df <- pivot_longer(df, cols = 4:7, names_to = "variable")
+    df <- melt(df, id.vars = c("ploidy", "Var1", "Var2"))
 
     df$variable <- gsub("sd", "standard deviation", df$variable)
     df$variable <- gsub("prop", "proportion in area", df$variable)
@@ -198,19 +234,39 @@ plots_overall <- function(est.ploidy.chr_df, filter_diff=0, filter_corr=0){
 
     p_aneuploids <- ggarrange(p1, p2, common.legend = T)
 
-    df <- as.data.frame(table(data.frame(chr=aneuploids[[1]]$name, ploidy = aneuploids[[1]]$ploidy)))
+    df <- as.data.frame(table(data.frame(chr=aneuploids$Var2, ploidy = aneuploids$ploidy)))
     df <- df %>% group_by(chr, ploidy) %>% summarise(Freq_all = sum(Freq))
     p_aneuploids2 <- ggplot(df, aes(chr,ploidy)) +
       geom_tile(aes(fill = Freq_all)) +
       geom_text(aes(label=Freq_all)) +
       scale_fill_gradient(low="white", high = "red")
 
-  } else { # parei aqui! Fazer para se nao tiver aneuploids
+  } else {
     ploidies <- est.ploidy.chr_df[[1]]
+    if(is.null(dim(ploidies))) { # If only one individual
+      ploidies <- t(ploidies)
+      rownames(ploidies) <- rownames(est.ploidy.chr_df[[1]])[-idx]
+    }
     ploidies.prop <- est.ploidy.chr_df[[2]]
+    if(is.null(dim(ploidies.prop))) { # If only one individual
+      ploidies.prop <- t(ploidies.prop)
+      rownames(ploidies.prop) <- rownames(est.ploidy.chr_df[[1]])[-idx]
+    }
     ploidies.sd <- est.ploidy.chr_df[[4]]
+    if(is.null(dim(ploidies.sd))) { # If only one individual
+      ploidies.sd <- t(ploidies.sd)
+      rownames(ploidies.sd) <- rownames(est.ploidy.chr_df[[1]])[-idx]
+    }
     ploidies.corr <- est.ploidy.chr_df[[5]]
+    if(is.null(dim(ploidies.corr))) { # If only one individual
+      ploidies.corr <- t(ploidies.corr)
+      rownames(ploidies.corr) <- rownames(est.ploidy.chr_df[[1]])[-idx]
+    }
     ploidies.diff <- est.ploidy.chr_df[[3]]
+    if(is.null(dim(ploidies.diff))) { # If only one individual
+      ploidies.diff <- t(ploidies.diff)
+      rownames(ploidies.diff) <- rownames(est.ploidy.chr_df[[1]])[-idx]
+    }
 
     p_aneuploids <- paste0("No aneuploid samples")
     p_aneuploids2 <- paste0("No aneuploid samples")
@@ -220,7 +276,12 @@ plots_overall <- function(est.ploidy.chr_df, filter_diff=0, filter_corr=0){
   }
 
   # Graphics using only area method and non-aneuploidy individuals
+  if(nrow(ploidies) < 2) {
+    ploidy_all_tex <- list(rownames(ploidies))
+    names(ploidy_all_tex) <- ploidies[,1]
+  } else {
   ploidy_all_tex <- split(names(ploidies[,1]), ploidies[,1])
+  }
   text_ploidy <- vector()
   for(i in 1:length(ploidy_all_tex)){
     line1 <- paste0("<br/>ploidy ",names(ploidy_all_tex)[i], ":<br/>")
@@ -271,10 +332,125 @@ plots_overall <- function(est.ploidy.chr_df, filter_diff=0, filter_corr=0){
   # Weird individuals
   # set filters
   # All
-  ploidy_all_weird <- unique(c(as.character(ploidies.corr$Var1)[which(ploidies.corr$corr < input$filter_corr)],
-                               as.character(ploidies.diff$Var1)[which(ploidies.diff$diff < input$filter_diff)]))
+  ploidy_all_weird <- unique(c(as.character(ploidies.corr$Var1)[which(ploidies.corr$corr < filter_corr)],
+                               as.character(ploidies.diff$Var1)[which(ploidies.diff$diff < filter_diff)]))
 
   if(length(ploidy_all_weird) == 0) ploidy_all_weird <- "Set filters"
 
-  list(p, p_aneuploids, p_aneuploids2, text_ploidy, aneuploid_text, aneuploidy_df, ploidy_all_weird, aneuploidy_all_weird)
+
+  list(p, p_aneuploids, p_aneuploids2, text_ploidy, aneuploid_text,
+       aneuploidy_df, ploidy_all_weird, aneuploidy_all_weird)
+}
+
+#' Plot BAF
+#'
+#' @param data_sample data.frame with BAF and genomic position information
+#' @param area_single area around the expected peak to be considered
+#' @param ploidy expected ploidy
+#' @param dot.size graphic dot size
+#' @param add_lines add expected peaks lines
+#' @param colors add area colors
+#'
+#' @export
+plot_baf <- function(data_sample, area_single, ploidy, dot.size, add_lines, colors){
+  ymin <- seq(0, 1, 1/ploidy) - (area_single/(ploidy*2))
+  ymax <- seq(0, 1, 1/ploidy) + (area_single/(ploidy*2))
+
+  ymin[which(ymin < 0)] <- 0
+  ymax[which(ymax > 1)] <- 1
+  rets <- data.frame(ymin, ymax, xmax = Inf, xmin = -Inf)
+
+  idx_tot <- FALSE
+  idx <- list()
+  for(i in 1:nrow(rets)){
+    idx <- data_sample$sample >= rets$ymin[i] & data_sample$sample <= rets$ymax[i]
+    idx_tot <- idx_tot | idx
+  }
+
+  data_sample$color <- NA
+  data_sample$color[which(!idx_tot)] <- "red"
+  data_sample$color[which(idx_tot)] <- "black"
+
+  p_baf <- data_sample %>% ggplot(aes(x=Position, y=sample)) +
+    {if(colors) geom_point(aes(color = color), alpha=0.7, size=dot.size) else geom_point(alpha=0.7, size=dot.size)} +
+    scale_color_manual(values = c("red", "black")) +
+    {if(add_lines) geom_rect(data = rets, inherit.aes=FALSE,
+                             aes(ymin=ymin,ymax=ymax,
+                                 xmax = xmax, xmin = xmin,
+                                 alpha=0.001, color = "red"))} +
+    ylab("BAF") +
+    facet_grid(~ Chr, scales = "free_x") + theme_bw() +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+          legend.position="none")
+  return(p_baf)
+}
+
+
+plot_baf_hist <- function(data_sample, area_single, ploidy, colors, add_lines){
+  ymin <- seq(0, 1, 1/ploidy) - (area_single/(ploidy*2))
+  ymax <- seq(0, 1, 1/ploidy) + (area_single/(ploidy*2))
+
+  ymin[which(ymin < 0)] <- 0
+  ymax[which(ymax > 1)] <- 1
+  rets <- data.frame(ymin, ymax, xmax = Inf, xmin = -Inf)
+
+  data_sample$color <- NA
+  data_sample$color[which(data_sample$color == "black")] <- "inside area"
+  data_sample$color[which(data_sample$color == "red")] <- "outside area"
+
+  modes.df2 <- list()
+  for(i in 1:nrow(rets)) {
+    split_data <- split(data_sample$sample, data_sample$Chr)
+    x <- split_data[[1]]
+    modes.df2[[i]] <- matrix(unlist(sapply(split_data, function(x){
+      estimated <- median(x[which(x > rets$ymin[i] & x < rets$ymax[i])])
+      expected <- seq(0, 1, 1/ploidy)[i]
+      return(data.frame(estimated, expected))
+    })), nrow = 2)
+    colnames(modes.df2[[i]]) <- names(split_data)
+    rownames(modes.df2[[i]]) <- c("modes estimated", "modes expected")
+  }
+
+  modes.df2 <- lapply(modes.df2, function(x) {
+    y <- t(x)
+    y <- data.frame(Chr=rownames(y), y)
+    pivot_longer(y, cols = 2:3)
+  })
+
+  modes.df2 <- do.call(rbind, modes.df2)
+  modes.df2$alpha <- modes.df2$name
+  modes.df2$alpha <- gsub("modes.expected", 1, modes.df2$alpha)
+  modes.df2$alpha <- as.numeric(gsub("modes.estimated", 0.5, modes.df2$alpha))
+
+  p_hist <- data_sample %>% ggplot(aes(x=sample)) +
+    {if(colors) geom_histogram(aes(fill = color)) else  geom_histogram()} +
+    scale_x_continuous(breaks = round(seq(0, 1, 1/ploidy),2)) +
+    {if(add_lines) geom_vline(data = modes.df2, aes(xintercept= value,
+                                                          color = name,
+                                                          linetype = name,
+                                                          alpha = alpha),
+                                    linewidth = 0.8)}+
+    {if(colors) scale_fill_manual(values = c("red", "black"))} +
+    scale_color_manual(values = c("blue", "purple")) +
+    scale_linetype_manual(values = c("dashed", "solid"), guide="none") +
+    scale_alpha(range = c(0.7, 1), guide="none") +
+    facet_grid(~ Chr, scales = "free_x") + theme_bw() +  xlab("BAF") +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+          legend.position="bottom") +
+    labs(color= "Peaks", fill = "Area")
+
+  p_hist_all <- data_sample %>% ggplot(aes(x=sample)) +
+    {if(colors) geom_histogram(aes(fill = color)) else  geom_histogram()} +
+    scale_x_continuous(breaks = round(seq(0, 1, 1/ploidy),2)) +
+    {if(colors) scale_fill_manual(values = c("red", "black"))} +
+    scale_color_manual(values = c("blue", "purple")) +
+    scale_linetype_manual(values = c("dashed", "solid"), guide="none") +
+    scale_alpha(range = c(0.7, 1), guide="none") +
+    theme_bw() +  xlab("BAF") +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+          legend.position="bottom") +
+    labs(color= "Peaks", fill = "Area")
+
+  p_hist <- ggarrange(p_hist_all, p_hist, widths = c(1,max(data_sample$Chr)-2))
+  return(p_hist)
 }

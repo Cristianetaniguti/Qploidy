@@ -170,7 +170,7 @@ get_probs_polyorigin <- function(df, f1.codes, ind = NULL, ploidy = 4, n.cores= 
   melt_df_lst <- split(melt_df, melt_df$ind)
 
   clust <- makeCluster(n.cores)
-  clusterExport(clust, c("get_probs_sing", "f1.codes", "ploidy", "pivot_longer"))
+  clusterExport(clust, c("get_probs_sing"))
   homoprob.lst <- parLapply(clust, melt_df_lst, function(x) get_probs_sing(melt_df = x,
                                                                            f1.codes = f1.codes,
                                                                            ploidy = ploidy))
@@ -188,6 +188,8 @@ get_probs_polyorigin <- function(df, f1.codes, ind = NULL, ploidy = 4, n.cores= 
 #' @param melt_df long format of the data.frame resulted from read_polyOrigin function
 #' @param f1.codes data.frame with polyOrigin stages codification
 #' @param ploidy integer defining the ploidy
+#'
+#' @importFrom tidyr pivot_longer
 #'
 #' @export
 get_probs_sing <- function(melt_df, f1.codes, ploidy){

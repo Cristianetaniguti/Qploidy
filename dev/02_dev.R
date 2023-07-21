@@ -24,6 +24,8 @@ golem::add_module(name = "upload", with_test = TRUE)
 golem::add_module(name = "interpolation", with_test = TRUE)
 golem::add_module(name = "all", with_test = TRUE)
 golem::add_module(name = "single", with_test = TRUE)
+golem::add_module(name = "compare", with_test = TRUE)
+
 
 ## Add helper functions ----
 ## Creates fct_* and utils_*

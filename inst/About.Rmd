@@ -1,29 +1,29 @@
 ---
-title: "About"
+title: "Qploidy"
 output: html_document
 date: "2023-07-05"
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+The goal of Qploidy is to perform ploidy and aneuploid estimation using data from Axiom and Illumina array genotyping platforms. The package has a shiny interface to facilitate and provide graphics visualization of the two steps: i) Interpolation; ii) Ploidy estimation. 
+
+## Installation
+
+You can install the development version of Qploidy like so:
+
+``` r
+#install.packages("devtools")
+devtools::install_github("cristianetaniguti/Qploidy")
 ```
 
-## R Markdown
+## How to use
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+You can use Qploidy using its graphical interface by:
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+``` r
+library(Qploidy)
+run_app()
 ```
 
-## Including Plots
+Or you can also use its functions individually. Access furthers instructions for that in its tutorial:
 
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
-```
-
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+* [Interpolation and ploidy estimation - code version]()

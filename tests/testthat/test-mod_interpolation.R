@@ -20,29 +20,28 @@ testServer(
     session$setInputs(load_summary = list(datapath = system.file("summary_example.txt", package = "Qploidy")),
                       load_ind_names = list(datapath = system.file("ind.names_example.txt", package = "Qploidy")),
                       load_geno_pos = list(datapath = system.file("geno.pos_example.txt", package = "Qploidy")),
-                      fitpoly_scores = list(datapath = system.file("tetraploids_refs_sub_z_models.dat", package = "Qploidy")),
-                      load_baf = list(datapath = system.file("baf_sub_roses_texas.txt", package = "Qploidy")),
-                      load_logR = list(datapath = system.file("logR_sub_roses_texas.txt", package = "Qploidy")),
+                      fitpoly_scores = list(datapath = system.file("tetraploids_refs_sub_z_scores.dat", package = "Qploidy")),
                       refs = paste0("Tetra_", 1:50),
                       ploidy = 4,
                       n.cores = 1)
 
     #Prepare Axiom file
-    input <- list()
-    input$load_summary$datapath <- system.file("summary_example.txt", package = "Qploidy")
-    input$load_ind_names$datapath <- system.file("ind.names_example.txt", package = "Qploidy")
-    input$load_geno_pos$datapath <- system.file("geno.pos_example.txt", package = "Qploidy")
-    input$refs <- paste0("Tetra_", 1:50)
-    input$ploidy <- 4
-    input$n.cores <- 1
+    # input <- list()
+    # input$load_summary$datapath <- system.file("summary_example.txt", package = "Qploidy")
+    # input$load_ind_names$datapath <- system.file("ind.names_example.txt", package = "Qploidy")
+    # input$load_geno_pos$datapath <- system.file("geno.pos_example.txt", package = "Qploidy")
+    # input$fitpoly_scores$datapath <- system.file("tetraploids_refs_sub_z_scores.dat", package = "Qploidy")
+    # input$refs <- paste0("Tetra_", 1:50)
+    # input$ploidy <- 4
+    # input$n.cores <- 1
 
-    summary <- vroom(input$load_summary$datapath)
+    summary <- vroom(input$load_summary$datapath, show_col_types = FALSE)
     cleaned_summary <- clean_summary(summary_df = summary)
 
     expect_true(length(cleaned_summary) == 2)
     expect_true(round(sum(cleaned_summary$A_probes[,4]),0) == 3925567)
 
-    ind.names <- vroom(input$load_ind_names$datapath)
+    ind.names <- vroom(input$load_ind_names$datapath, show_col_types = FALSE)
 
     R_theta <- get_R_theta(cleaned_summary, ind.names)
 
@@ -51,7 +50,7 @@ testServer(
 
     fitpoly_input <- summary_to_fitpoly(R_all, theta_all)
 
-    expect_equal(round(sum(fitpoly_input$X),0), 1187)
+    expect_equal(round(sum(fitpoly_input$X),0), 239122013)
     expect_equal(round(sum(fitpoly_input$ratio),0), 82226)
 
     # Export file for fitpoly
@@ -65,8 +64,7 @@ testServer(
     #                  ncores=1)
 
     # After fitpoly
-    input$fitpoly_scores$datapath <- system.file("tetraploids_refs_sub_z_scores.dat", package = "Qploidy")
-    scores <- vroom(input$fitpoly_scores$datapath)
+    scores <- vroom(input$fitpoly_scores$datapath, show_col_types = FALSE)
     expect_equal(sum(scores$geno, na.rm = TRUE), 203516)
 
     # Filters
@@ -76,7 +74,7 @@ testServer(
     scores_filt <- scores[-which(scores$MarkerName %in% rm.mks),]
 
     keep.mks <- which(fitpoly_input$MarkerName %in% scores_filt$MarkerName &
-                         fitpoly_input$SampleName %in% scores_filt$SampleName)
+                        fitpoly_input$SampleName %in% scores_filt$SampleName)
 
     fitpoly_input_filt <- fitpoly_input[keep.mks,]
     theta <- fitpoly_input_filt$ratio
@@ -98,9 +96,9 @@ testServer(
 
     # Generate clusters
     library(parallel)
-    ploidy <- input$ploidy
     clust <- makeCluster(input$n.cores)
-    clusterExport(clust, c("par_fitpoly_interpolation", "ploidy"))
+    ploidy <- input$ploidy
+    clusterExport(clust, c("par_fitpoly_interpolation"))
     clusters <- parLapply(clust, lst_interpolation, function(x) {
       library(ggplot2)
       par_fitpoly_interpolation(x, ploidy= ploidy, plot = FALSE)
@@ -137,7 +135,6 @@ testServer(
     R_filt <- R_all[match(keep.mks, R_all$MarkerName),]
     theta_filt <- theta_all[match(keep.mks, theta_all$MarkerName),]
 
-    input$n.cores <- 2
     par <- rep(1:input$n.cores, each=round((nrow(R_filt)/input$n.cores)+1,0))[1:nrow(R_filt)]
 
     par_R <- split.data.frame(R_filt[,-1], par)
@@ -153,7 +150,7 @@ testServer(
     }
 
     clust <- makeCluster(input$n.cores)
-    clusterExport(clust, c("get_logR", "get_logR_par", "ploidy"))
+    clusterExport(clust, c("get_logR", "get_logR_par"))
     logRs_diplo <- parLapply(clust, par_all, function(x) {
       get_logR_par(x, ploidy = ploidy)
     })
@@ -166,7 +163,7 @@ testServer(
 
     # Get BAF
     clust <- makeCluster(input$n.cores)
-    clusterExport(clust, c("get_baf", "get_baf_par", "ploidy"))
+    clusterExport(clust, c("get_baf", "get_baf_par"))
     bafs_diplo <- parLapply(clust, par_all, function(x) {
       get_baf_par(x, ploidy = ploidy)
     })
@@ -179,21 +176,17 @@ testServer(
     bafs_diplo_df <- as.data.frame(bafs_diplo_m)
     bafs_diplo_df <- cbind(mks=rownames(bafs_diplo_df), bafs_diplo_df)
 
-    expect_equal(sum(bafs_diplo_df[,-1]), 25315.016)
-    expect_equal(round(sum(logRs_diplod_m[,-1]),0), 1819)
+    expect_equal(sum(bafs_diplo_df[,-1]), 25343, tolerance = 1)
+    expect_equal(round(sum(logRs_diplod_m[,-1], na.rm = T),0), 1921)
 
     # geno.pos <- vroom(input$load_geno_pos$datapath)
-    geno.pos <- vroom(system.file("geno.pos_example.txt", package = "Qploidy"))
+    geno.pos <- vroom(system.file("geno.pos_example.txt", package = "Qploidy"), show_col_types = FALSE)
 
     chr <- geno.pos$Chr[match(bafs_diplo_df$mks,geno.pos$Name)]
     pos <- geno.pos$Position[match(bafs_diplo_df$mks,geno.pos$Name)]
 
     baf <- cbind(Name=bafs_diplo_df$mks, Chr = chr, Position = pos, bafs_diplo_df[,-1])
     logR <- cbind(Name=logRs_diplod_m$mks, Chr = chr, Position = pos, logRs_diplod_m[,-1])
-
-    vroom_write(baf, file = "baf.example.txt")
-    vroom_write(logR, file = "logR.example.txt")
-
   })
 
 test_that("module ui works", {

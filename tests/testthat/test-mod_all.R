@@ -54,7 +54,6 @@ testServer(
 
     data_sample <- data_sample[order(data_sample$Chr, data_sample$Position),]
 
-    est.ploidy.chr_df <- area_estimate_ploidy_by_chr(data_sample, ploidy = input$ploidys, area = input$area)
     est.ploidy.chr_df <- area_estimate_ploidy_by_chr(data_sample, ploidys = input$ploidys, area = input$area)
 
     # Get overall ploidy estimation graphics

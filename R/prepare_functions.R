@@ -170,7 +170,7 @@ get_probs_polyorigin <- function(df, f1.codes, ind = NULL, ploidy = 4, n.cores= 
   melt_df_lst <- split(melt_df, melt_df$ind)
 
   clust <- makeCluster(n.cores)
-  clusterExport(clust, c("get_probs_sing"))
+  clusterExport(clust, c("get_probs_sing", "f1.codes"))
   homoprob.lst <- parLapply(clust, melt_df_lst, function(x) get_probs_sing(melt_df = x,
                                                                            f1.codes = f1.codes,
                                                                            ploidy = ploidy))

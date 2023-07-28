@@ -203,7 +203,16 @@ mod_all_server <- function(id){
                                                    ploidy = 4, n.cores = 2)
           return(list(logR, baf, haplo_mappoly, haplo_polyorigin))
         } else if(input$example_data == "roses_texas"){
-          cat("Developing")
+          logR <- vroom("C:/Users/Rose_Lab/Documents/Cris_temp/Qploidy_data/roses_texas/fitpoly/logR_roses_texas.txt", show_col_types = FALSE)
+          baf <- vroom("C:/Users/Rose_Lab/Documents/Cris_temp/Qploidy_data/roses_texas/fitpoly/baf_roses_texas.txt", show_col_types = FALSE)
+          haplo_mappoly <- readRDS("C:/Users/Rose_Lab/Documents/Cris_temp/TAMU-RoseLab/standalone_apps/ploidy_estimation/data/count_breaks_poly/homoprob_normal.RDS")
+          polyorigin  <- vroom("C:/Users/Rose_Lab/Documents/Cris_temp/Qploidy_data/roses_texas/geno.pos_roses_texas.txt", show_col_types = FALSE)
+          f1.codes <- vroom(system.file("F1codes.polyorigin.txt", package = "Qploidy"), show_col_types = FALSE)
+          ploidy <- 4
+          haplo_polyorigin <- get_probs_polyorigin(polyorigin,
+                                                   f1.codes = f1.codes,
+                                                   ploidy = 4, n.cores = 2)
+          return(list(logR, baf, haplo_mappoly, haplo_polyorigin))
         } else if(input$example_data == "roses_france"){
           cat("Developing")
         } else if(input$example_data == "potatoes") {

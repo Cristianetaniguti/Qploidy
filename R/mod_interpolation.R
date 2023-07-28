@@ -113,6 +113,7 @@ mod_interpolation_ui <- function(id){
 #'
 #'
 #' @import parallel
+#' @import vroom
 #'
 #' @noRd
 mod_interpolation_server <- function(id){
@@ -154,7 +155,17 @@ mod_interpolation_server <- function(id){
           result <- list(fitpoly_input=fitpoly_input, R_all=R_all, theta_all=theta_all)
           return(result)
         } else if(input$example_data == "roses_texas"){
-          cat("Developing")
+          summary <- vroom("C:/Users/Rose_Lab/Documents/Cris_temp/Qploidy_data/roses_texas/summary_roses_texas.txt", show_col_types = FALSE)
+          ind.names <- vroom("C:/Users/Rose_Lab/Documents/Cris_temp/Qploidy_data/roses_texas/ind.names_roses_texas.txt", show_col_types = FALSE)
+
+          cleaned_summary <- clean_summary(summary_df = summary)
+
+          R_theta <- get_R_theta(cleaned_summary, ind.names)
+          R_all <- R_theta[[1]]
+          theta_all <- R_theta[[2]]
+          fitpoly_input <- summary_to_fitpoly(R_all, theta_all)
+          result <- list(fitpoly_input=fitpoly_input, R_all=R_all, theta_all=theta_all)
+          return(result)
         } else if(input$example_data == "roses_france"){
           cat("Developing")
         } else if(input$example_data == "potatoes") {

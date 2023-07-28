@@ -99,7 +99,8 @@ count_breaks_plot <- function(counts, n.graphics=NULL,
              theme(axis.title.y = element_blank(),
                    axis.title.x = element_blank(),
                    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
-                   legend.key.size = unit(1, 'cm')) +
+                   legend.key.size = unit(1, 'cm'),
+                   strip.text.y.right = element_text(angle = 0)) +
              {if(!by_LG) facet_grid(individual ~ LG) else facet_grid(individual ~ .)} +
              {if(by_LG) labs(fill="groups") else labs(fill="ploidy")})
 

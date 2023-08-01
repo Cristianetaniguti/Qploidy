@@ -430,7 +430,7 @@ mod_all_server <- function(id){
         breaks_polyorigin_df <- count_breaks_df(homoprob =haplo()[[2]]$homoprob,
                                                            aneuploids = aneuploids,
                                                            inds = input$samples)
-        print(breaks_polyorigin_df)
+
         breaks_polyorigin_plot <- count_breaks_plot(breaks_polyorigin_df,
                                                              by_LG = FALSE)
 

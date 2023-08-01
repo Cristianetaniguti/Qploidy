@@ -109,7 +109,7 @@ par_fitpoly_interpolation <- function(scores_temp, ploidy, plot=TRUE){
   scores_temp$geno <- as.factor(scores_temp$geno)
 
   centers <- lapply(plot_data_split, function(x) apply(x[,3:4], 2, mean))
-  if(length(centers) != ploidy + 1 | any(sapply(plot_data_split, nrow) < 2)) {
+  if(length(centers) != ploidy + 1 | any(sapply(plot_data_split, nrow) < 2)| any(is.na(sapply(centers, "[[", 2)))) {
     if(plot){
       p <- ggplot(scores_temp, aes(x=theta, y=R, color = geno))  +
         geom_point()

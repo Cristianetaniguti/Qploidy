@@ -54,7 +54,6 @@ testServer(
 
     data_sample <- data_sample[order(data_sample$Chr, data_sample$Position),]
 
-    est.ploidy.chr_df <- area_estimate_ploidy_by_chr(data_sample, ploidy = input$ploidys, area = input$area)
     est.ploidy.chr_df <- area_estimate_ploidy_by_chr(data_sample, ploidys = input$ploidys, area = input$area)
 
     # Get overall ploidy estimation graphics
@@ -70,20 +69,20 @@ testServer(
 
     temp <- load(system.file("mappoly.homoprob.ex.RData", package = "Qploidy"))
     haplo_mappoly <- get(temp)
-    # polyorigin  <- vroom(system.file("genofile_sub.csv", package = "Qploidy"), show_col_types = FALSE)
-    # f1.codes <- vroom(system.file("F1codes.polyorigin.txt", package = "Qploidy"), show_col_types = FALSE)
-    # haplo_polyorigin <- get_probs_polyorigin(polyorigin,
-    #                                          f1.codes = f1.codes,
-    #                                          ploidy = 4, n.cores = 2)
+    polyorigin  <- vroom(system.file("genofile_sub.csv", package = "Qploidy"), show_col_types = FALSE)
+    f1.codes <- vroom(system.file("F1codes.polyorigin.txt", package = "Qploidy"), show_col_types = FALSE)
+    haplo_polyorigin <- Qploidy:::get_probs_polyorigin_sd(polyorigin,
+                                                f1.codes = f1.codes,
+                                                ploidy = 4, n.cores = 2)
 
 
     ## MAPpoly
     p_m_df <- count_breaks_df(homoprob = haplo_mappoly$homoprob,
-                            inds = input$samples,
-                            aneuploids = aneuploids)
+                              inds = input$samples,
+                              aneuploids = aneuploids)
 
     ## polyOrigin
-    #p_p_df <- count_breaks_df(homoprob = haplo_polyorigin, aneuploids = aneuploids)
+    p_p_df <- count_breaks_df(homoprob = haplo_polyorigin$homoprob, aneuploids = aneuploids)
 
     # Single individual analysis
     data_sample <- logR_baf[[2]][,c(2,3,which(colnames(logR_baf[[2]]) %in% c(input$graphics)))]
@@ -104,16 +103,16 @@ testServer(
       all_haplo_mappoly <- ggarrange(plotlist = haplo_lst,ncol = 1, common.legend = TRUE)
     } else all_haplo_mappoly <- NULL
 
-    # if(any(unique(haplo[[2]]$homoprob$individual) %in% input$graphics)){
-    #   haplo_lst <- list()
-    #   for(i in 1:length(unique(haplo[[2]]$homoprob$LG))){
-    #     haplo_lst[[i]] <- plot(haplo[[2]], lg = unique(haplo[[2]]$homoprob$LG)[i],
-    #                            ind = input$graphics,
-    #                            use.plotly = FALSE)
-    #   }
-    #
-    #   all_haplo_polyorigin <- ggarrange(plotlist = haplo_lst,ncol = 1, common.legend = TRUE)
-    # } else all_haplo_polyorigin <- NULL
+    if(any(unique(haplo_polyorigin$homoprob$individual) %in% input$graphics)){
+      haplo_lst <- list()
+      for(i in 1:length(unique(haplo_polyorigin$homoprob$LG))){
+        haplo_lst[[i]] <- plot(haplo_polyorigin, lg = unique(haplo_polyorigin$homoprob$LG)[i],
+                               ind = input$graphics,
+                               use.plotly = FALSE)
+      }
+
+      all_haplo_polyorigin <- ggarrange(plotlist = haplo_lst,ncol = 1, common.legend = TRUE)
+    } else all_haplo_polyorigin <- NULL
 
     ## Check with diaQTL
     # library(diaQTL)
@@ -123,7 +122,7 @@ testServer(
     #                   n.core = 2)
     #
     # p_d <- haplo_plot(data = data,
-    #                 id = "16400_N080",
+    #                 id = "Unknow_1",
     #                 chrom = 1,
     #                 position = "cM")
 

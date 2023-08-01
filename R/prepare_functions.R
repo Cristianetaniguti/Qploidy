@@ -70,6 +70,31 @@ get_R_theta <- function(cleaned_summary, ind.names, sd.normalization = FALSE, at
   return(list(R_all=R_all, theta_all = theta_all))
 }
 
+#' Get R and theta values from Illumina intensities file with option to do standard normalization by plate and markers
+#'
+#' @param cleaned_summary List with X and Y intensities.
+#' @param atan logical. If TRUE calculates the theta using atan2
+#'
+#' @import tidyr
+#' @importFrom dplyr mutate
+#'
+#' @export
+get_R_theta_illumina <- function(cleaned_illumina, atan = FALSE){
+  R_all <- as.data.frame(cleaned_illumina$X[,-1] + cleaned_illumina$Y[,-1])
+  if(atan){
+    theta_all <- as.data.frame((atan2(as.matrix(cleaned_illumina$Y[,-1]), as.matrix(cleaned_illumina$X[,-1])))/(pi/2))
+  }  else {
+    theta_all <- as.data.frame(as.matrix(cleaned_illumina$Y[,-1])/(as.matrix(cleaned_illumina$Y[,-1]) + as.matrix(cleaned_illumina$X[,-1])))
+  }
+
+  probes_names <-  cleaned_illumina$X[,1]
+
+  R_all <- cbind(MarkerName = probes_names, R_all)
+  theta_all <- cbind(MarkerName = probes_names, theta_all)
+
+  return(list(R_all=R_all, theta_all = theta_all))
+}
+
 #' Convert Summary file to fitpoly format
 #'
 #' @param R_all data.frame with R values
@@ -170,6 +195,27 @@ get_probs_polyorigin <- function(df, f1.codes, ind = NULL, ploidy = 4, n.cores= 
   melt_df_lst <- split(melt_df, melt_df$ind)
 
   clust <- makeCluster(n.cores)
+  clusterExport(clust, c("get_probs_sing"))
+  homoprob.lst <- parLapply(clust, melt_df_lst, function(x) get_probs_sing(melt_df = x,
+                                                                           f1.codes = f1.codes,
+                                                                           ploidy = ploidy))
+  stopCluster(clust)
+
+  homoprob <- do.call(rbind, homoprob.lst)
+
+  structure(list(info = list(ploidy = ploidy,
+                             n.ind = length(unique(homoprob$individual))) ,
+                 homoprob = homoprob), class = "mappoly.homoprob")
+}
+
+get_probs_polyorigin_sd <- function(df, f1.codes, ind = NULL, ploidy = 4, n.cores= 1){
+  df_prob <- data.frame(df)
+  if(!is.null(ind)) df_prob <- df_prob[,c(1:3,which(colnames(df_prob) %in% ind))]
+  melt_df <- pivot_longer(df_prob, cols = 4:ncol(df_prob), names_to = "ind", values_to = "geno")
+
+  melt_df_lst <- split(melt_df, melt_df$ind)
+
+  clust <- makeCluster(n.cores)
   clusterExport(clust, c("get_probs_sing", "f1.codes"))
   homoprob.lst <- parLapply(clust, melt_df_lst, function(x) get_probs_sing(melt_df = x,
                                                                            f1.codes = f1.codes,
@@ -182,6 +228,7 @@ get_probs_polyorigin <- function(df, f1.codes, ind = NULL, ploidy = 4, n.cores= 
                              n.ind = length(unique(homoprob$individual))) ,
                  homoprob = homoprob), class = "mappoly.homoprob")
 }
+
 
 #' Converts polyOrigin genotype probabilities format to mappoly homoprob format for a single individual
 #'

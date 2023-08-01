@@ -45,7 +45,7 @@ area_estimate_ploidy_by_chr <- function(data_sample, ploidys, area){
         dots.int <- apply(prop_tot[[z]], 2, function(x) sum(x)/dim(by_chr[[z]])[1])
       dots.int_tot[[z]] <- rbind(dots.int_tot[[z]], dots.int)
 
-      modes_paste <- apply(modes_tot[[z]], 2, function(x) paste0(x[-1], collapse = "/"))
+      modes_paste <- apply(modes_tot[[z]], 2, function(x) paste0(round(x[-1],3), collapse = "/"))
       modes_paste_tot[[z]] <- rbind(modes_paste_tot[[z]], modes_paste)
 
       corr <- apply(modes_tot[[z]], 2, function(x) cor(x = x[-1], y = seq(0,1,1/ploidys[j])))

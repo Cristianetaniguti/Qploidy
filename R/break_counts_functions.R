@@ -1,19 +1,21 @@
+globalVariables(c("."))
+
 #' Count number of recombination breakpoints in parents gametes
 #'
-#' @param object of class mappoly.homoprob
-#' @param P1 string defining parent 1 name
-#' @param P2 string defining parent 2 name
+#' @param homoprob object of class mappoly.homoprob
+#' @param aneuploids data.frame with each chromosome ploidy
+#' @param ped.file path to csv file containing three columns: 1) Sample ID, 2) Parent1 ID, 3) Parent2 ID
 #' @param inds vector with individuals to be evaluated
 #'
 #' @import tidyr
 #' @import dplyr
+#' @importFrom utils read.csv
 #'
 #' @export
 count_breaks_df <- function(homoprob,
                             aneuploids = NULL,
-                            P1 = "P1",
-                            P2 = "P2",
-                            inds = NULL){
+                            inds = NULL,
+                            ped.file = NULL){
 
   homoprob$LG <- paste0("Chr", homoprob$LG)
   homoprob$most_likely <- homoprob$probability
@@ -21,15 +23,24 @@ count_breaks_df <- function(homoprob,
   homoprob$most_likely[which(homoprob$probability <= 0.5)] <- 0
   homoprob$parent <- NA
   ploidy <- length(unique(homoprob$homolog))/2
-  homoprob$parent[which(homoprob$homolog %in% letters[1:ploidy])] <- P1
-  homoprob$parent[which(homoprob$homolog %in% letters[(ploidy+1):(2*ploidy)])] <- P2
 
-  if(!is.null(inds)) homoprob <- homoprob %>% filter(individual %in% inds)
+  if(is.null(ped.file)){
+    homoprob$parent[which(homoprob$homolog %in% letters[1:ploidy])] <- "P1"
+    homoprob$parent[which(homoprob$homolog %in% letters[(ploidy+1):(2*ploidy)])] <- "P2"
+  } else {
+    ped <- read.csv(ped.file)
+    p1 <- ped[match(homoprob$individual[which(homoprob$homolog %in% letters[1:ploidy])], ped$id),2]
+    p2 <- ped[match(homoprob$individual[which(homoprob$homolog %in% letters[(ploidy+1):(2*ploidy)])], ped$id),3]
+    homoprob$parent[which(homoprob$homolog %in% letters[1:ploidy])] <- p1
+    homoprob$parent[which(homoprob$homolog %in% letters[(ploidy+1):(2*ploidy)])] <- p2
+  }
 
-  counts <- homoprob %>% group_by(individual, LG, parent, homolog) %>%
-    summarize(counts = sum(sequence(rle(as.character(most_likely))$length) == 1) - 1) %>%
-    group_by(individual, LG, parent) %>%
-    summarize(total_counts = sum(counts))
+  if(!is.null(inds)) homoprob <- homoprob %>% filter(.data$individual %in% inds)
+
+  counts <- homoprob %>% group_by(.data$individual, .data$LG, .data$parent, .data$homolog) %>%
+    summarize(counts = sum(sequence(rle(as.character(.data$most_likely))$length) == 1) - 1) %>%
+    group_by(.data$individual, .data$LG, .data$parent) %>%
+    summarize(total_counts = sum(.data$counts))
 
   if(!is.null(aneuploids)){
     aneuploids <- pivot_longer(as.data.frame(aneuploids), cols = 2:ncol(aneuploids), values_to = "ploidy", names_to = "LG")
@@ -92,8 +103,8 @@ count_breaks_plot <- function(counts, n.graphics=NULL,
 
   p_list <- counts %>% ungroup() %>%  mutate(div.n.graphics = div.n.graphics) %>%
     split(., .$div.n.graphics) %>%
-    lapply(., function(x) ggplot(x, aes(x=parent, y=total_counts, fill = LG)) +
-             {if(by_LG) geom_bar(stat = "identity", aes(fill = LG)) else geom_bar(stat = "identity", aes(fill = ploidy))}+
+    lapply(., function(x) ggplot(x, aes(x=.data$parent, y=.data$total_counts, fill = .data$LG)) +
+             {if(by_LG) geom_bar(stat = "identity", aes(fill = .data$LG)) else geom_bar(stat = "identity", aes(fill = .data$ploidy))}+
              coord_flip() +
              {if(by_LG) scale_fill_manual(values=mycolors) else scale_fill_manual(values=ploidycolors)} +
              theme(axis.title.y = element_blank(),
@@ -101,7 +112,7 @@ count_breaks_plot <- function(counts, n.graphics=NULL,
                    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
                    legend.key.size = unit(1, 'cm'),
                    strip.text.y.right = element_text(angle = 0)) +
-             {if(!by_LG) facet_grid(individual ~ LG) else facet_grid(individual ~ .)} +
+             {if(!by_LG) facet_grid(.data$individual ~ .data$LG) else facet_grid(.data$individual ~ .)} +
              {if(by_LG) labs(fill="groups") else labs(fill="ploidy")})
 
   p <- ggarrange(plotlist = p_list, common.legend = T, ncol = ncol, nrow = round(n.graphics/ncol,0))

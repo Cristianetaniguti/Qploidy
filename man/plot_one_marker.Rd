@@ -6,6 +6,11 @@
 \usage{
 plot_one_marker(scores_temp, ploidy)
 }
+\arguments{
+\item{scores_temp}{data.frame of fitpoly scores output}
+
+\item{ploidy}{integer defining ploidy}
+}
 \description{
 Interpolation plot
 }

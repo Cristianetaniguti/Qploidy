@@ -161,6 +161,7 @@ mod_all_ui <- function(id){
 #'
 #' @importFrom stats coef cor lm median sd
 #' @importFrom utils data write.csv write.table
+#' @import dpseg
 #'
 #' @noRd
 mod_all_server <- function(id){

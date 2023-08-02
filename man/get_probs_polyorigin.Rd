@@ -14,6 +14,8 @@ get_probs_polyorigin(df, f1.codes, ind = NULL, ploidy = 4, n.cores = 1)
 \item{ind}{character defining the individual to be evalueated}
 
 \item{ploidy}{integer defining the ploidy}
+
+\item{n.cores}{define how many cores to be used in parallelization}
 }
 \description{
 Converts polyOrigin genotype probabilities format to mappoly homoprob format

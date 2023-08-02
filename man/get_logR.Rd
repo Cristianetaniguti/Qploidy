@@ -6,6 +6,17 @@
 \usage{
 get_logR(theta_subject, R_subject, centers_theta, mod, ploidy)
 }
+\arguments{
+\item{theta_subject}{numeric theta to be interpolated}
+
+\item{R_subject}{numeric R to be interpolated}
+
+\item{centers_theta}{theta centroids defined by clusterization}
+
+\item{mod}{interpolation model}
+
+\item{ploidy}{integer defining ploidy}
+}
 \description{
 Create logR
 }

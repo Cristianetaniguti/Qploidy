@@ -14,8 +14,8 @@ testServer(
       grepl("test", ns("test"))
     )
     # packages
-    library(vroom)
-    library(tidyr)
+    # library(vroom)
+    # library(tidyr)
 
     session$setInputs(samples = c("Diplo_1", "Diplo_2","Tetra_1","Tetra_2","Unknow_1"),
                       ploidys = c(2,5),
@@ -71,10 +71,13 @@ testServer(
     haplo_mappoly <- get(temp)
     polyorigin  <- vroom(system.file("genofile_sub.csv", package = "Qploidy"), show_col_types = FALSE)
     f1.codes <- vroom(system.file("F1codes.polyorigin.txt", package = "Qploidy"), show_col_types = FALSE)
-    haplo_polyorigin <- Qploidy:::get_probs_polyorigin_sd(polyorigin,
-                                                f1.codes = f1.codes,
-                                                ploidy = 4, n.cores = 2)
+    haplo_polyorigin <- get_probs_polyorigin(polyorigin,
+                                             f1.codes = f1.codes,
+                                             ploidy = 4, n.cores = 2)
 
+    #     haplo_polyorigin <- Qploidy:::get_probs_polyorigin_sd(polyorigin,
+    #                                                           f1.codes = f1.codes,
+    #                                                           ploidy = 4, n.cores = 2)
 
     ## MAPpoly
     p_m_df <- count_breaks_df(homoprob = haplo_mappoly$homoprob,

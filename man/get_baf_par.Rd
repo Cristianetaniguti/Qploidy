@@ -6,6 +6,11 @@
 \usage{
 get_baf_par(par_all_item, ploidy = 2)
 }
+\arguments{
+\item{par_all_item}{list containing R and theta matrices, and clusters models}
+
+\item{ploidy}{integer defining ploidy}
+}
 \description{
 To create baf in parallel
 }

@@ -10,8 +10,6 @@ summary_to_fitpoly(R_all, theta_all)
 \item{R_all}{data.frame with R values}
 
 \item{theta_all}{data.frame with theta values}
-
-\item{ind.names}{data.frame first column with the plate name and second with sample name}
 }
 \description{
 Convert Summary file to fitpoly format

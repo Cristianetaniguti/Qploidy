@@ -1,3 +1,5 @@
+globalVariables(c("ind", "zscore", "chr"))
+
 #' Edit Axiom Summary file
 #'
 #' Remove consecutive A allele probe from the summary file
@@ -63,7 +65,7 @@ get_R_theta <- function(cleaned_summary, ind.names, sd.normalization = FALSE, at
     array_ids <- data.frame(array=exp, inds = ids[-1])
     R_melt$array <- array_ids$array[match(R_melt$ind, array_ids$inds)]
 
-    R_z <- R_melt %>% group_by(MarkerName, array) %>% mutate(zscore = (R-mean(R))/sd(R))
+    R_z <- R_melt %>% group_by(.data$MarkerName, .data$array) %>% mutate(zscore = (.data$R-mean(.data$R))/sd(.data$R))
     R_all <- pivot_wider(R_z[,c(1,2,5)], names_from = ind, values_from = zscore)
   }
 
@@ -72,7 +74,7 @@ get_R_theta <- function(cleaned_summary, ind.names, sd.normalization = FALSE, at
 
 #' Get R and theta values from Illumina intensities file with option to do standard normalization by plate and markers
 #'
-#' @param cleaned_summary List with X and Y intensities.
+#' @param cleaned_illumina List with X and Y intensities.
 #' @param atan logical. If TRUE calculates the theta using atan2
 #'
 #' @import tidyr
@@ -99,7 +101,6 @@ get_R_theta_illumina <- function(cleaned_illumina, atan = FALSE){
 #'
 #' @param R_all data.frame with R values
 #' @param theta_all data.frame with theta values
-#' @param ind.names data.frame first column with the plate name and second with sample name
 #'
 #' @importFrom tidyr pivot_longer
 #' @export
@@ -124,9 +125,10 @@ summary_to_fitpoly <- function(R_all, theta_all){
 #' Code adapted from diaQTL
 #'
 #' @param filename character with path to polyancentry CSV file
+#' @param outstem output pedigree filename
 #'
 #' @export
-read_polyOrigin <- function(filename){
+read_polyOrigin <- function(filename, outstem=NULL){
   con <- file(filename,"r")
   temp <- readLines(con)
   ix <- grep("PolyOrigin",temp)
@@ -142,6 +144,7 @@ read_polyOrigin <- function(filename){
   y <- strsplit(parents,split="|",fixed=T)
   parents <- data.frame(pop=sapply(y,function(y){y[1]}),parent1=sapply(y,function(y){y[2]}),parent2=sapply(y,function(y){y[length(y)]}),stringsAsFactors = F)
   ped <- merge(ped,parents)
+  write.csv(ped[,2:4],file=paste(outstem,"diaQTL_pedfile.csv",sep=""),row.names=F)
 
   k <- grep("parentgeno",temp[ix])
   header <- setdiff(strsplit(temp[ix[k]+1],split=",",fixed=T)[[1]],"")
@@ -183,6 +186,7 @@ read_polyOrigin <- function(filename){
 #' @param f1.codes data.frame with polyOrigin stages codification
 #' @param ind character defining the individual to be evalueated
 #' @param ploidy integer defining the ploidy
+#' @param n.cores define how many cores to be used in parallelization
 #'
 #' @importFrom tidyr pivot_longer
 #' @import parallel

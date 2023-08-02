@@ -5,10 +5,12 @@
 \title{Extracts genotype probabilities information from polyOrigin polyancentry output file
 Code adapted from diaQTL}
 \usage{
-read_polyOrigin(filename)
+read_polyOrigin(filename, outstem = NULL)
 }
 \arguments{
 \item{filename}{character with path to polyancentry CSV file}
+
+\item{outstem}{output pedigree filename}
 }
 \description{
 Extracts genotype probabilities information from polyOrigin polyancentry output file

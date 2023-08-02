@@ -4,16 +4,16 @@
 \alias{count_breaks_df}
 \title{Count number of recombination breakpoints in parents gametes}
 \usage{
-count_breaks_df(homoprob, aneuploids = NULL, P1 = "P1", P2 = "P2", inds = NULL)
+count_breaks_df(homoprob, aneuploids = NULL, inds = NULL, ped.file = NULL)
 }
 \arguments{
-\item{P1}{string defining parent 1 name}
+\item{homoprob}{object of class mappoly.homoprob}
 
-\item{P2}{string defining parent 2 name}
+\item{aneuploids}{data.frame with each chromosome ploidy}
 
 \item{inds}{vector with individuals to be evaluated}
 
-\item{object}{of class mappoly.homoprob}
+\item{ped.file}{path to csv file containing three columns: 1) Sample ID, 2) Parent1 ID, 3) Parent2 ID}
 }
 \description{
 Count number of recombination breakpoints in parents gametes

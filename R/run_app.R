@@ -2,6 +2,11 @@
 #'
 #' @param ... arguments to pass to golem_opts.
 #' See `?get_golem_options` for more details.
+#' @param onStart to be documented
+#' @param options to be documented
+#' @param enableBookmarking to be documented
+#' @param uiPatter to be documented
+#'
 #' @inheritParams shinyApp
 #'
 #' @export

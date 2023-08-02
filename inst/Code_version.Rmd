@@ -223,13 +223,34 @@ colnames(aneuploids)[1] <- "X"
 
 haplo_mappoly <- readRDS("C:/Users/Rose_Lab/Documents/Cris_temp/TAMU-RoseLab/standalone_apps/ploidy_estimation/data/count_breaks_poly/homoprob_normal.RDS")
 
-genoprob <- read_polyOrigin("C:/Users/Rose_Lab/Documents/Cris_temp/Qploidy_data/roses_texas/5pop_compareprob2_fulldata_polyancestry.csv")
+genoprob <- read_polyOrigin(filename = "C:/Users/Rose_Lab/Documents/Cris_temp/Qploidy_data/roses_texas/5pop_compareprob2_fulldata_polyancestry.csv")
 
 f1.codes <- vroom(system.file("F1codes.polyorigin.txt", package = "Qploidy"), show_col_types = FALSE)
-haplo_polyorigin <- get_probs_polyorigin(genoprob,
-                                         f1.codes = f1.codes,
-                                         ploidy = 4, n.cores = 20)
+haplo_polyorigin <- Qploidy:::get_probs_polyorigin_sd(genoprob,
+                                                      f1.codes = f1.codes,
+                                                      ploidy = 4, n.cores = 20)
 
+#saveRDS(haplo_polyorigin, file = "haplo_polyorigin_rose_texas.rds", compress = TRUE)
+haplo_polyorigin <- readRDS("haplo_polyorigin_rose_texas.rds")
+haplo_polyorigin$homoprob$individual <- gsub("^X", "", haplo_polyorigin$homoprob$individual)
+
+library(diaQTL)
+
+convert_polyorigin("C:/Users/Rose_Lab/Documents/Cris_temp/Qploidy_data/roses_texas/5pop_compareprob2_fulldata_polyancestry.csv")
+
+data <- read_data(genofile = "diaQTL_genofile.csv",
+                  ploidy = 4,
+                  pedfile = "diaQTL_pedfile.csv",
+                  n.core = 2)
+
+p_d <- haplo_plot(data = data,
+                id = "16009_N132",
+                chrom = 3,
+                position = "cM")
+
+plot(haplo_polyorigin, lg = 3, ind = "16009_N132")
+
+p_p_df %>% filter(individual == "16009_N132")
 
 ## MAPpoly
 
@@ -258,11 +279,13 @@ for(i in 1:length(end)){
 # fix sample names
 haplo_polyorigin$homoprob$individual <- gsub("^X", "", haplo_polyorigin$homoprob$individual)
 
-p_p_df <- count_breaks_df(homoprob = haplo_polyorigin$homoprob, aneuploids = aneuploids)
+p_p_df <- count_breaks_df(homoprob = haplo_polyorigin$homoprob,
+                          aneuploids = aneuploids,
+                          ped.file = "diaQTL_pedfile.csv")
 
-vroom_write(p_p_df, file = "polyorigin_break_counts_up.txt")
+vroom_write(counts, file = "polyorigin_break_counts_up_parents.txt")
 
-p_p_df <- vroom("polyorigin_break_counts_up.txt")
+p_p_df <- vroom("polyorigin_break_counts_up_parents.txt")
 p_p_plot_pop <- list()
 pops <- c("MBxGV", "MBxRR", "MBxBE", "16009", 
           "16035", "16009", "16400", "16401",

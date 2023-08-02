@@ -1,3 +1,7 @@
+globalVariables(c("color", "xmax", "xmin", "value", "name",
+                  "Var1", "ploidy", "chromosome", "aneuploidy_ploidy",
+                  "#individuals*#chrom", "Freq", "Freq_all", "#individuals",
+                  "LG", "MarkerName", "R", "SampleName"))
 
 #' Estimate ploidy using area method
 #'

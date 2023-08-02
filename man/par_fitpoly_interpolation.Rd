@@ -6,6 +6,13 @@
 \usage{
 par_fitpoly_interpolation(scores_temp, ploidy, plot = TRUE)
 }
+\arguments{
+\item{scores_temp}{fitpoly scores output file}
+
+\item{ploidy}{integer defining ploidy}
+
+\item{plot}{logical to create or not the interpolation plot}
+}
 \description{
 Clusterization using fitpoly
 }

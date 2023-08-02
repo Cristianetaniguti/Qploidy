@@ -197,7 +197,7 @@ mod_interpolation_server <- function(id){
 
     refs_fitpoly <- reactive({
       refs_fitpoly <- summary()[[1]]
-      refs_fitpoly <- refs_fitpoly %>% filter(SampleName %in% input$refs)
+      refs_fitpoly <- refs_fitpoly %>% filter(.data$SampleName %in% input$refs)
       refs_fitpoly
     })
 
@@ -223,7 +223,7 @@ mod_interpolation_server <- function(id){
     })
 
     lst_interpolation <- reactive({
-      n.na <- fitpoly_scores() %>% group_by(MarkerName) %>% summarize(n.na = (sum(is.na(geno))/length(geno))*100)
+      n.na <- fitpoly_scores() %>% group_by(.data$MarkerName) %>% summarize(n.na = (sum(is.na(.data$geno))/length(.data$geno))*100)
       rm.mks <- n.na$MarkerName[which(n.na$n.na > 25)]
       missing.data <- length(rm.mks)
       scores_filt <- fitpoly_scores()[-which(fitpoly_scores()$MarkerName %in% rm.mks),]

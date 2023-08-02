@@ -4,7 +4,14 @@
 \alias{get_baf}
 \title{Create BAF According to Wang 2007}
 \usage{
-get_baf(theta_subject, R_subject, centers_theta, ploidy)
+get_baf(theta_subject, centers_theta, ploidy)
+}
+\arguments{
+\item{theta_subject}{numeric theta to be interpolated}
+
+\item{centers_theta}{theta centroids defined by clusterization}
+
+\item{ploidy}{integer defining ploidy}
 }
 \description{
 Create BAF According to Wang 2007

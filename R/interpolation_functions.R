@@ -1,4 +1,12 @@
+globalVariables(c("theta", "R", "geno", "Var1"))
+
 #' Create logR
+#'
+#' @param R_subject numeric R to be interpolated
+#' @param theta_subject numeric theta to be interpolated
+#' @param centers_theta theta centroids defined by clusterization
+#' @param ploidy integer defining ploidy
+#' @param mod interpolation model
 #'
 #' @export
 get_logR <- function(theta_subject, R_subject, centers_theta, mod, ploidy){
@@ -29,6 +37,9 @@ get_logR <- function(theta_subject, R_subject, centers_theta, mod, ploidy){
 
 #' To create logR in parallel
 #'
+#' @param par_all_item list containing R and theta matrices, and clusters models
+#' @param ploidy integer defining ploidy
+#'
 #' @export
 get_logR_par <- function(par_all_item, ploidy =2){
   logRs_diplo <- list()
@@ -50,8 +61,12 @@ get_logR_par <- function(par_all_item, ploidy =2){
 
 #' Create BAF According to Wang 2007
 #'
+#' @param theta_subject numeric theta to be interpolated
+#' @param centers_theta theta centroids defined by clusterization
+#' @param ploidy integer defining ploidy
+#'
 #' @export
-get_baf <- function(theta_subject, R_subject, centers_theta, ploidy){
+get_baf <- function(theta_subject, centers_theta, ploidy){
   pos <- vector()
   centers_theta <- sort(centers_theta, decreasing = F)
   idx <- which(theta_subject <= centers_theta[1])
@@ -86,12 +101,14 @@ get_baf <- function(theta_subject, R_subject, centers_theta, ploidy){
 
 #' To create baf in parallel
 #'
+#' @param par_all_item list containing R and theta matrices, and clusters models
+#' @param ploidy integer defining ploidy
+#'
 #' @export
 get_baf_par <- function(par_all_item, ploidy=2){
   baf <- list()
   for(i in 1:nrow(par_all_item[[1]])){
-    baf[[i]] <- get_baf(R_subject = par_all_item[[1]][i,],
-                        theta_subject = par_all_item[[2]][i,],
+    baf[[i]] <- get_baf(theta_subject = par_all_item[[2]][i,],
                         centers_theta = par_all_item[[3]][[i]]$centers_theta,
                         ploidy = ploidy)
   }
@@ -100,6 +117,10 @@ get_baf_par <- function(par_all_item, ploidy=2){
 
 
 #' Clusterization using fitpoly
+#'
+#' @param scores_temp fitpoly scores output file
+#' @param ploidy integer defining ploidy
+#' @param plot logical to create or not the interpolation plot
 #'
 #' @export
 par_fitpoly_interpolation <- function(scores_temp, ploidy, plot=TRUE){
@@ -123,10 +144,10 @@ par_fitpoly_interpolation <- function(scores_temp, ploidy, plot=TRUE){
     centers_df <- cbind(centers_df, cluster = 1:(ploidy + 1))
 
     if(plot){
-      p <- ggplot(scores_temp, aes(x=theta, y=R, color = geno))  +
+      p <- ggplot(scores_temp, aes(x=.data$theta, y=.data$R, color = .data$geno))  +
         geom_point() +
-        geom_point(data = centers_df, aes(x= theta, y = R), color = "black") +
-        geom_line(data = centers_df, aes(x= theta, y = R), color = "black") + theme_bw()
+        geom_point(data = centers_df, aes(x= .data$theta, y = .data$R), color = "black") +
+        geom_line(data = centers_df, aes(x= .data$theta, y = .data$R), color = "black") + theme_bw()
     } else p <- NULL
 
     # Create models for interpolation
@@ -145,6 +166,9 @@ par_fitpoly_interpolation <- function(scores_temp, ploidy, plot=TRUE){
 
 
 #' Interpolation plot
+#'
+#' @param scores_temp data.frame of fitpoly scores output
+#' @param ploidy integer defining ploidy
 #'
 #' @export
 plot_one_marker <- function(scores_temp, ploidy){

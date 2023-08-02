@@ -12,3 +12,4 @@ $run_dev.*
 ^\.github$
 ^\.circleci$
 ^\.circleci/config\.yml$
+app.R

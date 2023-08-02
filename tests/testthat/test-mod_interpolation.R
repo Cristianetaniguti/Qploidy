@@ -14,9 +14,9 @@ testServer(
       grepl("test", ns("test"))
     )
 
-    library(vroom)
-    library(dplyr)
-    library(tidyr)
+    # library(vroom)
+    # library(dplyr)
+    # library(tidyr)
     session$setInputs(load_summary = list(datapath = system.file("summary_example.txt", package = "Qploidy")),
                       load_ind_names = list(datapath = system.file("ind.names_example.txt", package = "Qploidy")),
                       load_geno_pos = list(datapath = system.file("geno.pos_example.txt", package = "Qploidy")),

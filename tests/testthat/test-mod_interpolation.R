@@ -94,11 +94,15 @@ testServer(
 
     lst_interpolation <- split(data_interpolation, data_interpolation$mks)
 
+    #vroom_write(data_interpolation, file = "data_interpolation.txt")
+
     # Generate clusters
     library(parallel)
     clust <- makeCluster(input$n.cores)
     ploidy <- input$ploidy
     clusterExport(clust, c("par_fitpoly_interpolation"))
+    clusterExport(clust, c("par_fitpoly_interpolation", "ploidy"))
+
     clusters <- parLapply(clust, lst_interpolation, function(x) {
       library(ggplot2)
       par_fitpoly_interpolation(x, ploidy= ploidy, plot = FALSE)

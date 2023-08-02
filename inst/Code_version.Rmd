@@ -244,13 +244,13 @@ data <- read_data(genofile = "diaQTL_genofile.csv",
                   n.core = 2)
 
 p_d <- haplo_plot(data = data,
-                id = "16009_N132",
-                chrom = 3,
+                id = "16401_N025",
+                chrom = 2,
                 position = "cM")
 
-plot(haplo_polyorigin, lg = 3, ind = "16009_N132")
+plot(haplo_polyorigin, lg = 6, ind = "16035_N034")
 
-p_p_df %>% filter(individual == "16009_N132")
+p_p_df %>% filter(individual == "16035_N034")
 
 ## MAPpoly
 
@@ -423,7 +423,7 @@ rm.mks <- n.na$MarkerName[which(n.na$n.na > 25)]
 missing.data <- length(rm.mks)
 scores_filt <- scores[-which(scores$MarkerName %in% rm.mks),]
 
-keep.mks <- which(fitpoly_potato_input$MarkerName %in% scores_filt$MarkerName & fitpoly_potato_input$SampleName %in% scores_filt$SampleName)
+# keep.mks <- which(fitpoly_potato_input$MarkerName %in% scores_filt$MarkerName & fitpoly_potato_input$SampleName %in% scores_filt$SampleName)
 
 keep.mks <- match(paste0(scores_filt$SampleName, "_", scores_filt$MarkerName),
                   paste0(fitpoly_potato_input$SampleName, "_", fitpoly_potato_input$MarkerName))

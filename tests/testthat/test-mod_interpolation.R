@@ -17,6 +17,7 @@ testServer(
     # library(vroom)
     # library(dplyr)
     # library(tidyr)
+    # library(testthat)
     session$setInputs(load_summary = list(datapath = system.file("summary_example.txt", package = "Qploidy")),
                       load_ind_names = list(datapath = system.file("ind.names_example.txt", package = "Qploidy")),
                       load_geno_pos = list(datapath = system.file("geno.pos_example.txt", package = "Qploidy")),
@@ -30,7 +31,7 @@ testServer(
     # input$load_summary$datapath <- system.file("summary_example.txt", package = "Qploidy")
     # input$load_ind_names$datapath <- system.file("ind.names_example.txt", package = "Qploidy")
     # input$load_geno_pos$datapath <- system.file("geno.pos_example.txt", package = "Qploidy")
-    # input$fitpoly_scores$datapath <- system.file("tetraploids_refs_sub_z_scores.dat", package = "Qploidy")
+    # input$fitpoly_scores$datapath <- system.file("tetraploids_refs_scores.dat", package = "Qploidy")
     # input$refs <- paste0("Tetra_", 1:50)
     # input$ploidy <- 4
     # input$n.cores <- 1
@@ -60,12 +61,12 @@ testServer(
     # saveMarkerModels(ploidy=4,
     #                  data=fitpoly_input_sele,
     #                  p.threshold=0.9,
-    #                  filePrefix="tetraploids_refs_z",
-    #                  ncores=1)
+    #                  filePrefix="tetraploids_refs",
+    #                  ncores=20)
 
     # After fitpoly
     scores <- vroom(input$fitpoly_scores$datapath, show_col_types = FALSE)
-    expect_equal(sum(scores$geno, na.rm = TRUE), 203516)
+    expect_equal(sum(scores$geno, na.rm = TRUE), 203403)
 
     # Filters
     n.na <- scores %>% group_by(MarkerName) %>% summarize(n.na = (sum(is.na(geno))/length(geno))*100)
@@ -73,8 +74,8 @@ testServer(
     missing.data <- length(rm.mks)
     scores_filt <- scores[-which(scores$MarkerName %in% rm.mks),]
 
-    keep.mks <- which(fitpoly_input$MarkerName %in% scores_filt$MarkerName &
-                        fitpoly_input$SampleName %in% scores_filt$SampleName)
+    keep.mks <- match(paste0(scores_filt$SampleName, "_", scores_filt$MarkerName),
+                      paste0(fitpoly_input$SampleName, "_", fitpoly_input$MarkerName))
 
     fitpoly_input_filt <- fitpoly_input[keep.mks,]
     theta <- fitpoly_input_filt$ratio
@@ -94,15 +95,12 @@ testServer(
 
     lst_interpolation <- split(data_interpolation, data_interpolation$mks)
 
-    #vroom_write(data_interpolation, file = "data_interpolation.txt")
-
     # Generate clusters
     library(parallel)
     clust <- makeCluster(input$n.cores)
     ploidy <- input$ploidy
     clusterExport(clust, c("par_fitpoly_interpolation"))
-    clusterExport(clust, c("par_fitpoly_interpolation", "ploidy"))
-
+    #clusterExport(clust, c("par_fitpoly_interpolation", "ploidy"))
     clusters <- parLapply(clust, lst_interpolation, function(x) {
       library(ggplot2)
       par_fitpoly_interpolation(x, ploidy= ploidy, plot = FALSE)
@@ -124,10 +122,15 @@ testServer(
     expect_equal(c(nrow(cleaned_summary[[1]]),
                    missing.data,
                    wrong_n_clusters,
-                   length(clusters_filt)), c(2379, 293, 1347, 727))
+                   length(clusters_filt)), c(2379, 294, 1348, 725))
 
     mks <- names(clusters)
     mks[which(rm.mks)] <- paste(mks[which(rm.mks)], "(discarded)")
+
+    # Add discarted
+    data_interpolation_disc.mks <- do.call(rbind, lst_interpolation)
+    data_interpolation_disc.mks$mks.disc <- mks[match(data_interpolation_disc.mks$mks, names(clusters))]
+
     # Plot markers interpolation
     p <- plot_one_marker(lst_interpolation[[1]], ploidy = 4)
     # Discarded marker:

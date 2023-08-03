@@ -12,7 +12,7 @@ mod_all_ui <- function(id){
   tagList(
     sidebarPanel(
       box(width= 12, solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,  status="info", title = "Upload files", label = tags$b("Upload files"),
-          fileInput(ns("load_logR"), label = "Upload logR file"),
+          #fileInput(ns("load_logR"), label = "Upload logR file"),
           fileInput(ns("load_baf"), label = "Upload BAF file")
       ),
       box(width= 12, solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,  status="info", title = "Choose examples", label = tags$b("Choose examples"),
@@ -144,15 +144,18 @@ mod_all_ui <- function(id){
                      column(12,
                             br(),
                             plotOutput(ns("plot_lines")), br(),
-                            plotOutput(ns("plot_hist")), br(),
-                            p("MAPpoly probabilities:"), br(),
-                            plotOutput(ns("plot_haplo_mappoly"), height = "1100px"),
-                            p("polyOrigin probabilities:"), br(),
-                            plotOutput(ns("plot_haplo_polyorigin"), height = "1100px"))
+                            plotOutput(ns("plot_hist"))
+                     ),
+                 ),br(),
+                 box(width = 12, solidHeader = TRUE, collapsible = TRUE,  collapsed = TRUE, status="primary", title = "Haplotypes",
+                     box(width = 12, solidHeader = FALSE, collapsible = TRUE,  collapsed = TRUE, status="primary", title = "MAPpoly probabilities",
+                         plotOutput(ns("plot_haplo_mappoly"), height = "1100px"),
+                     ),
+                     box(width = 12, solidHeader = FALSE, collapsible = TRUE,  collapsed = TRUE, status="primary", title = "PolyOrigin probabilities",
+                         plotOutput(ns("plot_haplo_polyorigin"), height = "1100px"))
                  )
         )
       )
-
     )
   )
 }
@@ -169,59 +172,76 @@ mod_all_server <- function(id){
     ns <- session$ns
 
     input_logR_baf <- reactive({
-      if(!is.null(input$load_logR) & !is.null(input$load_baf)){
-        logR <- vroom(input$load_logR$datapath, show_col_types = FALSE)
-        baf <- vroom(input$load_baf$datapath, show_col_types = FALSE)
-        if(!is.null(input$load_mappoly)){
-          haplo_mappoly <- load(input$load_mappoly$datapath)
-        } else haplo_mappoly <- NULL
+      withProgress(message = 'Working:', value = 0, {
+        incProgress(0.5, detail = paste("Loading BAF file..."))
 
-        if(!is.null(input$load_polyorigin)){ #fixme
-          genofile <- read_polyOrigin(input$load_polyorigin$datapath)
-          f1.codes <- vroom(system.file("F1codes.polyorigin.txt", package = "Qploidy"), show_col_types = FALSE)
-          haplo_polyorigin <- get_probs_polyorigin(genofile,
-                                                   f1.codes = f1.codes,
-                                                   ploidy = input$ploidy_polyorigin, n.cores = 2)
-        } else haplo_polyorigin <- NULL
-        return(list(logR, baf, haplo_mappoly, haplo_polyorigin))
-      } else {
-        return(NULL)
-      }
+        #if(!is.null(input$load_logR) & !is.null(input$load_baf)){
+        if(!is.null(input$load_baf)){
+          #logR <- vroom(input$load_logR$datapath, show_col_types = FALSE)
+          logR <- NULL
+          baf <- vroom(input$load_baf$datapath, show_col_types = FALSE)
+          if(!is.null(input$load_mappoly)){
+            haplo_mappoly <- load(input$load_mappoly$datapath)
+          } else haplo_mappoly <- NULL
+
+          if(!is.null(input$load_polyorigin)){ #fixme
+            genofile <- read_polyOrigin(input$load_polyorigin$datapath)
+            f1.codes <- vroom(system.file("F1codes.polyorigin.txt", package = "Qploidy"), show_col_types = FALSE)
+            haplo_polyorigin <- get_probs_polyorigin(genofile,
+                                                     f1.codes = f1.codes,
+                                                     ploidy = input$ploidy_polyorigin, n.cores = 2)
+          } else haplo_polyorigin <- NULL
+          return(list(logR, baf, haplo_mappoly, haplo_polyorigin))
+        } else {
+          return(NULL)
+        }
+      })
     })
 
     loadExample <- reactive({
-      if(is.null(input_logR_baf())){
-        if(input$example_data == "example_data"){
-          logR <- vroom(system.file("logR.example.txt", package = "Qploidy"), show_col_types = FALSE)
-          baf <- vroom(system.file("baf.example.txt", package = "Qploidy"), show_col_types = FALSE)
-          temp <- load(system.file("mappoly.homoprob.ex.RData", package = "Qploidy"))
-          haplo_mappoly <- get(temp)
-          polyorigin  <- vroom(system.file("genofile_sub.csv", package = "Qploidy"), show_col_types = FALSE)
-          f1.codes <- vroom(system.file("F1codes.polyorigin.txt", package = "Qploidy"), show_col_types = FALSE)
-          ploidy <- 4
-          haplo_polyorigin <- get_probs_polyorigin(polyorigin,
-                                                   f1.codes = f1.codes,
-                                                   ploidy = 4, n.cores = 2)
-          return(list(logR, baf, haplo_mappoly, haplo_polyorigin))
-        } else if(input$example_data == "roses_texas"){
-          logR <- vroom("C:/Users/Rose_Lab/Documents/Cris_temp/Qploidy_data/roses_texas/fitpoly/logR_roses_texas.txt", show_col_types = FALSE)
-          baf <- vroom("C:/Users/Rose_Lab/Documents/Cris_temp/Qploidy_data/roses_texas/fitpoly/baf_roses_texas.txt", show_col_types = FALSE)
-          haplo_mappoly <- readRDS("C:/Users/Rose_Lab/Documents/Cris_temp/TAMU-RoseLab/standalone_apps/ploidy_estimation/data/count_breaks_poly/homoprob_normal.RDS")
-          polyorigin  <- vroom("C:/Users/Rose_Lab/Documents/Cris_temp/Qploidy_data/roses_texas/geno.pos_roses_texas.txt", show_col_types = FALSE)
-          f1.codes <- vroom(system.file("F1codes.polyorigin.txt", package = "Qploidy"), show_col_types = FALSE)
-          ploidy <- 4
-          haplo_polyorigin <- get_probs_polyorigin(polyorigin,
-                                                   f1.codes = f1.codes,
-                                                   ploidy = 4, n.cores = 2)
-          return(list(logR, baf, haplo_mappoly, haplo_polyorigin))
-        } else if(input$example_data == "roses_france"){
-          cat("Developing")
-        } else if(input$example_data == "potatoes") {
-          cat("Developing")
+      withProgress(message = 'Working:', value = 0, {
+        incProgress(0.3, detail = paste("Loading BAF file..."))
+
+        if(is.null(input_logR_baf())){
+          if(input$example_data == "example_data"){
+            #logR <- vroom(system.file("logR.example.txt", package = "Qploidy"), show_col_types = FALSE)
+            logR <- NULL
+            baf <- vroom(system.file("baf.example.txt", package = "Qploidy"), show_col_types = FALSE)
+            temp <- load(system.file("mappoly.homoprob.ex.RData", package = "Qploidy"))
+            haplo_mappoly <- get(temp)
+            polyorigin  <- vroom(system.file("genofile_sub.csv", package = "Qploidy"), show_col_types = FALSE)
+            f1.codes <- vroom(system.file("F1codes.polyorigin.txt", package = "Qploidy"), show_col_types = FALSE)
+            ploidy <- 4
+            haplo_polyorigin <- get_probs_polyorigin(polyorigin,
+                                                     f1.codes = f1.codes,
+                                                     ploidy = 4, n.cores = 2)
+            return(list(logR, baf, haplo_mappoly, haplo_polyorigin))
+          } else if(input$example_data == "roses_texas"){
+            #logR <- vroom("C:/Users/Rose_Lab/Documents/Cris_temp/Qploidy_data/roses_texas/fitpoly/logR_roses_texas.txt", show_col_types = FALSE)
+            logR <- NULL
+            baf <- vroom("C:/Users/Rose_Lab/Documents/Cris_temp/Qploidy_data/roses_texas/fitpoly/baf_roses_texas.txt", show_col_types = FALSE)
+            incProgress(0.3, detail = paste("Loading MAPpoly file..."))
+
+            haplo_mappoly <- readRDS("C:/Users/Rose_Lab/Documents/Cris_temp/TAMU-RoseLab/standalone_apps/ploidy_estimation/data/count_breaks_poly/homoprob_normal.RDS")
+            # polyorigin  <- read_polyOrigin("C:/Users/Rose_Lab/Documents/Cris_temp/Qploidy_data/roses_texas/5pop_compareprob2_fulldata_polyancestry.csv")
+            # f1.codes <- vroom(system.file("F1codes.polyorigin.txt", package = "Qploidy"), show_col_types = FALSE)
+            # ploidy <- 4
+            # haplo_polyorigin <- Qploidy:::get_probs_polyorigin_sd(polyorigin,
+            #                                          f1.codes = f1.codes,
+            #                                          ploidy = 4, n.cores = 20)
+            # saveRDS(haplo_polyorigin, file = "homoprob_polyorigin.rds")
+            incProgress(0.3, detail = paste("Loading PolyOrigin file..."))
+            haplo_polyorigin <- readRDS("C:/Users/Rose_Lab/Documents/Cris_temp/Qploidy_data/roses_texas/homoprob_polyorigin.rds")
+            return(list(logR, baf, haplo_mappoly, haplo_polyorigin))
+          } else if(input$example_data == "roses_france"){
+            cat("Developing")
+          } else if(input$example_data == "potatoes") {
+            cat("Developing")
+          }
+        } else {
+          return(NULL)
         }
-      } else {
-        return(NULL)
-      }
+      })
     })
 
     logR_baf <- reactive({
@@ -243,8 +263,8 @@ mod_all_server <- function(id){
     })
 
     observe({
-      choices_names <- as.list(unique(colnames(logR_baf()[[1]])[-c(1:3)]))
-      names(choices_names) <- unique(colnames(logR_baf()[[1]])[-c(1:3)])
+      choices_names <- as.list(unique(colnames(logR_baf()[[2]])[-c(1:3)]))
+      names(choices_names) <- unique(colnames(logR_baf()[[2]])[-c(1:3)])
 
       updatePickerInput(session, "samples",
                         label = "Select samples for overall analysis",
@@ -253,12 +273,16 @@ mod_all_server <- function(id){
     })
 
     est.ploidy.chr_df <- eventReactive(input$run_overal,{
-      data_sample <- logR_baf()[[2]][,c(2,3,which(colnames(logR_baf()[[2]]) %in% c(input$samples)))]
+      withProgress(message = 'Working:', value = 0, {
+        incProgress(0.5, detail = paste("Estimating ploidy..."))
 
-      data_sample <- data_sample[order(data_sample$Chr, data_sample$Position),]
+        data_sample <- logR_baf()[[2]][,c(2,3,which(colnames(logR_baf()[[2]]) %in% c(input$samples)))]
 
-      est.ploidy.chr_df <- area_estimate_ploidy_by_chr(data_sample, ploidys = input$ploidys, area = input$area)
-      est.ploidy.chr_df
+        data_sample <- data_sample[order(data_sample$Chr, data_sample$Position),]
+
+        est.ploidy.chr_df <- area_estimate_ploidy_by_chr(data_sample, ploidys = input$ploidys, area = input$area)
+        est.ploidy.chr_df
+      })
     })
 
     output$result.ploidy <- DT::renderDataTable({
@@ -364,9 +388,13 @@ mod_all_server <- function(id){
     )
 
     est.ploidy.chr_plots <- reactive({
-      # Build graphics to overview the estimations
-      ps <- plots_overall(est.ploidy.chr_df(),  input$filter_diff, input$filter_corr)
-      ps
+      withProgress(message = 'Working:', value = 0, {
+        incProgress(0.5, detail = paste("Generating plots..."))
+
+        # Build graphics to overview the estimations
+        ps <- plots_overall(est.ploidy.chr_df(),  input$filter_diff, input$filter_corr)
+        return(ps)
+      })
     })
 
     output$overall_p1 <- renderPlot({
@@ -415,30 +443,34 @@ mod_all_server <- function(id){
     )
 
     graphics_breaks <- reactive({
-      aneuploids <- data.frame(X = rownames(est.ploidy.chr_df()[[1]]), est.ploidy.chr_df()[[1]])
+      withProgress(message = 'Working:', value = 0, {
+        incProgress(0.5, detail = paste("Counting breaks..."))
 
-      if(any(unique(haplo()[[1]]$homoprob$individual) %in% input$samples)){
-        breaks_mappoly_df <- count_breaks_df(homoprob =haplo()[[1]]$homoprob,
-                                                     aneuploids = aneuploids,
-                                                     inds = input$samples)
+        aneuploids <- data.frame(X = rownames(est.ploidy.chr_df()[[1]]), est.ploidy.chr_df()[[1]])
 
-        breaks_mappoly_plot <- count_breaks_plot(breaks_mappoly_df,
-                                                       by_LG = FALSE)
-        breaks_mappoly <- list(df=breaks_mappoly_df, plot = breaks_mappoly_plot)
-      } else breaks_mappoly <- NULL
+        if(any(unique(haplo()[[1]]$homoprob$individual) %in% input$samples)){
+          breaks_mappoly_df <- count_breaks_df(homoprob =haplo()[[1]]$homoprob,
+                                               aneuploids = aneuploids,
+                                               inds = input$samples)
 
-      if(any(unique(haplo()[[2]]$homoprob$individual) %in% input$samples)){
-        breaks_polyorigin_df <- count_breaks_df(homoprob =haplo()[[2]]$homoprob,
-                                                           aneuploids = aneuploids,
-                                                           inds = input$samples)
+          breaks_mappoly_plot <- count_breaks_plot(breaks_mappoly_df,
+                                                   by_LG = FALSE)
+          breaks_mappoly <- list(df=breaks_mappoly_df, plot = breaks_mappoly_plot)
+        } else breaks_mappoly <- NULL
 
-        breaks_polyorigin_plot <- count_breaks_plot(breaks_polyorigin_df,
-                                                             by_LG = FALSE)
+        if(any(unique(haplo()[[2]]$homoprob$individual) %in% input$samples)){
+          breaks_polyorigin_df <- count_breaks_df(homoprob =haplo()[[2]]$homoprob,
+                                                  aneuploids = aneuploids,
+                                                  inds = input$samples)
 
-        breaks_polyorigin <- list(df = breaks_polyorigin_df, plot = breaks_polyorigin_plot)
-      } else breaks_polyorigin <- NULL
+          breaks_polyorigin_plot <- count_breaks_plot(breaks_polyorigin_df,
+                                                      by_LG = FALSE)
 
-      list(breaks_mappoly, breaks_polyorigin)
+          breaks_polyorigin <- list(df = breaks_polyorigin_df, plot = breaks_polyorigin_plot)
+        } else breaks_polyorigin <- NULL
+
+        return(list(breaks_mappoly, breaks_polyorigin))
+      })
     })
 
     output$breaks_mappoly_plot <- renderPlot({
@@ -484,8 +516,8 @@ mod_all_server <- function(id){
     )
 
     observe({
-      choices_names <- as.list(unique(colnames(logR_baf()[[1]])[-c(1:3)]))
-      names(choices_names) <- unique(colnames(logR_baf()[[1]])[-c(1:3)])
+      choices_names <- as.list(unique(colnames(logR_baf()[[2]])[-c(1:3)]))
+      names(choices_names) <- unique(colnames(logR_baf()[[2]])[-c(1:3)])
 
       updatePickerInput(session, "graphics",
                         label = "Select sample for the graphic",
@@ -495,35 +527,58 @@ mod_all_server <- function(id){
 
     # Single individual analysis
     graphics_baf <- eventReactive(input$run_individual,{
-      data_sample <- logR_baf()[[2]][,c(2,3,which(colnames(logR_baf()[[2]]) %in% c(input$graphics)))]
-      colnames(data_sample)[3] <- "sample"
+      withProgress(message = 'Working:', value = 0, {
+        incProgress(0.5, detail = paste("Generating individual BAF plots..."))
 
-      p_baf <- plot_baf(data_sample, input$area_single, input$ploidy, input$dot.size, input$add_lines, input$colors)
-      p_hist <- plot_baf_hist(data_sample, input$area_single, input$ploidy, input$colors, input$add_lines)
+        data_sample <- logR_baf()[[2]][,c(2,3,which(colnames(logR_baf()[[2]]) %in% c(input$graphics)))]
+        colnames(data_sample)[3] <- "sample"
 
-      if(any(unique(haplo()[[1]]$homoprob$individual) %in% input$graphics)){
-        haplo_lst <- list()
-        for(i in 1:length(unique(haplo()[[1]]$homoprob$LG))){
-          haplo_lst[[i]] <- plot(haplo()[[1]], lg = unique(haplo()[[1]]$homoprob$LG)[i],
-                                 ind = input$graphics,
-                                 use.plotly = FALSE)
-        }
+        p_baf <- plot_baf(data_sample, input$area_single, input$ploidy, input$dot.size, input$add_lines, input$colors)
+        p_hist <- plot_baf_hist(data_sample, input$area_single, input$ploidy, input$colors, input$add_lines)
 
-        all_haplo_mappoly <- ggarrange(plotlist = haplo_lst, common.legend = TRUE)
-      } else all_haplo_mappoly <- NULL
+        return(list(p_baf, p_hist))
+      })
+    })
 
-      if(any(unique(haplo()[[2]]$homoprob$individual) %in% input$graphics)){
-        haplo_lst <- list()
-        for(i in 1:length(unique(haplo()[[2]]$homoprob$LG))){
-          haplo_lst[[i]] <- plot(haplo()[[2]], lg = unique(haplo()[[2]]$homoprob$LG)[i],
-                                 ind = input$graphics,
-                                 use.plotly = FALSE)
-        }
+    individual_haplo <- reactive({
+      withProgress(message = 'Working:', value = 0, {
+        incProgress(0.5, detail = paste("Generating individual haplotypes plots..."))
 
-        all_haplo_polyorigin <- ggarrange(plotlist = haplo_lst, common.legend = TRUE)
-      } else all_haplo_polyorigin <- NULL
+        mappoly <- haplo()[[1]]
+        if(all(grep("^X", unique(mappoly$homoprob$individual))))
+          mappoly$homoprob$individual <- gsub("^X", "", mappoly$homoprob$individual)
 
-      list(p_baf, p_hist, all_haplo_mappoly, all_haplo_polyorigin)
+        print(unique(mappoly$homoprob$individual))
+        if(any(unique(mappoly$homoprob$individual) %in% input$graphics)){
+          haplo_lst <- list()
+          for(i in 1:length(unique(mappoly$homoprob$homoprob$LG))){
+            haplo_lst[[i]] <- plot(mappoly, lg = unique(mappoly$homoprob$LG)[i],
+                                   ind = input$graphics,
+                                   use.plotly = FALSE)
+          }
+
+          all_haplo_mappoly <- ggarrange(plotlist = haplo_lst, common.legend = TRUE)
+        } else all_haplo_mappoly <- NULL
+
+        polyorigin <- haplo()[[2]]
+        if(all(grep("^X", unique(polyorigin$homoprob$individual))))
+          polyorigin$homoprob$individual <- gsub("^X", "",polyorigin$homoprob$individual)
+
+        print(unique(polyorigin$homoprob$individual))
+
+        if(any(polyorigin$homoprob$individual %in% input$graphics)){
+          haplo_lst <- list()
+          for(i in 1:length(unique(polyorigin$homoprob$LG))){
+            haplo_lst[[i]] <- plot(polyorigin, lg = unique(polyorigin$homoprob$LG)[i],
+                                   ind = input$graphics,
+                                   use.plotly = FALSE)
+          }
+
+          all_haplo_polyorigin <- ggarrange(plotlist = haplo_lst, common.legend = TRUE)
+        } else all_haplo_polyorigin <- NULL
+
+        return(list(all_haplo_mappoly, all_haplo_polyorigin))
+      })
     })
 
     output$plot_lines <- renderPlot({
@@ -535,66 +590,18 @@ mod_all_server <- function(id){
     })
 
     output$plot_haplo_mappoly <- renderPlot({
-      graphics_baf()[[3]]
+      validate(
+        need(!is.null(individual_haplo()[[1]]), "MAPpoly haplotype information not provided for this individual."),
+      )
+      individual_haplo()[[1]]
     })
 
     output$plot_haplo_polyorigin <- renderPlot({
-      graphics_baf()[[3]]
+      validate(
+        need(!is.null(individual_haplo()[[2]]), "PolyOrigin haplotype information not provided for this individual."),
+      )
+      individual_haplo()[[2]]
     })
-
-    graphics_logR <- eventReactive(input$run_individual,{
-      # logR_sample <- data[[1]][,c(2,3,which(colnames(data[[1]]) %in% c(input$graphics)))]
-      logR_sample <- data()[[1]][,c(2,3,which(colnames(data()[[1]]) %in% c(input$graphics)))]
-      colnames(logR_sample)[3] <- "sample"
-      # Segmentation of logR
-      logR_list <- split(logR_sample, logR_sample[,1])
-      logR_list <- lapply(logR_list, function(x) x[order(x[,2]$Position),])
-      segs_all <- lapply(logR_list, function(x) {
-        if(length(which(is.na(x$sample))) > 0) {
-          x1 <- x$Position[-which(is.na(x$sample))]
-          y1 <- x$sample[-which(is.na(x$sample))]
-        } else {
-          x1 <- x$Position
-          y1 <- x$sample
-        }
-
-        dpseg(x= x1,
-              y= y1,
-              jumps=FALSE,
-              P=0.001,
-              type="var",
-              store.matrix=TRUE)
-      })
-
-      logR_list_int <- logR_list
-      for(j in 1:length(segs_all)){
-        intercept <- vector()
-        for(i in 1:length(segs_all[[j]]$segments$x1)){
-          idx_start <- which(logR_list[[j]]$Position == segs_all[[j]]$segments$x1[i])
-          idx_end <- which(logR_list[[j]]$Position == segs_all[[j]]$segments$x2[i])
-          intercept[idx_start[1]:idx_end[length(idx_end)]] <- segs_all[[j]]$segments$intercept[i]
-        }
-        if(length(intercept) != nrow(logR_list[[j]])) intercept[length(intercept):nrow(logR_list[[j]])] <- NA # bugfix
-        logR_list_int[[j]] <- cbind(logR_list[[j]],intercept)
-      }
-
-      logR_df_int <- do.call(rbind, logR_list_int)
-
-      #lim <- max(c(abs(max(logR_df_int$sample, na.rm = T)), abs(min(logR_df_int$sample, na.rm = T))))
-      segs_plot <- logR_df_int %>% ggplot(aes(x=Position)) +
-        geom_point(aes(y = sample), alpha = 0.3) +
-        geom_line(aes(y=intercept), color = "red") + ylab("logR") +
-        facet_grid(.~Chr , scales = "free_x") + theme_bw() + ylim(-1,1)+
-        theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
-
-      segs_plot
-    })
-
-    output$plot_logR <- renderPlot({
-      graphics_logR()
-    })
-
-
   })
 }
 

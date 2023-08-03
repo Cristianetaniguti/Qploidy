@@ -152,11 +152,11 @@ mod_interpolation_server <- function(id){
       withProgress(message = 'Working:', value = 0, {
         if(is.null(input_summary())){
           if(input$example_data == "example_data"){
-            incProgress(0.3, detail = paste("Loading example data..."))
+            incProgress(0.5, detail = paste("Loading example data..."))
             result <- readRDS(system.file("summary_result_example.rds", package = "Qploidy"))
             return(result)
           } else if(input$example_data == "roses_texas"){
-            incProgress(0.3, detail = paste("Loading roses data..."))
+            incProgress(0.5, detail = paste("Loading roses data..."))
 
             summary <- vroom("C:/Users/Rose_Lab/Documents/Cris_temp/Qploidy_data/roses_texas/summary_roses_texas.txt", show_col_types = FALSE)
             ind.names <- vroom("C:/Users/Rose_Lab/Documents/Cris_temp/Qploidy_data/roses_texas/ind.names_roses_texas.txt", show_col_types = FALSE)
@@ -200,9 +200,13 @@ mod_interpolation_server <- function(id){
     })
 
     refs_fitpoly <- reactive({
-      refs_fitpoly <- summary()[[1]]
-      refs_fitpoly <- refs_fitpoly %>% filter(.data$SampleName %in% input$refs)
-      refs_fitpoly
+      withProgress(message = 'Working:', value = 0, {
+        incProgress(0.5, detail = paste("Filtering scores..."))
+
+        refs_fitpoly <- summary()[[1]]
+        refs_fitpoly <- refs_fitpoly %>% filter(.data$SampleName %in% input$refs)
+        return(refs_fitpoly)
+      })
     })
 
     output$down_fitpoly <- downloadHandler(
@@ -218,101 +222,122 @@ mod_interpolation_server <- function(id){
     )
 
     fitpoly_scores <- reactive({
-      if(is.null(input$load_scores)){
-        scores <- NULL
-      } else {
-        scores <- vroom(input$load_scores$datapath, show_col_types = FALSE)
-      }
+      withProgress(message = 'Working:', value = 0, {
+
+        if(is.null(input$load_scores)){
+          scores <- NULL
+        } else {
+          incProgress(0.5, detail = paste("Loading scores data..."))
+
+          scores <- vroom(input$load_scores$datapath, show_col_types = FALSE)
+        }
+      })
+
       scores
     })
 
     lst_interpolation <- reactive({
-      if(!is.null(fitpoly_scores())){
-        n.na <- fitpoly_scores() %>% group_by(.data$MarkerName) %>% summarize(n.na = (sum(is.na(.data$geno))/length(.data$geno))*100)
-        rm.mks <- n.na$MarkerName[which(n.na$n.na > 25)]
-        missing.data <- length(rm.mks)
-        scores_filt <- fitpoly_scores()[-which(fitpoly_scores()$MarkerName %in% rm.mks),]
+      withProgress(message = 'Working:', value = 0, {
+        incProgress(0.5, detail = paste("Preparing for clusterization..."))
+        if(!is.null(fitpoly_scores())){
+          n.na <- fitpoly_scores() %>% group_by(.data$MarkerName) %>% summarize(n.na = (sum(is.na(.data$geno))/length(.data$geno))*100)
+          rm.mks <- n.na$MarkerName[which(n.na$n.na > 25)]
+          missing.data <- length(rm.mks)
+          scores_filt <- fitpoly_scores()[-which(fitpoly_scores()$MarkerName %in% rm.mks),]
 
-        keep.mks <- match(paste0(scores_filt$MarkerName, "_",scores_filt$SampleName),
-                          paste0(summary()[[1]]$MarkerName, "_", summary()[[1]]$SampleName))
+          keep.mks <- match(paste0(scores_filt$MarkerName, "_",scores_filt$SampleName),
+                            paste0(summary()[[1]]$MarkerName, "_", summary()[[1]]$SampleName))
 
-        fitpoly_input_filt <- summary()[[1]][keep.mks,]
-        theta <- fitpoly_input_filt$ratio
-        R <- fitpoly_input_filt$R
+          fitpoly_input_filt <- summary()[[1]][keep.mks,]
+          theta <- fitpoly_input_filt$ratio
+          R <- fitpoly_input_filt$R
 
-        rm.na <- which(is.na(scores_filt$geno))
-        if(length(rm.na) > 0){
-          R[rm.na] <- NA
-          theta[rm.na] <- NA
+          rm.na <- which(is.na(scores_filt$geno))
+          if(length(rm.na) > 0){
+            R[rm.na] <- NA
+            theta[rm.na] <- NA
+          }
+
+          data_interpolation <- data.frame(mks = fitpoly_input_filt$MarkerName,
+                                           ind = fitpoly_input_filt$SampleName,
+                                           R = R,
+                                           theta = theta,
+                                           geno = scores_filt$geno)
+          lst_inter <- split(data_interpolation, data_interpolation$mks)
+
+          return(list(data_interpolation, missing.data))
+        } else {
+          return(NULL)
         }
-
-        data_interpolation <- data.frame(mks = fitpoly_input_filt$MarkerName,
-                                         ind = fitpoly_input_filt$SampleName,
-                                         R = R,
-                                         theta = theta,
-                                         geno = scores_filt$geno)
-        lst_inter <- split(data_interpolation, data_interpolation$mks)
-
-        return(list(data_interpolation, missing.data))
-      } else {
-        return(NULL)
-      }
+      })
     })
 
     clusters <- reactive({
-      # Generate clusters
-      if(!is.null(fitpoly_scores())){
-        ploidy_r <- input$ploidy
-        clust <- makeCluster(input$n.cores)
-        clusterExport(clust, c("par_fitpoly_interpolation"))
-        clusters <- parLapply(clust, lst_interpolation()[[1]], function(x) {
-          par_fitpoly_interpolation(x, ploidy= ploidy_r , plot = FALSE)
-        })
-        stopCluster(clust)
-        return(clusters)
-      } else {
-        return(NULL)
-      }
+      withProgress(message = 'Working:', value = 0, {
+        incProgress(0.5, detail = paste("Defining clusters centroids..."))
+
+        # Generate clusters
+        if(!is.null(fitpoly_scores())){
+          ploidy_r <- input$ploidy
+          clust <- makeCluster(input$n.cores)
+          clusterExport(clust, c("par_fitpoly_interpolation"))
+          clusters <- parLapply(clust, lst_interpolation()[[1]], function(x) {
+            par_fitpoly_interpolation(x, ploidy= ploidy_r , plot = FALSE)
+          })
+          stopCluster(clust)
+          return(clusters)
+        } else {
+          return(NULL)
+        }
+      })
     })
 
     filters <- reactive({
-      if(!is.null(clusters())){
-        # Filter by number of clusters
-        rm.mks <- sapply(clusters(), function(x) is.null(x$mod))
-        wrong_n_clusters <- sum(unlist(rm.mks))
-        clusters_filt <- clusters()[-which(rm.mks)]
+      withProgress(message = 'Working:', value = 0, {
+        incProgress(0.5, detail = paste("Counting filtered markers..."))
 
-        # Filtered markers table
-        filtered.markers <- data.frame(nrow(summary()[[2]]),
-                                       lst_interpolation()[[2]],
-                                       wrong_n_clusters,
-                                       length(clusters_filt))
+        if(!is.null(clusters())){
+          # Filter by number of clusters
+          rm.mks <- sapply(clusters(), function(x) is.null(x$mod))
+          wrong_n_clusters <- sum(unlist(rm.mks))
+          clusters_filt <- clusters()[-which(rm.mks)]
 
-        colnames(filtered.markers) <- c("n.mk.start", "missing.data", "wrong_n_clusters", "n.mk.selected")
-        return(list(clusters_filt, filtered.markers, rm.mks))
-      } else if(!is.null(input$filters_table)){
-        filtered.markers <- vroom(input$filter_table)
-        return(list(NULL, filtered.markers, NULL))
-      } else {
-        filtered.markers <- vroom(system.file("filtered.markers.txt", package = "Qploidy"))
-        return(list(NULL, filtered.markers, NULL))
-      }
+          # Filtered markers table
+          filtered.markers <- data.frame(nrow(summary()[[2]]),
+                                         lst_interpolation()[[2]],
+                                         wrong_n_clusters,
+                                         length(clusters_filt))
+
+          colnames(filtered.markers) <- c("n.mk.start", "missing.data", "wrong_n_clusters", "n.mk.selected")
+          return(list(clusters_filt, filtered.markers, rm.mks))
+        } else if(!is.null(input$filters_table)){
+          filtered.markers <- vroom(input$filter_table)
+          return(list(NULL, filtered.markers, NULL))
+        } else {
+          filtered.markers <- vroom(system.file("filtered.markers.txt", package = "Qploidy"))
+          return(list(NULL, filtered.markers, NULL))
+        }
+      })
     })
 
     data_interpolation_disc.mks <- reactive({
-      if(is.null(input$data_interpolation_in) & is.null(lst_interpolation())){
-        data_interpolation_disc.mks <- readRDS(system.file("data_interpolation.rds", package = "Qploidy"))
-      } else if(is.null(input$data_interpolation_in)) {
-        # Add discarted
-        rm.mks <- sapply(clusters, function(x) is.null(x$mod))
-        mks <- names(clusters)
-        mks[which(rm.mks)] <- paste(mks[which(rm.mks)], "(discarded)")
-        data_interpolation_disc.mks <- do.call(rbind, lst_interpolation()[[1]])
-        data_interpolation_disc.mks$mks.disc <- mks[match(data_interpolation_disc.mks$mks, names(clusters()))]
-      } else {
-        data_interpolation_disc.mks <- vroom(input$data_interpolation_in$datapath)
-      }
-      return(data_interpolation_disc.mks)
+      withProgress(message = 'Working:', value = 0, {
+        incProgress(0.5, detail = paste("Counting filtered markers..."))
+
+        if(is.null(input$data_interpolation_in) & is.null(lst_interpolation())){
+          data_interpolation_disc.mks <- readRDS(system.file("data_interpolation.rds", package = "Qploidy"))
+        } else if(is.null(input$data_interpolation_in)) {
+          # Add discarted
+          rm.mks <- sapply(clusters, function(x) is.null(x$mod))
+          mks <- names(clusters)
+          mks[which(rm.mks)] <- paste(mks[which(rm.mks)], "(discarded)")
+          data_interpolation_disc.mks <- do.call(rbind, lst_interpolation()[[1]])
+          data_interpolation_disc.mks$mks.disc <- mks[match(data_interpolation_disc.mks$mks, names(clusters()))]
+        } else {
+          data_interpolation_disc.mks <- vroom(input$data_interpolation_in$datapath)
+        }
+        return(data_interpolation_disc.mks)
+      })
     })
 
     output$data_interpolation <- downloadHandler(
@@ -327,19 +352,25 @@ mod_interpolation_server <- function(id){
     )
 
     observe({
-      choices <- as.list(unique(data_interpolation_disc.mks()$mks))
-      names(choices) <- unique(data_interpolation_disc.mks()$mks.disc)
+      withProgress(message = 'Working:', value = 0, {
+        incProgress(0.5, detail = paste("Counting filtered markers..."))
 
-      updatePickerInput(session, "int_marker",
-                        label = "Selected marker",
-                        choices = choices,
-                        selected=unlist(choices)[1])
+        choices <- as.list(unique(data_interpolation_disc.mks()$mks))
+        names(choices) <- unique(data_interpolation_disc.mks()$mks.disc)
+
+        updatePickerInput(session, "int_marker",
+                          label = "Selected marker",
+                          choices = choices,
+                          selected=unlist(choices)[1])
+      })
 
     })
 
     output$interpolation <- renderPlot({
-      lst_interpolation <- split(data_interpolation_disc.mks(), data_interpolation_disc.mks()$mks)
-      plot_one_marker(lst_interpolation[[input$int_marker]], ploidy = input$ploidy)
+      if(input$int_marker != "This will be updated"){
+        lst_interpolation <- split(data_interpolation_disc.mks(), data_interpolation_disc.mks()$mks)
+        plot_one_marker(lst_interpolation[[input$int_marker]], ploidy = input$ploidy)
+      } else NULL
     })
 
     output$filtered_markers <- DT::renderDataTable(server = FALSE, {
@@ -352,58 +383,62 @@ mod_interpolation_server <- function(id){
     })
 
     logR_BAF <- reactive({
-      if(!is.null(filters()[[1]])){
-        keep.mks <- names(filters()[[1]])
-        # Getting logR for entire dataset
-        R_filt <- summary()[[2]][match(keep.mks, summary()[[2]]$MarkerName),]
-        theta_filt <- summary()[[3]][match(keep.mks, summary()[[3]]$MarkerName),]
+      withProgress(message = 'Working:', value = 0, {
+        incProgress(0.5, detail = paste("Interpolating BAF..."))
 
-        par <- rep(1:input$n.cores, each=round((nrow(R_filt)/input$n.cores)+1,0))[1:nrow(R_filt)]
+        if(!is.null(filters()[[1]])){
+          keep.mks <- names(filters()[[1]])
+          # Getting logR for entire dataset
+          R_filt <- summary()[[2]][match(keep.mks, summary()[[2]]$MarkerName),]
+          theta_filt <- summary()[[3]][match(keep.mks, summary()[[3]]$MarkerName),]
 
-        par_R <- split.data.frame(R_filt[,-1], par)
-        par_theta <- split.data.frame(theta_filt[,-1], par)
-        par_clusters_filt <- split(filters()[[1]], par)
+          par <- rep(1:input$n.cores, each=round((nrow(R_filt)/input$n.cores)+1,0))[1:nrow(R_filt)]
 
-        par_all <- list()
-        for(i in 1:input$n.cores){
-          par_all[[i]] <- list()
-          par_all[[i]][[1]] <- par_R[[i]]
-          par_all[[i]][[2]] <- par_theta[[i]]
-          par_all[[i]][[3]] <- par_clusters_filt[[i]]
+          par_R <- split.data.frame(R_filt[,-1], par)
+          par_theta <- split.data.frame(theta_filt[,-1], par)
+          par_clusters_filt <- split(filters()[[1]], par)
+
+          par_all <- list()
+          for(i in 1:input$n.cores){
+            par_all[[i]] <- list()
+            par_all[[i]][[1]] <- par_R[[i]]
+            par_all[[i]][[2]] <- par_theta[[i]]
+            par_all[[i]][[3]] <- par_clusters_filt[[i]]
+          }
+
+          clust <- makeCluster(input$n.cores)
+          ploidy_r <- input$ploidy
+          clusterExport(clust, c("get_logR", "get_logR_par"))
+          logRs_diplo <- parLapply(clust, par_all, function(x) {
+            get_logR_par(x, ploidy = ploidy_r)
+          })
+          stopCluster(clust)
+
+          logRs_diplod_lt <- unlist(logRs_diplo, recursive = F)
+          logRs_diplod_m <- do.call(rbind, logRs_diplod_lt)
+          rownames(logRs_diplod_m) <- keep.mks
+          logRs_diplod_m <- cbind(mks=rownames(logRs_diplod_m), logRs_diplod_m)
+
+          # Get BAF
+          clust <- makeCluster(input$n.cores)
+          clusterExport(clust, c("get_baf", "get_baf_par"))
+          bafs_diplo <- parLapply(clust, par_all, function(x) {
+            get_baf_par(x, ploidy = ploidy_r)
+          })
+          stopCluster(clust)
+
+          bafs_diplo_lt <- unlist(bafs_diplo, recursive = F)
+          bafs_diplo_m <- do.call(rbind, bafs_diplo_lt)
+          rownames(bafs_diplo_m) <- keep.mks
+          colnames(bafs_diplo_m) <- colnames(logRs_diplod_m)[-1]
+          bafs_diplo_df <- as.data.frame(bafs_diplo_m)
+          bafs_diplo_df <- cbind(mks=rownames(bafs_diplo_df), bafs_diplo_df)
+
+          return(list(logRs_diplod_m, bafs_diplo_df))
+        } else {
+          return(NULL)
         }
-
-        clust <- makeCluster(input$n.cores)
-        ploidy_r <- input$ploidy
-        clusterExport(clust, c("get_logR", "get_logR_par"))
-        logRs_diplo <- parLapply(clust, par_all, function(x) {
-          get_logR_par(x, ploidy = ploidy_r)
-        })
-        stopCluster(clust)
-
-        logRs_diplod_lt <- unlist(logRs_diplo, recursive = F)
-        logRs_diplod_m <- do.call(rbind, logRs_diplod_lt)
-        rownames(logRs_diplod_m) <- keep.mks
-        logRs_diplod_m <- cbind(mks=rownames(logRs_diplod_m), logRs_diplod_m)
-
-        # Get BAF
-        clust <- makeCluster(input$n.cores)
-        clusterExport(clust, c("get_baf", "get_baf_par"))
-        bafs_diplo <- parLapply(clust, par_all, function(x) {
-          get_baf_par(x, ploidy = ploidy_r)
-        })
-        stopCluster(clust)
-
-        bafs_diplo_lt <- unlist(bafs_diplo, recursive = F)
-        bafs_diplo_m <- do.call(rbind, bafs_diplo_lt)
-        rownames(bafs_diplo_m) <- keep.mks
-        colnames(bafs_diplo_m) <- colnames(logRs_diplod_m)[-1]
-        bafs_diplo_df <- as.data.frame(bafs_diplo_m)
-        bafs_diplo_df <- cbind(mks=rownames(bafs_diplo_df), bafs_diplo_df)
-
-        return(list(logRs_diplod_m, bafs_diplo_df))
-      } else {
-        return(NULL)
-      }
+      })
     })
 
     output$down_logR <- downloadHandler(

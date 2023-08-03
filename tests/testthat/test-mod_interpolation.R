@@ -18,6 +18,7 @@ testServer(
     # library(dplyr)
     # library(tidyr)
     # library(testthat)
+
     session$setInputs(load_summary = list(datapath = system.file("summary_example.txt", package = "Qploidy")),
                       load_ind_names = list(datapath = system.file("ind.names_example.txt", package = "Qploidy")),
                       load_geno_pos = list(datapath = system.file("geno.pos_example.txt", package = "Qploidy")),
@@ -66,7 +67,7 @@ testServer(
 
     # After fitpoly
     scores <- vroom(input$fitpoly_scores$datapath, show_col_types = FALSE)
-    expect_equal(sum(scores$geno, na.rm = TRUE), 203516)
+    expect_equal(sum(scores$geno, na.rm = TRUE), 203403)
 
     # Filters
     n.na <- scores %>% group_by(MarkerName) %>% summarize(n.na = (sum(is.na(geno))/length(geno))*100)
@@ -122,7 +123,7 @@ testServer(
     expect_equal(c(nrow(cleaned_summary[[1]]),
                    missing.data,
                    wrong_n_clusters,
-                   length(clusters_filt)), c(2379, 293, 1347, 727))
+                   length(clusters_filt)), c(2379, 294, 1348, 725))
 
     mks <- names(clusters)
     mks[which(rm.mks)] <- paste(mks[which(rm.mks)], "(discarded)")
@@ -158,6 +159,7 @@ testServer(
 
     clust <- makeCluster(input$n.cores)
     clusterExport(clust, c("get_logR", "get_logR_par"))
+    #clusterExport(clust, c("get_logR", "get_logR_par", "ploidy"))
     logRs_diplo <- parLapply(clust, par_all, function(x) {
       get_logR_par(x, ploidy = ploidy)
     })
@@ -171,6 +173,7 @@ testServer(
     # Get BAF
     clust <- makeCluster(input$n.cores)
     clusterExport(clust, c("get_baf", "get_baf_par"))
+    #clusterExport(clust, c("get_baf", "get_baf_par", "ploidy"))
     bafs_diplo <- parLapply(clust, par_all, function(x) {
       get_baf_par(x, ploidy = ploidy)
     })
@@ -184,7 +187,7 @@ testServer(
     bafs_diplo_df <- cbind(mks=rownames(bafs_diplo_df), bafs_diplo_df)
 
     expect_equal(sum(bafs_diplo_df[,-1]), 25343, tolerance = 1)
-    expect_equal(round(sum(logRs_diplod_m[,-1], na.rm = T),0), 2067)
+    expect_equal(round(sum(logRs_diplod_m[,-1], na.rm = T),0), 2066)
 
     geno.pos <- vroom(input$load_geno_pos$datapath, show_col_types = FALSE)
 

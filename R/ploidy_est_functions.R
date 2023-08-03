@@ -32,9 +32,9 @@ area_estimate_ploidy_by_chr <- function(data_sample, ploidys, area){
     prop_tot <- modes_tot  <- sd_areas_tot <- as.list(rep(NA, length(by_chr)))
     for(z in 1:length(by_chr)){
       for(i in 1:nrow(rets)){
-        prop <- apply(by_chr[[z]][,-c(1,2)], 2, function(x) sum(x >= rets$ymin[i] & x <= rets$ymax[i]))
-        modes <- apply(by_chr[[z]][,-c(1,2)], 2, function(x) median(x[x >= rets$ymin[i] & x <= rets$ymax[i]]))
-        sd_areas <- apply(by_chr[[z]][,-c(1,2)], 2, function(x) sd(x[x >= rets$ymin[i] & x <= rets$ymax[i]]))
+        prop <- apply(by_chr[[z]][,-c(1,2)], 2, function(x) sum(x >= rets$ymin[i] & x <= rets$ymax[i], na.rm = TRUE))
+        modes <- apply(by_chr[[z]][,-c(1,2)], 2, function(x) median(x[x >= rets$ymin[i] & x <= rets$ymax[i]],na.rm = TRUE))
+        sd_areas <- apply(by_chr[[z]][,-c(1,2)], 2, function(x) sd(x[x >= rets$ymin[i] & x <= rets$ymax[i]], na.rm = TRUE))
 
         prop_tot[[z]] <- rbind(prop_tot[[z]], prop)
         modes_tot[[z]] <- rbind(modes_tot[[z]], modes)
@@ -45,8 +45,8 @@ area_estimate_ploidy_by_chr <- function(data_sample, ploidys, area){
     # remove NAs
     prop_tot <- lapply(prop_tot, function(x) x[-1,])
     for(z in 1:length(prop_tot)){
-      if(is.null(ncol(prop_tot[[z]]))) dots.int <- sum(prop_tot[[z]])/dim(by_chr[[z]])[1] else
-        dots.int <- apply(prop_tot[[z]], 2, function(x) sum(x)/dim(by_chr[[z]])[1])
+      if(is.null(ncol(prop_tot[[z]]))) dots.int <- sum(prop_tot[[z]], na.rm = TRUE)/dim(by_chr[[z]])[1] else
+        dots.int <- apply(prop_tot[[z]], 2, function(x) sum(x, na.rm = TRUE)/dim(by_chr[[z]])[1])
       dots.int_tot[[z]] <- rbind(dots.int_tot[[z]], dots.int)
 
       modes_paste <- apply(modes_tot[[z]], 2, function(x) paste0(round(x[-1],3), collapse = "/"))
@@ -120,8 +120,8 @@ area_estimate_ploidy_by_chr <- function(data_sample, ploidys, area){
   modes_paste_tot_mt <- t(modes_paste_tot_mt)
   dots.int_tot_mt <- t(dots.int_tot_mt)
 
-  colnames(result.ploidy) <- colnames(diff.first.second) <- paste0("Chr",names(by_chr))
-  colnames(sd_tot_mt) <- colnames(corr_tot_mt) <- colnames(modes_paste_tot_mt) <- colnames(dots.int_tot_mt) <- paste0("Chr",names(by_chr))
+  colnames(result.ploidy) <- colnames(diff.first.second) <- names(by_chr)
+  colnames(sd_tot_mt) <- colnames(corr_tot_mt) <- colnames(modes_paste_tot_mt) <- colnames(dots.int_tot_mt) <- names(by_chr)
 
   rownames(diff.first.second) <- rownames(result.ploidy)
   rownames(sd_tot_mt) <- rownames(corr_tot_mt) <- rownames(modes_paste_tot_mt) <- rownames(dots.int_tot_mt) <- rownames(result.ploidy)
@@ -455,6 +455,6 @@ plot_baf_hist <- function(data_sample, area_single, ploidy, colors, add_lines){
           legend.position="bottom") +
     labs(color= "Peaks", fill = "Area")
 
-  p_hist <- ggarrange(p_hist_all, p_hist, widths = c(1,max(data_sample$Chr)-2))
+  p_hist <- ggarrange(p_hist_all, p_hist, widths = c(1,length(unique(data_sample$Chr))-2))
   return(p_hist)
 }

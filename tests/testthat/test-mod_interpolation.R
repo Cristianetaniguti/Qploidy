@@ -21,7 +21,7 @@ testServer(
     session$setInputs(load_summary = list(datapath = system.file("summary_example.txt", package = "Qploidy")),
                       load_ind_names = list(datapath = system.file("ind.names_example.txt", package = "Qploidy")),
                       load_geno_pos = list(datapath = system.file("geno.pos_example.txt", package = "Qploidy")),
-                      fitpoly_scores = list(datapath = system.file("tetraploids_refs_sub_z_scores.dat", package = "Qploidy")),
+                      fitpoly_scores = list(datapath = system.file("tetraploids_refs_scores.tsv.gz", package = "Qploidy")),
                       refs = paste0("Tetra_", 1:50),
                       ploidy = 4,
                       n.cores = 1)
@@ -31,7 +31,7 @@ testServer(
     # input$load_summary$datapath <- system.file("summary_example.txt", package = "Qploidy")
     # input$load_ind_names$datapath <- system.file("ind.names_example.txt", package = "Qploidy")
     # input$load_geno_pos$datapath <- system.file("geno.pos_example.txt", package = "Qploidy")
-    # input$fitpoly_scores$datapath <- system.file("tetraploids_refs_scores.dat", package = "Qploidy")
+    # input$fitpoly_scores$datapath <- system.file("tetraploids_refs_scores.tsv.gz", package = "Qploidy")
     # input$refs <- paste0("Tetra_", 1:50)
     # input$ploidy <- 4
     # input$n.cores <- 1
@@ -66,7 +66,7 @@ testServer(
 
     # After fitpoly
     scores <- vroom(input$fitpoly_scores$datapath, show_col_types = FALSE)
-    expect_equal(sum(scores$geno, na.rm = TRUE), 203403)
+    expect_equal(sum(scores$geno, na.rm = TRUE), 203516)
 
     # Filters
     n.na <- scores %>% group_by(MarkerName) %>% summarize(n.na = (sum(is.na(geno))/length(geno))*100)
@@ -122,7 +122,7 @@ testServer(
     expect_equal(c(nrow(cleaned_summary[[1]]),
                    missing.data,
                    wrong_n_clusters,
-                   length(clusters_filt)), c(2379, 294, 1348, 725))
+                   length(clusters_filt)), c(2379, 293, 1347, 727))
 
     mks <- names(clusters)
     mks[which(rm.mks)] <- paste(mks[which(rm.mks)], "(discarded)")
@@ -184,10 +184,9 @@ testServer(
     bafs_diplo_df <- cbind(mks=rownames(bafs_diplo_df), bafs_diplo_df)
 
     expect_equal(sum(bafs_diplo_df[,-1]), 25343, tolerance = 1)
-    expect_equal(round(sum(logRs_diplod_m[,-1], na.rm = T),0), 1921)
+    expect_equal(round(sum(logRs_diplod_m[,-1], na.rm = T),0), 2067)
 
-    # geno.pos <- vroom(input$load_geno_pos$datapath)
-    geno.pos <- vroom(system.file("geno.pos_example.txt", package = "Qploidy"), show_col_types = FALSE)
+    geno.pos <- vroom(input$load_geno_pos$datapath, show_col_types = FALSE)
 
     chr <- geno.pos$Chr[match(bafs_diplo_df$mks,geno.pos$Name)]
     pos <- geno.pos$Position[match(bafs_diplo_df$mks,geno.pos$Name)]

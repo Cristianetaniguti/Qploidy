@@ -21,7 +21,7 @@ run_app(
 
 \item{enableBookmarking}{to be documented}
 
-\item{uiPatter}{to be documented}
+\item{uiPattern}{to be documented}
 }
 \description{
 Run the Shiny Application

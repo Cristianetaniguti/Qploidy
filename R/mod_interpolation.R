@@ -149,30 +149,35 @@ mod_interpolation_server <- function(id){
     })
 
     loadExample <- reactive({
-      if(is.null(input_summary())){
-        if(input$example_data == "example_data"){
-          result <- readRDS(system.file("summary_result_example.rds", package = "Qploidy"))
-          return(result)
-        } else if(input$example_data == "roses_texas"){
-          summary <- vroom("C:/Users/Rose_Lab/Documents/Cris_temp/Qploidy_data/roses_texas/summary_roses_texas.txt", show_col_types = FALSE)
-          ind.names <- vroom("C:/Users/Rose_Lab/Documents/Cris_temp/Qploidy_data/roses_texas/ind.names_roses_texas.txt", show_col_types = FALSE)
+      withProgress(message = 'Working:', value = 0, {
+        if(is.null(input_summary())){
+          if(input$example_data == "example_data"){
+            incProgress(0.3, detail = paste("Loading example data..."))
+            result <- readRDS(system.file("summary_result_example.rds", package = "Qploidy"))
+            return(result)
+          } else if(input$example_data == "roses_texas"){
+            incProgress(0.3, detail = paste("Loading roses data..."))
 
-          cleaned_summary <- clean_summary(summary_df = summary)
+            summary <- vroom("C:/Users/Rose_Lab/Documents/Cris_temp/Qploidy_data/roses_texas/summary_roses_texas.txt", show_col_types = FALSE)
+            ind.names <- vroom("C:/Users/Rose_Lab/Documents/Cris_temp/Qploidy_data/roses_texas/ind.names_roses_texas.txt", show_col_types = FALSE)
 
-          R_theta <- get_R_theta(cleaned_summary, ind.names)
-          R_all <- R_theta[[1]]
-          theta_all <- R_theta[[2]]
-          fitpoly_input <- summary_to_fitpoly(R_all, theta_all)
-          result <- list(fitpoly_input=fitpoly_input, R_all=R_all, theta_all=theta_all)
-          return(result)
-        } else if(input$example_data == "roses_france"){
-          cat("Developing")
-        } else if(input$example_data == "potatoes") {
-          cat("Developing")
+            cleaned_summary <- clean_summary(summary_df = summary)
+
+            R_theta <- get_R_theta(cleaned_summary, ind.names)
+            R_all <- R_theta[[1]]
+            theta_all <- R_theta[[2]]
+            fitpoly_input <- summary_to_fitpoly(R_all, theta_all)
+            result <- list(fitpoly_input=fitpoly_input, R_all=R_all, theta_all=theta_all)
+            return(result)
+          } else if(input$example_data == "roses_france"){
+            cat("Developing")
+          } else if(input$example_data == "potatoes") {
+            cat("Developing")
+          }
+        } else {
+          return(NULL)
         }
-      } else {
-        return(NULL)
-      }
+      })
     })
 
     summary <- reactive({
@@ -299,6 +304,9 @@ mod_interpolation_server <- function(id){
         data_interpolation_disc.mks <- readRDS(system.file("data_interpolation.rds", package = "Qploidy"))
       } else if(is.null(input$data_interpolation_in)) {
         # Add discarted
+        rm.mks <- sapply(clusters, function(x) is.null(x$mod))
+        mks <- names(clusters)
+        mks[which(rm.mks)] <- paste(mks[which(rm.mks)], "(discarded)")
         data_interpolation_disc.mks <- do.call(rbind, lst_interpolation()[[1]])
         data_interpolation_disc.mks$mks.disc <- mks[match(data_interpolation_disc.mks$mks, names(clusters()))]
       } else {
@@ -319,8 +327,8 @@ mod_interpolation_server <- function(id){
     )
 
     observe({
-      choices <- as.list(data_interpolation_disc.mks()$mks)
-      names(choices) <- data_interpolation_disc.mks()$mks.disc
+      choices <- as.list(unique(data_interpolation_disc.mks()$mks))
+      names(choices) <- unique(data_interpolation_disc.mks()$mks.disc)
 
       updatePickerInput(session, "int_marker",
                         label = "Selected marker",

@@ -4,7 +4,7 @@
 #' @param onStart to be documented
 #' @param options to be documented
 #' @param enableBookmarking to be documented
-#' @param uiPatter to be documented
+#' @param uiPattern to be documented
 #'
 #' @inheritParams shinyApp
 #'

@@ -116,8 +116,6 @@ mod_all_ui <- function(id){
         tabPanel("Graphics - Single individual analysis",
                  br(),
                  box(width= 12, solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,  status="info", title = "Single individual visualization options", label = tags$b("Single individual visualization options"),
-                     numericInput(ns("area_single"), label = "Total area", value = 0.75, step = 0.1),
-                     textInput(ns("ploidy"), label = "Input ploidy", value = 2),
                      pickerInput(ns("graphics"),
                                  label = "Select sample for graphics",
                                  choices = "This will be updated after samples are selected above",
@@ -130,6 +128,11 @@ mod_all_ui <- function(id){
                                    dropupAuto = FALSE
                                  ),
                                  multiple = FALSE),
+                     p("Ploidy estimation options:"),
+                     numericInput(ns("area_single"), label = "Total area", value = 0.75, step = 0.1),
+                     sliderInput(ns("ploidys_single"), label = "select ploidy", min = 2, max = 8, value = c(2,5), step = 1),
+                     p("or user-defined ploidy:"),
+                     textInput(ns("ploidy"), label = "Input ploidy", value = NULL),
                      textInput(ns("centromeres"), label = "Add centromeres positions (bp)", value = "1 = 49130338, 5 = 49834357"),
                      checkboxInput(ns("add_centromeres"), label = "Add centromere line", value = FALSE),
                      checkboxInput(ns("colors"), label = "Color area", value = FALSE),
@@ -297,7 +300,9 @@ mod_all_server <- function(id){
 
         data_sample <- data_sample[order(data_sample$Chr, data_sample$Position),]
 
-        est.ploidy.chr_df <- area_estimate_ploidy_by_chr(data_sample, ploidys = input$ploidys, area = input$area)
+        est.ploidy.chr_df <- area_estimate_ploidy_by_chr(data_sample,
+                                                         ploidys = input$ploidys,
+                                                         area = input$area)
         est.ploidy.chr_df
       })
     })
@@ -547,11 +552,8 @@ mod_all_server <- function(id){
       withProgress(message = 'Working:', value = 0, {
         incProgress(0.5, detail = paste("Generating individual BAF plots..."))
 
-        #data_sample <- baf[,c(2,3,which(colnames(baf) %in% c(input$graphics)))]
-        data_sample <- logR_baf()[[2]][,c(2,3,which(colnames(logR_baf()[[2]]) %in% c(input$graphics)))]
-        colnames(data_sample)[3] <- "sample"
-
         # input <- list()
+        # input$graphics <- "Unknow_1"
         # input$area_single <- 0.75
         # input$ploidy <- "4, 2"
         # input$dot.size <- 1
@@ -560,8 +562,26 @@ mod_all_server <- function(id){
         # input$colors <- TRUE
         # input$centromeres <- "1 = 49130338, 5 = 49834357"
         # input$add_centromeres <- TRUE
+        # input$ploidys <- c(2,6)
+        # ploidys <- input$ploidys
+        # input$filter_diff <- 0.015
+        #
+        # data_sample <- baf[,c(2,3,which(colnames(baf) %in% c(input$graphics)))]
+        data_sample <- logR_baf()[[2]][,c(2,3,which(colnames(logR_baf()[[2]]) %in% c(input$graphics)))]
+        colnames(data_sample)[3] <- "sample"
 
-        ploidy <- as.numeric(unlist(strsplit(input$ploidy, ",")))
+        if(input$ploidy == ""){
+          est.ploidy <- area_est_ploidy_single_sample(data_sample,
+                                                      ploidys = input$ploidys_single,
+                                                      area = input$area_single)
+
+          # idx <- which(est.ploidy[[2]] < input$filter_diff) # apply filter required adaptation
+          # if(length(idx) > 0) est.ploidy[[1]][idx] <- NA
+          ploidy <- est.ploidy[[1]]
+
+        } else {
+          ploidy <- as.numeric(unlist(strsplit(input$ploidy, ",")))
+        }
 
         p_baf <- plot_baf(data_sample,
                           area_single = input$area_single,

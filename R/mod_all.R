@@ -117,7 +117,7 @@ mod_all_ui <- function(id){
                  br(),
                  box(width= 12, solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,  status="info", title = "Single individual visualization options", label = tags$b("Single individual visualization options"),
                      numericInput(ns("area_single"), label = "Total area", value = 0.75, step = 0.1),
-                     numericInput(ns("ploidy"), label = "Input ploidy", value = 2),
+                     textInput(ns("ploidy"), label = "Input ploidy", value = 2),
                      pickerInput(ns("graphics"),
                                  label = "Select sample for graphics",
                                  choices = "This will be updated after samples are selected above",
@@ -130,9 +130,12 @@ mod_all_ui <- function(id){
                                    dropupAuto = FALSE
                                  ),
                                  multiple = FALSE),
-                     checkboxInput(ns("colors"), label = "Color area", value = TRUE),
-                     checkboxInput(ns("add_lines"), label = "Add expected and estimated modes", value = TRUE),
-                     numericInput(ns("dot.size"), label = "Dot size", value = 1),br(),
+                     textInput(ns("centromeres"), label = "Add centromeres positions (bp)", value = "1 = 49130338, 5 = 49834357"),
+                     checkboxInput(ns("add_centromeres"), label = "Add centromere line", value = FALSE),
+                     checkboxInput(ns("colors"), label = "Color area", value = FALSE),
+                     checkboxInput(ns("add_estimated_peaks"), label = "Add estimated peaks lines", value = FALSE),
+                     checkboxInput(ns("add_expected_peaks"), label = "Add expected peaks lines", value = FALSE),
+                     numericInput(ns("dot.size"), label = "Dot size", value = 1), br(),
                      actionButton(ns("run_individual"), "Run")
                  ),
                  # box(width = 12, solidHeader = TRUE, collapsible = TRUE,  collapsed = TRUE, status="primary", title = "Segmented logR plot",
@@ -235,7 +238,22 @@ mod_all_server <- function(id){
           } else if(input$example_data == "roses_france"){
             cat("Developing")
           } else if(input$example_data == "potatoes") {
-            cat("Developing")
+            #logR <- vroom("C:/Users/Rose_Lab/Documents/Cris_temp/Qploidy_data/roses_texas/fitpoly/logR_roses_texas.txt", show_col_types = FALSE)
+            logR <- NULL
+            baf <- vroom("C:/Users/Rose_Lab/Documents/Cris_temp/Qploidy_data/potato_texas/baf_potato_texas.tsv.gz", show_col_types = FALSE)
+            incProgress(0.3, detail = paste("Loading MAPpoly file..."))
+
+            haplo_mappoly <- NULL
+            # polyorigin  <- read_polyOrigin("C:/Users/Rose_Lab/Documents/Cris_temp/Qploidy_data/roses_texas/5pop_compareprob2_fulldata_polyancestry.csv")
+            # f1.codes <- vroom(system.file("F1codes.polyorigin.txt", package = "Qploidy"), show_col_types = FALSE)
+            # ploidy <- 4
+            # haplo_polyorigin <- Qploidy:::get_probs_polyorigin_sd(polyorigin,
+            #                                          f1.codes = f1.codes,
+            #                                          ploidy = 4, n.cores = 20)
+            # saveRDS(haplo_polyorigin, file = "homoprob_polyorigin.rds")
+            incProgress(0.3, detail = paste("Loading PolyOrigin file..."))
+            haplo_polyorigin <- NULL
+            return(list(logR, baf, haplo_mappoly, haplo_polyorigin))
           }
         } else {
           return(NULL)
@@ -529,11 +547,38 @@ mod_all_server <- function(id){
       withProgress(message = 'Working:', value = 0, {
         incProgress(0.5, detail = paste("Generating individual BAF plots..."))
 
+        #data_sample <- baf[,c(2,3,which(colnames(baf) %in% c(input$graphics)))]
         data_sample <- logR_baf()[[2]][,c(2,3,which(colnames(logR_baf()[[2]]) %in% c(input$graphics)))]
         colnames(data_sample)[3] <- "sample"
 
-        p_baf <- plot_baf(data_sample, input$area_single, input$ploidy, input$dot.size, input$add_lines, input$colors)
-        p_hist <- plot_baf_hist(data_sample, input$area_single, input$ploidy, input$colors, input$add_lines)
+        # input <- list()
+        # input$area_single <- 0.75
+        # input$ploidy <- "4, 2"
+        # input$dot.size <- 1
+        # input$add_estimated_peaks <- TRUE
+        # input$add_expected_peaks <- TRUE
+        # input$colors <- TRUE
+        # input$centromeres <- "1 = 49130338, 5 = 49834357"
+        # input$add_centromeres <- TRUE
+
+        ploidy <- as.numeric(unlist(strsplit(input$ploidy, ",")))
+
+        p_baf <- plot_baf(data_sample,
+                          area_single = input$area_single,
+                          ploidy = ploidy,
+                          dot.size = input$dot.size,
+                          add_estimated_peaks= input$add_estimated_peaks,
+                          add_expected_peaks = input$add_expected_peaks,
+                          colors = input$colors,
+                          centromeres = input$centromeres,
+                          add_centromeres = input$add_centromeres)
+
+        p_hist <- plot_baf_hist(data_sample,
+                                area_single = input$area_single,
+                                ploidy = ploidy,
+                                colors = input$colors,
+                                add_estimated_peaks = input$add_estimated_peaks,
+                                add_expected_peaks = input$add_expected_peaks)
 
         return(list(p_baf, p_hist))
       })
@@ -547,7 +592,6 @@ mod_all_server <- function(id){
         if(all(grep("^X", unique(mappoly$homoprob$individual))))
           mappoly$homoprob$individual <- gsub("^X", "", mappoly$homoprob$individual)
 
-        print(unique(mappoly$homoprob$individual))
         if(any(unique(mappoly$homoprob$individual) %in% input$graphics)){
           haplo_lst <- list()
           for(i in 1:length(unique(mappoly$homoprob$homoprob$LG))){
@@ -562,8 +606,6 @@ mod_all_server <- function(id){
         polyorigin <- haplo()[[2]]
         if(all(grep("^X", unique(polyorigin$homoprob$individual))))
           polyorigin$homoprob$individual <- gsub("^X", "",polyorigin$homoprob$individual)
-
-        print(unique(polyorigin$homoprob$individual))
 
         if(any(polyorigin$homoprob$individual %in% input$graphics)){
           haplo_lst <- list()

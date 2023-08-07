@@ -4,18 +4,34 @@
 \alias{plot_baf}
 \title{Plot BAF}
 \usage{
-plot_baf(data_sample, area_single, ploidy, dot.size, add_lines, colors)
+plot_baf(
+  data_sample,
+  area_single,
+  ploidy,
+  dot.size = 1,
+  add_estimated_peaks = FALSE,
+  add_expected_peaks = FALSE,
+  centromeres = NULL,
+  add_centromeres = FALSE,
+  colors = FALSE
+)
 }
 \arguments{
 \item{data_sample}{data.frame with BAF and genomic position information}
 
 \item{area_single}{area around the expected peak to be considered}
 
-\item{ploidy}{expected ploidy}
+\item{ploidy}{expected ploidy overall (single integer value) or for each chromosome}
 
 \item{dot.size}{graphic dot size}
 
-\item{add_lines}{add expected peaks lines}
+\item{add_estimated_peaks}{add expected peaks lines}
+
+\item{add_expected_peaks}{add estimated peaks}
+
+\item{centromeres}{vector defining centromeres positions}
+
+\item{add_centromeres}{logical defining if centromeres positions will be displayed}
 
 \item{colors}{add area colors}
 }

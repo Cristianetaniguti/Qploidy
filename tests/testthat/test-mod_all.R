@@ -24,26 +24,28 @@ testServer(
                       area_single = 0.75,
                       dot.size = 1,
                       colors = TRUE,
-                      add_lines = TRUE,
+                      add_estimated_peaks = TRUE,
+                      add_expected_peaks = TRUE,
                       ploidy = 4)
 
     # packages and inputs
 
-    library(vroom)
-    library(tidyr)
-
-    input <- list()
-    input$samples <- c("Diplo_1", "Diplo_2","Tetra_1","Tetra_2","Unknow_1")
-    input$ploidys <- c(2,5)
-    input$area <- 0.75
-    input$filter_corr <- 0
-    input$filter_diff <- 0
-    input$graphics <- c("Unknow_1")
-    input$area_single <- 0.75
-    input$dot.size <- 1
-    input$colors <- TRUE
-    input$add_lines <- TRUE
-    input$ploidy <- 4
+    # library(vroom)
+    # library(tidyr)
+    #
+    # input <- list()
+    # input$samples <- c("Diplo_1", "Diplo_2","Tetra_1","Tetra_2","Unknow_1")
+    # input$ploidys <- c(2,5)
+    # input$area <- 0.75
+    # input$filter_corr <- 0
+    # input$filter_diff <- 0
+    # input$graphics <- c("Unknow_1")
+    # input$area_single <- 0.75
+    # input$dot.size <- 1
+    # input$colors <- TRUE
+    # input$add_estimated_peaks <- TRUE
+    # input$add_expected_peaks <- TRUE
+    # input$ploidy <- 4
 
     # upload files
     baf <- vroom(system.file("baf.example.txt", package = "Qploidy"), show_col_types = FALSE)
@@ -94,13 +96,16 @@ testServer(
     data_sample <- logR_baf[[2]][,c(2,3,which(colnames(logR_baf[[2]]) %in% c(input$graphics)))]
     colnames(data_sample)[3] <- "sample"
 
-    p_baf <- plot_baf(data_sample, input$area_single, input$ploidy, input$dot.size, input$add_lines, input$colors)
+    p_baf <- plot_baf(data_sample,
+                      input$area_single,
+                      input$ploidy,
+                      input$dot.size,
+                      input$colors)
 
     p_hist <- plot_baf_hist(data_sample,
                             area_single = input$area_single,
                             ploidy = input$ploidy,
-                            colors = input$colors,
-                            add_lines = input$add_lines)
+                            colors = input$colors)
     p_hist
 
     if(any(unique(haplo_mappoly$homoprob$individual) %in% input$graphics)){

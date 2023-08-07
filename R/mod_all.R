@@ -117,7 +117,7 @@ mod_all_ui <- function(id){
                  br(),
                  box(width= 12, solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,  status="info", title = "Single individual visualization options", label = tags$b("Single individual visualization options"),
                      numericInput(ns("area_single"), label = "Total area", value = 0.75, step = 0.1),
-                     numericInput(ns("ploidy"), label = "Input ploidy", value = 2),
+                     textInput(ns("ploidy"), label = "Input ploidy", value = 2),
                      pickerInput(ns("graphics"),
                                  label = "Select sample for graphics",
                                  choices = "This will be updated after samples are selected above",
@@ -547,13 +547,25 @@ mod_all_server <- function(id){
       withProgress(message = 'Working:', value = 0, {
         incProgress(0.5, detail = paste("Generating individual BAF plots..."))
 
+        #data_sample <- baf[,c(2,3,which(colnames(baf) %in% c(input$graphics)))]
         data_sample <- logR_baf()[[2]][,c(2,3,which(colnames(logR_baf()[[2]]) %in% c(input$graphics)))]
         colnames(data_sample)[3] <- "sample"
 
-        print(input$centromeres)
+        # input <- list()
+        # input$area_single <- 0.75
+        # input$ploidy <- "4, 2"
+        # input$dot.size <- 1
+        # input$add_estimated_peaks <- TRUE
+        # input$add_expected_peaks <- TRUE
+        # input$colors <- TRUE
+        # input$centromeres <- "1 = 49130338, 5 = 49834357"
+        # input$add_centromeres <- TRUE
+
+        ploidy <- as.numeric(unlist(strsplit(input$ploidy, ",")))
+
         p_baf <- plot_baf(data_sample,
                           area_single = input$area_single,
-                          ploidy = input$ploidy,
+                          ploidy = ploidy,
                           dot.size = input$dot.size,
                           add_estimated_peaks= input$add_estimated_peaks,
                           add_expected_peaks = input$add_expected_peaks,
@@ -563,7 +575,7 @@ mod_all_server <- function(id){
 
         p_hist <- plot_baf_hist(data_sample,
                                 area_single = input$area_single,
-                                ploidy = input$ploidy,
+                                ploidy = ploidy,
                                 colors = input$colors,
                                 add_estimated_peaks = input$add_estimated_peaks,
                                 add_expected_peaks = input$add_expected_peaks)

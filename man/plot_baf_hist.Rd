@@ -4,7 +4,14 @@
 \alias{plot_baf_hist}
 \title{Plot BAF histogram}
 \usage{
-plot_baf_hist(data_sample, area_single, ploidy, colors, add_lines)
+plot_baf_hist(
+  data_sample,
+  area_single,
+  ploidy,
+  colors = FALSE,
+  add_estimated_peaks = TRUE,
+  add_expected_peaks = FALSE
+)
 }
 \arguments{
 \item{data_sample}{data.frame with BAF and genomic position information}
@@ -15,7 +22,9 @@ plot_baf_hist(data_sample, area_single, ploidy, colors, add_lines)
 
 \item{colors}{add area colors}
 
-\item{add_lines}{add expected peaks lines}
+\item{add_estimated_peaks}{add expected peaks lines}
+
+\item{add_expected_peaks}{add estimated peaks}
 }
 \description{
 Plot BAF histogram

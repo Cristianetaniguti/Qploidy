@@ -555,6 +555,22 @@ logR <- logR[-which(grepl("CHLOROPLAST", logR$Chr) | grepl("CH00", logR$Chr)),]
 ## Re-run interpolation
 
 ```{r}
+library(vroom)
+library(dplyr)
+library(tidyr)
+
+fitpoly_potato_input <- readRDS("C:/Users/Rose_Lab/Documents/Cris_temp/TAMU-RoseLab/standalone_apps/ploidy_estimation/data/potato/fitpoly_potato_input.rds")
+
+# Filter - keep only tetraploids for clusterization with fitpoly
+tetra <- vroom("C:/Users/Rose_Lab/Documents/Cris_temp/Qploidy_data/potato_texas/tetraploids", delim = "\n")
+
+data <- fitpoly_potato_input %>% filter(SampleName %in% tetra$names)
+
+saveMarkerModels(ploidy=4,
+                 data=data,
+                 p.threshold=0.9,
+                 filePrefix="fitpoly_out_potato_texas2",
+                 ncores=20)
 
 ```
 

@@ -17,9 +17,7 @@ area_estimate_ploidy_by_chr <- function(data_sample, ploidys, area){
   freq <- pascalTriangle(ploidys[2])
   freq <- freq[-1]
   ploidys <- ploidys[1]:ploidys[2]
-  p.values_tot <- vector()
   dots.int_tot <- corr_tot <- max_sd_tot <- modes_paste_tot <- as.list(rep(NA, length(by_chr)))
-  means <- list()
   for(j in 1:length(ploidys)){
     # Area method
     ymin <- seq(0, 1, 1/ploidys[j]) - (area/(ploidys[j]*2))
@@ -411,7 +409,7 @@ plot_baf <- function(data_sample,
       rets2 <- rbind(rets2, rets)
       data_sample2 <- rbind(data_sample2, data_chr)
     }
-  }
+  } else data_sample2 <- data_sample
 
   p_baf <- data_sample2 %>% ggplot(aes(x=Position, y=sample)) +
     {if(colors) geom_point(aes(color = color), alpha=0.7, size=dot.size) else geom_point(alpha=0.7, size=dot.size)} +
@@ -489,6 +487,8 @@ plot_baf_hist <- function(data_sample,
       modes.df3 <- rbind(modes.df2, modes.df3)
       data_sample2 <- rbind(data_sample2, split_data)
     }
+  } else {
+    data_sample2 <- data_sample
   }
 
   p_hist <- data_sample2 %>% ggplot(aes(x=sample)) +
@@ -527,3 +527,82 @@ plot_baf_hist <- function(data_sample,
   p_hist <- ggarrange(p_hist_all, p_hist, widths = c(1,length(unique(data_sample$Chr))))
   return(p_hist)
 }
+
+#' Estimate ploidy using area method
+#'
+#' @param data_sample data.frame with BAF values and genomic position information
+#' @param ploidys range of ploidies to by tested
+#' @param area area around the expected peak to be considered
+#'
+#' @export
+area_est_ploidy_single_sample <- function(data_sample, ploidys, area){
+
+  by_chr <- split(data_sample, data_sample$Chr)
+
+  freq <- pascalTriangle(ploidys[2])
+  freq <- freq[-1]
+  ploidys <- ploidys[1]:ploidys[2]
+  dots.int_tot <-  as.list(rep(NA, length(by_chr)))
+  for(j in 1:length(ploidys)){
+    # Area method
+    ymin <- seq(0, 1, 1/ploidys[j]) - (area/(ploidys[j]*2))
+    ymax <- seq(0, 1, 1/ploidys[j]) + (area/(ploidys[j]*2))
+
+    ymin[which(ymin < 0)] <- 0
+    ymax[which(ymax > 1)] <- 1
+    rets <- data.frame(ymin, ymax)
+
+    prop_tot <- as.list(rep(NA, length(by_chr)))
+    for(z in 1:length(by_chr)){
+      for(i in 1:nrow(rets)){
+        prop <- apply(by_chr[[z]][,-c(1,2)], 2, function(x) sum(x >= rets$ymin[i] & x <= rets$ymax[i], na.rm = TRUE))
+        prop_tot[[z]] <- rbind(prop_tot[[z]], prop)
+      }
+    }
+
+    # remove NAs
+    prop_tot <- lapply(prop_tot, function(x) x[-1,])
+    for(z in 1:length(prop_tot)){
+      if(is.null(ncol(prop_tot[[z]]))) dots.int <- sum(prop_tot[[z]], na.rm = TRUE)/dim(by_chr[[z]])[1] else
+        dots.int <- apply(prop_tot[[z]], 2, function(x) sum(x, na.rm = TRUE)/dim(by_chr[[z]])[1])
+      dots.int_tot[[z]] <- rbind(dots.int_tot[[z]], dots.int)
+    }
+  }
+
+  dots.int_tot <- lapply(dots.int_tot, function(x) x[-1,])
+
+  # Area method
+  result.ploidy  <- diff.count <- second <- diff.second <- diff.first.second <- list()
+  for(z in 1:length(dots.int_tot)){
+    if(is.null(rownames(dots.int_tot[[z]]))) {
+      names(dots.int_tot[[z]]) <- ploidys
+      result.ploidy[[z]] <- ploidys[order(dots.int_tot[[z]], decreasing =T)][1]
+
+      diff.count[[z]] <- dots.int_tot[[z]][order(dots.int_tot[[z]], decreasing =T)][1]
+      second[[z]] <- ploidys[order(dots.int_tot[[z]], decreasing =T)][2]
+      diff.second[[z]] <- dots.int_tot[[z]][order(dots.int_tot[[z]], decreasing =T)][2]
+    } else {
+      rownames(dots.int_tot[[z]]) <- ploidys
+      result.ploidy[[z]] <- apply(dots.int_tot[[z]], 2, function(x) ploidys[order(x, decreasing =T)][1])
+      diff.count[[z]] <- apply(dots.int_tot[[z]], 2, function(x) x[order(x, decreasing =T)][1])
+      second[[z]] <- apply(dots.int_tot[[z]], 2, function(x) ploidys[order(x, decreasing =T)][2])
+      diff.second[[z]] <- apply(dots.int_tot[[z]], 2, function(x) x[order(x, decreasing =T)][2])
+    }
+    diff.first.second[[z]] <- diff.count[[z]] - diff.second[[z]]
+  }
+
+  result.ploidy <- do.call(rbind, result.ploidy)
+  diff.first.second <- do.call(rbind, diff.first.second)
+
+  result.ploidy <- as.vector(result.ploidy)
+  diff.first.second <- as.vector(diff.first.second)
+
+  names(result.ploidy) <- names(diff.first.second) <- names(by_chr)
+
+
+  est.ploidy.chr_single <- list(result.ploidy,
+                                diff.first.second)
+
+  return(est.ploidy.chr_single)
+}
+

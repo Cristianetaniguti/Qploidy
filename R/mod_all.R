@@ -155,7 +155,7 @@ mod_all_ui <- function(id){
                                         checkboxInput(ns("colors"), label = "Color area", value = FALSE),
                                  ),
                                  column(6,
-                                        checkboxInput(ns("add_estimated_peaks"), label = "Add estimated peaks lines", value = TRUE),
+                                        checkboxInput(ns("add_estimated_peaks"), label = "Add estimated peaks lines", value = FALSE),
                                         checkboxInput(ns("add_expected_peaks"), label = "Add expected peaks lines", value = TRUE),
                                  ),
                                  pickerInput(ns("dis.chr"),
@@ -579,7 +579,7 @@ mod_all_server <- function(id){
                         choices = choices_names,
                         selected=unlist(choices_names)[1])
 
-      chrs <- sort(unique(as.data.frame(baf)[,2]))
+      chrs <- sort(unique(as.data.frame(logR_baf()[[2]])[,2]))
       chrs_lst <- as.list(chrs)
       names(chrs_lst) <- chrs
 
@@ -595,7 +595,7 @@ mod_all_server <- function(id){
         incProgress(0.5, detail = paste("Generating individual BAF plots..."))
 
         # input <- list()
-        # input$graphics <- "Unknow_1"
+        # input$graphics <- "AOTX96216-2Ru_1"
         # input$area_single <- 0.75
         # input$ploidy <- "4, 2"
         # input$dot.size <- 1

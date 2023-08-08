@@ -10,158 +10,191 @@
 mod_all_ui <- function(id){
   ns <- NS(id)
   tagList(
-    sidebarPanel(
-      box(width= 12, solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,  status="info", title = "Upload files", label = tags$b("Upload files"),
-          #fileInput(ns("load_logR"), label = "Upload logR file"),
-          fileInput(ns("load_baf"), label = "Upload BAF file")
-      ),
-      box(width= 12, solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,  status="info", title = "Choose examples", label = tags$b("Choose examples"),
-          radioButtons(ns("example_data"), label = "Choose example data set",
-                       choices = c("Example data" = "example_data",
-                                   "Roses Texas" = "roses_texas",
-                                   "Roses France" = "roses_france",
-                                   "Potatoes Texas" = "potatoes"),
-                       selected = "example_data")),
-      box(width= 12, solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,  status="info", title = "Overall estimations options", label = tags$b("Overall estimations options"),
-          sliderInput(ns("ploidys"), label = "select ploidy", min = 2, max = 8, value = c(2,5), step = 1),
-          numericInput(ns("area"), label = "Total area", value = 0.75, step = 0.1),
-          numericInput(ns("filter_diff"), label = "Minimum filter difference", value = 0, step = 0.01),
-          numericInput(ns("filter_corr"), label = "Minimum correlation between estimated and expected peaks", value = 0, step = 0.01),
-          pickerInput(ns("samples"),
-                      label = "Select samples for overall analysis",
-                      choices = "This will be updated with files in data/joint_logR_BAF",
-                      selected = "This will be updated with files in data/joint_logR_BAF",
-                      options = pickerOptions(
-                        size = 8,
-                        `selected-text-format` = "count > 3",
-                        `live-search`=TRUE,
-                        actionsBox = TRUE,
-                        dropupAuto = FALSE
-                      ),
-                      multiple = TRUE),
-          actionButton(ns("run_overal"), "Run")), hr(),
-      box(width= 12, solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,  status="info", title = "Linkage map", label = tags$b("Linkage map"),
-          fileInput(ns("load_mappoly"), label = "Upload mappoly homoprob object"),
-          fileInput(ns("load_polyorigin"), label = "Upload polyOrigin output"),
-          numericInput(ns("ploidy_polyorigin"), label = "Maps ploidy", value = 4, step = 1),
-      )
+    column(12,
+           box(width= 12, solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,  status="info", title = "Upload files", label = tags$b("Upload files"),
+
+               box(width= 6, solidHeader = FALSE, collapsible = TRUE, collapsed = FALSE,  status="info", title = "Upload BAF file", label = tags$b("Upload BAF file"),
+                   #fileInput(ns("load_logR"), label = "Upload logR file"),
+                   fileInput(ns("load_baf"), label = "Upload BAF file")
+               ),
+               box(width= 6, solidHeader = FALSE, collapsible = TRUE, collapsed = FALSE,  status="info", title = "Choose examples", label = tags$b("Choose examples"),
+                   radioButtons(ns("example_data"), label = "Choose example data set",
+                                choices = c("Example data" = "example_data",
+                                            "Roses Texas" = "roses_texas",
+                                            "Roses France" = "roses_france",
+                                            "Potatoes Texas" = "potatoes"),
+                                selected = "example_data")),
+               box(width= 12, solidHeader = FALSE, collapsible = TRUE, collapsed = FALSE,  status="info", title = "Load linkage map", label = tags$b("Linkage map"),
+                   column(6,
+                          fileInput(ns("load_mappoly"), label = "Upload mappoly homoprob object"),
+                   ),
+                   column(6,
+                          fileInput(ns("load_polyorigin"), label = "Upload polyOrigin output"),
+                   ),
+                   column(6,
+                          numericInput(ns("ploidy_polyorigin"), label = "Maps ploidy", value = 4, step = 1),
+                   )
+               )
+           )
     ),
-    mainPanel(
-      tabsetPanel(
-        tabPanel("Tables - Overall analysis",
-                 p("The table include the ploidy estimated by chromosome and overall using the area peak method.
+    column(12,
+           tabsetPanel(
+             tabPanel("Tables - Overall analysis",
+                      box(width= 12, solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,  status="info", title = "Overall estimations options", label = tags$b("Overall estimations options"),
+                          column(6,
+                                 sliderInput(ns("ploidys"), label = "select ploidy", min = 2, max = 8, value = c(2,5), step = 1),
+                                 numericInput(ns("area"), label = "Total area", value = 0.75, step = 0.1),
+                                 numericInput(ns("filter_diff"), label = "Minimum filter difference", value = 0, step = 0.01),
+                          ),
+                          column(6,
+                                 numericInput(ns("filter_corr"), label = "Minimum correlation between estimated and expected peaks", value = 0, step = 0.01),
+                                 pickerInput(ns("samples"),
+                                             label = "Select samples for overall analysis",
+                                             choices = "This will be updated with files in data/joint_logR_BAF",
+                                             selected = "This will be updated with files in data/joint_logR_BAF",
+                                             options = pickerOptions(
+                                               size = 8,
+                                               `selected-text-format` = "count > 3",
+                                               `live-search`=TRUE,
+                                               actionsBox = TRUE,
+                                               dropupAuto = FALSE
+                                             ),
+                                             multiple = TRUE),
+                                 actionButton(ns("run_overal"), "Run"))
+                      ), hr(),
+                      p("The table include the ploidy estimated by chromosome and overall using the area peak method.
             The measures of quality are the difference between first and second place in the area method and the correlation coefficient (Pearson) between estimated and expected peak position."),
-                 box(width= 12, solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,  status="primary", title = "Ploidy estimations by chromosome table", label = tags$b("Ploidy estimations by chromosome table"),
-                     downloadButton(ns('result.ploidy_download'), "Download"), br(), hr(),
-                     DT::dataTableOutput(ns("result.ploidy")), br()
-                 ),
-                 box(width= 12, solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,  status="primary", title = "Proportion of dots inside selected area", label = tags$b("Proportion of dots inside selected area"),
-                     downloadButton(ns('dots.int_tot_mt_download'), "Download"), br(), hr(),
-                     DT::dataTableOutput(ns("dots.int_tot_mt")), br()
-                 ),
-                 box(width= 12, solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,  status="primary", title = "Difference between first and second place in area method table", label = tags$b("Difference between first and second place in area method table"),
-                     downloadButton(ns('diff.first.second_download'), "Download"), br(), hr(),
-                     DT::dataTableOutput(ns("diff.first.second")), br()
-                 ),
-                 box(width= 12, solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,  status="primary", title = "Standard deviation inside area table", label = tags$b("Standard deviation inside area table"),
-                     downloadButton(ns('sd_tot_mt_download'), "Download"), br(), hr(),
-                     DT::dataTableOutput(ns("sd_tot_mt")), br()
-                 ),
-                 box(width= 12, solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,  status="primary", title = "Highest correlation table", label = tags$b("Highest correlation table"),
-                     downloadButton(ns('corr_tot_mt_download'), "Download"), br(), hr(),
-                     DT::dataTableOutput(ns("corr_tot_mt")), br()
-                 ),
-                 box(width= 12, solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,  status="primary", title = "Modes inside areas table", label = tags$b("Modes inside areas table"),
-                     downloadButton(ns('modes_paste_tot_mt_download'), "Download"), br(), hr(),
-                     DT::dataTableOutput(ns("modes_paste_tot_mt"))
-                 )
+                      box(width= 12, solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,  status="primary", title = "Ploidy estimations by chromosome table", label = tags$b("Ploidy estimations by chromosome table"),
+                          downloadButton(ns('result.ploidy_download'), "Download"), br(), hr(),
+                          DT::dataTableOutput(ns("result.ploidy")), br()
+                      ),
+                      box(width= 12, solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,  status="primary", title = "Proportion of dots inside selected area", label = tags$b("Proportion of dots inside selected area"),
+                          downloadButton(ns('dots.int_tot_mt_download'), "Download"), br(), hr(),
+                          DT::dataTableOutput(ns("dots.int_tot_mt")), br()
+                      ),
+                      box(width= 12, solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,  status="primary", title = "Difference between first and second place in area method table", label = tags$b("Difference between first and second place in area method table"),
+                          downloadButton(ns('diff.first.second_download'), "Download"), br(), hr(),
+                          DT::dataTableOutput(ns("diff.first.second")), br()
+                      ),
+                      box(width= 12, solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,  status="primary", title = "Standard deviation inside area table", label = tags$b("Standard deviation inside area table"),
+                          downloadButton(ns('sd_tot_mt_download'), "Download"), br(), hr(),
+                          DT::dataTableOutput(ns("sd_tot_mt")), br()
+                      ),
+                      box(width= 12, solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,  status="primary", title = "Highest correlation table", label = tags$b("Highest correlation table"),
+                          downloadButton(ns('corr_tot_mt_download'), "Download"), br(), hr(),
+                          DT::dataTableOutput(ns("corr_tot_mt")), br()
+                      ),
+                      box(width= 12, solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,  status="primary", title = "Modes inside areas table", label = tags$b("Modes inside areas table"),
+                          downloadButton(ns('modes_paste_tot_mt_download'), "Download"), br(), hr(),
+                          DT::dataTableOutput(ns("modes_paste_tot_mt"))
+                      )
 
-        ),
-        tabPanel("Graphics - Overall analysis",
-                 p("The graphics include the ploidy estimated by chromosome and overall using the area peak method.
+             ),
+             tabPanel("Graphics - Overall analysis",
+                      p("The graphics include the ploidy estimated by chromosome and overall using the area peak method.
             The measures of quality are the difference between first and second place in the area method and the correlation coefficient (Pearson) between estimated and expected peak position."),
-                 box(width= 12, solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,  status="primary", title = "Euploid individuals", label = tags$b("Euploid individuals ploidy"),
-                     htmlOutput(ns("text_ploidy")), hr(),
-                     plotOutput(ns("overall_p1"))),
-                 box(width= 12, solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,  status="primary", title = "Aneuploidy individuals", label = tags$b("Aneuploidy individuals"),
-                     htmlOutput(ns("aneuploid_text")), hr(),
-                     plotOutput(ns("overall_p2")), br(),
-                     box(width= 12, solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,  status="primary", title = "Number chromosomes with each ploidy in aneuploidy individuals", label = tags$b("Number chromosomes with each ploidy in aneuploidy individuals"),
-                         plotOutput(ns("overall_p3"))),
-                     box(width= 12, solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,  status="primary", title = "Aneuploid individuals table", label = tags$b("Aneuploid individuals table"),
-                         downloadButton(ns('aneuploid_df_download'), "Download"), br(), br(),
-                         DT::dataTableOutput(ns("aneuploid_df")))), br(), hr(),
-                 box(width= 12, solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,  status="primary", title = "Euploid weird individuals", label = tags$b("Euploid weird individuals"),
-                     htmlOutput(ns("ploidy_all_weird"))),
-                 box(width= 12, solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,  status="primary", title = "Aneuploid weird individuals", label = tags$b("Aneuploid weird individuals"),
-                     htmlOutput(ns("aneuploidy_all_weird")))
+                      box(width= 12, solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,  status="primary", title = "Euploid individuals", label = tags$b("Euploid individuals ploidy"),
+                          htmlOutput(ns("text_ploidy")), hr(),
+                          plotOutput(ns("overall_p1"))),
+                      box(width= 12, solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,  status="primary", title = "Aneuploidy individuals", label = tags$b("Aneuploidy individuals"),
+                          htmlOutput(ns("aneuploid_text")), hr(),
+                          plotOutput(ns("overall_p2")), br(),
+                          box(width= 12, solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,  status="primary", title = "Number chromosomes with each ploidy in aneuploidy individuals", label = tags$b("Number chromosomes with each ploidy in aneuploidy individuals"),
+                              plotOutput(ns("overall_p3"))),
+                          box(width= 12, solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,  status="primary", title = "Aneuploid individuals table", label = tags$b("Aneuploid individuals table"),
+                              downloadButton(ns('aneuploid_df_download'), "Download"), br(), br(),
+                              DT::dataTableOutput(ns("aneuploid_df")))), br(), hr(),
+                      box(width= 12, solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,  status="primary", title = "Euploid weird individuals", label = tags$b("Euploid weird individuals"),
+                          htmlOutput(ns("ploidy_all_weird"))),
+                      box(width= 12, solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,  status="primary", title = "Aneuploid weird individuals", label = tags$b("Aneuploid weird individuals"),
+                          htmlOutput(ns("aneuploidy_all_weird")))
 
-        ),
-        tabPanel("Impact in mapping population",
-                 box(width= 12, solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,  status="primary", title = "Table", label = tags$b("Table"),
-                     p("MAPpoly"),
-                     downloadButton(ns('breaks_mappoly_download'), "Download"), br(), br(),
-                     DT::dataTableOutput(ns("breaks_mappoly_df")),
-                     p("polyOrigin"),
-                     downloadButton(ns('breaks_polyorigin_df_download'), "Download"), br(), br(),
-                     DT::dataTableOutput(ns("breaks_polyorigin_df"))
-                 ),
-                 box(width= 12, solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,  status="primary", title = "Graphic", label = tags$b("Graphic"),
-                     p("MAPpoly"),
-                     plotOutput(ns("breaks_mappoly_plot")),
-                     p("polyOrigin"),
-                     plotOutput(ns("breaks_polyorigin_plot"))
-                 )
-        ),
-        tabPanel("Graphics - Single individual analysis",
-                 br(),
-                 box(width= 12, solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,  status="info", title = "Single individual visualization options", label = tags$b("Single individual visualization options"),
-                     pickerInput(ns("graphics"),
-                                 label = "Select sample for graphics",
-                                 choices = "This will be updated after samples are selected above",
-                                 selected = "This will be updated after samples are selected above",
-                                 options = pickerOptions(
-                                   size = 8,
-                                   `selected-text-format` = "count > 3",
-                                   `live-search`=TRUE,
-                                   actionsBox = TRUE,
-                                   dropupAuto = FALSE
+             ),
+             tabPanel("Impact in mapping population",
+                      box(width= 12, solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,  status="primary", title = "Table", label = tags$b("Table"),
+                          p("MAPpoly"),
+                          downloadButton(ns('breaks_mappoly_download'), "Download"), br(), br(),
+                          DT::dataTableOutput(ns("breaks_mappoly_df")),
+                          p("polyOrigin"),
+                          downloadButton(ns('breaks_polyorigin_df_download'), "Download"), br(), br(),
+                          DT::dataTableOutput(ns("breaks_polyorigin_df"))
+                      ),
+                      box(width= 12, solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,  status="primary", title = "Graphic", label = tags$b("Graphic"),
+                          p("MAPpoly"),
+                          plotOutput(ns("breaks_mappoly_plot")),
+                          p("polyOrigin"),
+                          plotOutput(ns("breaks_polyorigin_plot"))
+                      )
+             ),
+             tabPanel("Graphics - Single individual analysis",
+                      br(),
+                      box(width= 12, solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,  status="info", title = "Single individual visualization options", label = tags$b("Single individual visualization options"),
+                          column(6,
+                                 pickerInput(ns("graphics"),
+                                             label = "Select sample for graphics",
+                                             choices = "This will be updated",
+                                             selected = "This will be updated",
+                                             options = pickerOptions(
+                                               size = 8,
+                                               `selected-text-format` = "count > 3",
+                                               `live-search`=TRUE,
+                                               actionsBox = TRUE,
+                                               dropupAuto = FALSE
+                                             ),
+                                             multiple = FALSE),
+                                 p("Ploidy estimation options:"),
+                                 numericInput(ns("area_single"), label = "Total area", value = 0.75, step = 0.1),
+                                 sliderInput(ns("ploidys_single"), label = "select ploidy", min = 2, max = 8, value = c(2,5), step = 1),
+                                 p("or user-defined ploidy:"),
+                                 textInput(ns("ploidy"), label = "Input ploidy", value = NULL),
+                          ),
+                          column(6,
+                                 textInput(ns("centromeres"), label = "Add centromeres positions (bp)", value = "1 = 49130338, 5 = 49834357"),
+                                 column(6,
+                                        checkboxInput(ns("add_centromeres"), label = "Add centromere line", value = FALSE),
+                                        checkboxInput(ns("colors"), label = "Color area", value = FALSE),
                                  ),
-                                 multiple = FALSE),
-                     p("Ploidy estimation options:"),
-                     numericInput(ns("area_single"), label = "Total area", value = 0.75, step = 0.1),
-                     sliderInput(ns("ploidys_single"), label = "select ploidy", min = 2, max = 8, value = c(2,5), step = 1),
-                     p("or user-defined ploidy:"),
-                     textInput(ns("ploidy"), label = "Input ploidy", value = NULL),
-                     textInput(ns("centromeres"), label = "Add centromeres positions (bp)", value = "1 = 49130338, 5 = 49834357"),
-                     checkboxInput(ns("add_centromeres"), label = "Add centromere line", value = FALSE),
-                     checkboxInput(ns("colors"), label = "Color area", value = FALSE),
-                     checkboxInput(ns("add_estimated_peaks"), label = "Add estimated peaks lines", value = FALSE),
-                     checkboxInput(ns("add_expected_peaks"), label = "Add expected peaks lines", value = FALSE),
-                     numericInput(ns("dot.size"), label = "Dot size", value = 1), br(),
-                     actionButton(ns("run_individual"), "Run")
-                 ),
-                 # box(width = 12, solidHeader = TRUE, collapsible = TRUE,  collapsed = TRUE, status="primary", title = "Segmented logR plot",
-                 #     column(12,
-                 #            plotOutput(ns("plot_logR")), br(),
-                 #     )
-                 # ),
-                 box(width = 12, solidHeader = TRUE, collapsible = TRUE,  collapsed = TRUE, status="primary", title = "BAF plot",
-                     column(12,
-                            br(),
-                            plotOutput(ns("plot_lines")), br(),
-                            plotOutput(ns("plot_hist"))
-                     ),
-                 ),br(),
-                 box(width = 12, solidHeader = TRUE, collapsible = TRUE,  collapsed = TRUE, status="primary", title = "Haplotypes",
-                     box(width = 12, solidHeader = FALSE, collapsible = TRUE,  collapsed = TRUE, status="primary", title = "MAPpoly probabilities",
-                         plotOutput(ns("plot_haplo_mappoly"), height = "1100px"),
-                     ),
-                     box(width = 12, solidHeader = FALSE, collapsible = TRUE,  collapsed = TRUE, status="primary", title = "PolyOrigin probabilities",
-                         plotOutput(ns("plot_haplo_polyorigin"), height = "1100px"))
-                 )
-        )
-      )
+                                 column(6,
+                                        checkboxInput(ns("add_estimated_peaks"), label = "Add estimated peaks lines", value = TRUE),
+                                        checkboxInput(ns("add_expected_peaks"), label = "Add expected peaks lines", value = TRUE),
+                                 ),
+                                 pickerInput(ns("dis.chr"),
+                                             label = "Select chromosomes for graphics",
+                                             choices = "This will be updated",
+                                             selected = "This will be updated",
+                                             options = pickerOptions(
+                                               size = 8,
+                                               `selected-text-format` = "count > 3",
+                                               `live-search`=TRUE,
+                                               actionsBox = TRUE,
+                                               dropupAuto = FALSE
+                                             ),
+                                             multiple = TRUE),
+                                 numericInput(ns("dot.size"), label = "Dot size", value = 1), br(),
+                                 actionButton(ns("run_individual"), "Run")
+                          )
+                      ),
+                      # box(width = 12, solidHeader = TRUE, collapsible = TRUE,  collapsed = TRUE, status="primary", title = "Segmented logR plot",
+                      #     column(12,
+                      #            plotOutput(ns("plot_logR")), br(),
+                      #     )
+                      # ),
+                      box(width = 12, solidHeader = TRUE, collapsible = TRUE,  collapsed = TRUE, status="primary", title = "BAF plot",
+                          column(12,
+                                 br(),
+                                 plotOutput(ns("plot_lines")), br(),
+                                 plotOutput(ns("plot_hist"))
+                          ),
+                      ),br(),
+                      box(width = 12, solidHeader = TRUE, collapsible = TRUE,  collapsed = TRUE, status="primary", title = "Haplotypes",
+                          box(width = 12, solidHeader = FALSE, collapsible = TRUE,  collapsed = TRUE, status="primary", title = "MAPpoly probabilities",
+                              plotOutput(ns("plot_haplo_mappoly"), height = "1100px"),
+                          ),
+                          box(width = 12, solidHeader = FALSE, collapsible = TRUE,  collapsed = TRUE, status="primary", title = "PolyOrigin probabilities",
+                              plotOutput(ns("plot_haplo_polyorigin"), height = "1100px"))
+                      )
+             )
+           )
     )
   )
 }
@@ -243,7 +276,7 @@ mod_all_server <- function(id){
           } else if(input$example_data == "potatoes") {
             #logR <- vroom("C:/Users/Rose_Lab/Documents/Cris_temp/Qploidy_data/roses_texas/fitpoly/logR_roses_texas.txt", show_col_types = FALSE)
             logR <- NULL
-            baf <- vroom("C:/Users/Rose_Lab/Documents/Cris_temp/Qploidy_data/potato_texas/baf_potato_texas.tsv.gz", show_col_types = FALSE)
+            baf <- vroom("C:/Users/Rose_Lab/Documents/Cris_temp/Qploidy_data/potato_texas/baf_potato_texas_round2.txt.gz", show_col_types = FALSE)
             incProgress(0.3, detail = paste("Loading MAPpoly file..."))
 
             haplo_mappoly <- NULL
@@ -545,6 +578,15 @@ mod_all_server <- function(id){
                         label = "Select sample for the graphic",
                         choices = choices_names,
                         selected=unlist(choices_names)[1])
+
+      chrs <- sort(unique(as.data.frame(baf)[,2]))
+      chrs_lst <- as.list(chrs)
+      names(chrs_lst) <- chrs
+
+      updatePickerInput(session, "dis.chr",
+                        label = "Select chromosomes for the graphic",
+                        choices = chrs_lst,
+                        selected=unlist(chrs_lst))
     })
 
     # Single individual analysis
@@ -562,13 +604,15 @@ mod_all_server <- function(id){
         # input$colors <- TRUE
         # input$centromeres <- "1 = 49130338, 5 = 49834357"
         # input$add_centromeres <- TRUE
-        # input$ploidys <- c(2,6)
+        # input$ploidys_single <- c(2,6)
         # ploidys <- input$ploidys
         # input$filter_diff <- 0.015
-        #
+        # input$dis.chr <- 5
         # data_sample <- baf[,c(2,3,which(colnames(baf) %in% c(input$graphics)))]
+
         data_sample <- logR_baf()[[2]][,c(2,3,which(colnames(logR_baf()[[2]]) %in% c(input$graphics)))]
         colnames(data_sample)[3] <- "sample"
+        data_sample <- data_sample %>% filter(Chr %in% input$dis.chr)
 
         if(input$ploidy == ""){
           est.ploidy <- area_est_ploidy_single_sample(data_sample,

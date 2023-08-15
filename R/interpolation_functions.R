@@ -35,6 +35,39 @@ get_logR <- function(theta_subject, R_subject, centers_theta, mod, ploidy){
   return(logR)
 }
 
+#' Create logR
+#'
+#' @param R_subject numeric R to be interpolated
+#' @param theta_subject numeric theta to be interpolated
+#' @param centers_theta theta centroids defined by clusterization
+#' @param ploidy integer defining ploidy
+#' @param mod interpolation model
+#'
+#' @export
+get_R_exp <- function(theta_subject, R_subject, centers_theta, mod, ploidy){
+  pos <- vector()
+  centers_theta <- sort(centers_theta, decreasing = F)
+  idx <- which(theta_subject < centers_theta[1])
+  if(length(idx) > 0) pos[idx] <- 1
+  for(i in 2:(ploidy+1)){
+    idx <- which(theta_subject > centers_theta[i-1] & theta_subject < centers_theta[i])
+    if(length(idx) > 0) pos[idx] <- i -1
+  }
+  idx <- which(theta_subject > centers_theta[ploidy+1])
+  if(length(idx) > 0) pos[idx] <- i-1
+
+  R_expected <- rep(NA, length(pos))
+  if(any(!is.na(pos))){
+    for(i in 1:max(pos, na.rm = T)){
+      idx <- which(pos == i)
+      if(length(idx) > 0)
+        R_expected[idx] <- coef(mod[[i]])[1] + theta_subject[idx]*coef(mod[[i]])[2]
+    }
+  }
+  R_expected <- unlist(R_expected)
+  return(R_expected)
+}
+
 #' To create logR in parallel
 #'
 #' @param par_all_item list containing R and theta matrices, and clusters models
@@ -45,6 +78,24 @@ get_logR_par <- function(par_all_item, ploidy =2){
   logRs_diplo <- list()
   for(i in 1:nrow(par_all_item[[1]])){
     logRs_diplo[[i]] <- get_logR(R_subject = par_all_item[[1]][i,],
+                                  theta_subject = par_all_item[[2]][i,],
+                                  centers_theta = par_all_item[[3]][[i]]$centers_theta,
+                                  mod = par_all_item[[3]][[i]]$mod,
+                                  ploidy = ploidy)
+  }
+  return(logRs_diplo)
+}
+
+#' To create logR in parallel
+#'
+#' @param par_all_item list containing R and theta matrices, and clusters models
+#' @param ploidy integer defining ploidy
+#'
+#' @export
+get_R_exp_par <- function(par_all_item, ploidy =2){
+  logRs_diplo <- list()
+  for(i in 1:nrow(par_all_item[[1]])){
+    logRs_diplo[[i]] <- get_R_exp(R_subject = par_all_item[[1]][i,],
                                  theta_subject = par_all_item[[2]][i,],
                                  centers_theta = par_all_item[[3]][[i]]$centers_theta,
                                  mod = par_all_item[[3]][[i]]$mod,

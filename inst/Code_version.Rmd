@@ -578,10 +578,49 @@ saveMarkerModels(ploidy=4,
 library(vroom)
 library(dplyr)
 library(tidyr)
+library(ggplot2)
 
 fitpoly_potato_input <- readRDS("C:/Users/Rose_Lab/Documents/Cris_temp/TAMU-RoseLab/standalone_apps/ploidy_estimation/data/potato/fitpoly_potato_input.rds")
-scores <- vroom("C:/Users/Rose_Lab/Documents/Cris_temp/Qploidy_data/potato_texas/fitpoly_out_potato_texas2_scores.dat")
 
+geno.pos <- vroom("C:/Users/Rose_Lab/Documents/Cris_temp/TAMU-RoseLab/standalone_apps/ploidy_estimation/data/potato/Potato_SNP_Map.txt")
+
+chr <- geno.pos$Chromosome[match(fitpoly_potato_input$MarkerName,geno.pos$Name)]
+pos <- geno.pos$Position[match(fitpoly_potato_input$MarkerName,geno.pos$Name)]
+
+fitpoly_potato_input_pos <- cbind(fitpoly_potato_input, chr, pos)
+temp <- fitpoly_potato_input_pos %>% filter(SampleName == "257-2_3" & grepl("ST4", chr))
+
+p5 <- temp %>% filter(chr == "ST4.03CH09") %>% ggplot(aes(x=pos, y = R)) +
+  geom_point() +
+  facet_grid(.~ chr, scales = "free")+ theme_bw() + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) + ylim(c(-10,10))
+
+
+# Z score by sample
+
+z_sample <- fitpoly_potato_input_pos %>% group_by(SampleName) %>% mutate(z = (R - mean(R, na.rm = TRUE))/sd(R, na.rm = TRUE))
+
+temp <- z_sample %>% filter(SampleName == "257-2_3" & grepl("ST4", chr))
+#%>% filter(chr == "ST4.03CH09")
+p4 <- temp  %>% ggplot(aes(x=pos, y = z)) +
+  geom_point() +
+  facet_grid(.~ chr, scales = "free")+ theme_bw() + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) + ylim(c(-10,10))
+
+
+# Z score by marker
+
+z_sample <- fitpoly_potato_input_pos %>% group_by(MarkerName) %>% mutate(z = (R - mean(R, na.rm = TRUE))/sd(R, na.rm = TRUE))
+
+temp <- z_sample %>% filter(SampleName == "TX20820-10" & grepl("ST4", chr))
+#%>% filter(chr %in% c("ST4.03CH11", "ST4.03CH10"))
+p3 <- temp %>% filter(chr %in% c("ST4.03CH11", "ST4.03CH10")) %>% ggplot(aes(x=pos, y = z)) +
+  geom_point() +
+  facet_grid(.~ chr, scales = "free")+ theme_bw() + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) + ylim(c(-15,15))
+
+# Filters
+scores <- vroom("C:/Users/Rose_Lab/Documents/Cris_temp/Qploidy_data/potato_texas/fitpoly_out_potato_texas2_scores.dat")
 n.na <- scores %>% group_by(MarkerName) %>% summarize(n.na = (sum(is.na(geno))/length(geno))*100)
 
 rm.mks <- n.na$MarkerName[which(n.na$n.na > 25)]
@@ -590,12 +629,15 @@ scores_filt <- scores[-which(scores$MarkerName %in% rm.mks),]
 
 # keep.mks <- which(fitpoly_potato_input$MarkerName %in% scores_filt$MarkerName & fitpoly_potato_input$SampleName %in% scores_filt$SampleName)
 
+# Convert R to zscore by marker
+fitpoly_potato_input <- fitpoly_potato_input %>% group_by(MarkerName) %>% mutate(z = (R - mean(R, na.rm = TRUE))/sd(R, na.rm = TRUE))
+
 keep.mks <- match(paste0(scores_filt$SampleName, "_", scores_filt$MarkerName),
                   paste0(fitpoly_potato_input$SampleName, "_", fitpoly_potato_input$MarkerName))
 
 fitpoly_input_filt <- fitpoly_potato_input[keep.mks,]
 theta <- fitpoly_input_filt$ratio
-R <- fitpoly_input_filt$R
+R <- fitpoly_input_filt$z
 
 rm.na <- which(is.na(scores_filt$geno))
 if(length(rm.na) > 0){
@@ -635,17 +677,16 @@ filtered.markers <- data.frame(length(unique(fitpoly_potato_input$MarkerName)),
 
 colnames(filtered.markers) <- c("n.mk.start", "missing.data", "wrong_n_clusters", "n.mk.selected")
 
-
 mks <- names(clusters)
 mks[which(rm.mks)] <- paste(mks[which(rm.mks)], "(discarded)")
 # Plot markers interpolation
-p <- plot_one_marker(lst_interpolation[[4]], ploidy = 4)
+p <- plot_one_marker(lst_interpolation[[5]], ploidy = 4)
 p
 
 keep.mks <- names(clusters_filt)
 # Getting logR and BAF for entire dataset
-R_filt <- pivot_wider(fitpoly_potato_input[which(fitpoly_potato_input$MarkerName %in% keep.mks),-c(3,4,6)], names_from = "SampleName", values_from = "R")
-theta_filt <- pivot_wider(fitpoly_potato_input[which(fitpoly_potato_input$MarkerName %in% keep.mks),-c(3,4,5)], names_from = "SampleName", values_from = "ratio")
+R_filt <- pivot_wider(fitpoly_potato_input[which(fitpoly_potato_input$MarkerName %in% keep.mks),-c(3,4,5,6)], names_from = "SampleName", values_from = "z")
+theta_filt <- pivot_wider(fitpoly_potato_input[which(fitpoly_potato_input$MarkerName %in% keep.mks),-c(3,4,5,7)], names_from = "SampleName", values_from = "ratio")
 
 n.cores <- 20
 par <- rep(1:n.cores, each=round((nrow(R_filt)/n.cores)+1,0))[1:nrow(R_filt)]
@@ -663,16 +704,17 @@ for(i in 1:n.cores){
 }
 
 clust <- makeCluster(n.cores)
-clusterExport(clust, c("get_logR", "get_logR_par", "ploidy"))
-logRs_diplo <- parLapply(clust, par_all, function(x) {
-  get_logR_par(x, ploidy = ploidy)
+clusterExport(clust, c("get_R_exp", "get_R_exp_par", "ploidy"))
+Rs_diplo <- parLapply(clust, par_all, function(x) {
+  get_R_exp_par(x, ploidy = ploidy)
 })
 stopCluster(clust)
 
-logRs_diplod_lt <- unlist(logRs_diplo, recursive = F)
-logRs_diplod_m <- do.call(rbind, logRs_diplod_lt)
-rownames(logRs_diplod_m) <- R_filt$mks
-logRs_diplod_m <- cbind(mks=rownames(logRs_diplod_m), logRs_diplod_m)
+Rs_diplod_lt <- unlist(Rs_diplo, recursive = F)
+Rs_diplod_m <- do.call(rbind, Rs_diplod_lt)
+rownames(Rs_diplod_m) <- R_filt$MarkerName
+colnames(Rs_diplod_m) <- colnames(R_filt)[-1]
+Rs_diplod_m <- cbind(mks=rownames(Rs_diplod_m), Rs_diplod_m)
 
 # Get BAF
 clust <- makeCluster(n.cores)
@@ -685,7 +727,7 @@ stopCluster(clust)
 bafs_diplo_lt <- unlist(bafs_diplo, recursive = F)
 bafs_diplo_m <- do.call(rbind, bafs_diplo_lt)
 rownames(bafs_diplo_m) <- theta_filt$MarkerName
-colnames(bafs_diplo_m) <- colnames(logRs_diplod_m)[-1]
+colnames(bafs_diplo_m) <- colnames(R_filt)[-1]
 bafs_diplo_df <- as.data.frame(bafs_diplo_m)
 bafs_diplo_df <- cbind(mks=rownames(bafs_diplo_df), bafs_diplo_df)
 
@@ -703,12 +745,98 @@ baf <- baf[-which(is.na(baf$Chr) | baf$Chr == "0"),]
 
 vroom_write(baf, file = "baf_potato_texas_round2.txt.gz")
 
-# logR <- cbind(Name=logRs_diplod_m$mks, Chr = chr, Position = pos, logRs_diplod_m[,-1])
-# logR <- logR[-which(is.na(logR$Chr)| logR$Chr == "0"),]
-# logR <- vroom("data/potato/logR_potato_texas.txt")
-# logR <- logR[,-4]
-# logR <- logR[-which(grepl("CHLOROPLAST", logR$Chr) | grepl("CH00", logR$Chr)),]
-#vroom_write(logR, file = "logR_potato_texas_round2.txt")
+dim(R_filt)
+
+R <- cbind(Name=Rs_diplod_m[,1], Chr = chr, Position = pos, Rs_diplod_m[,-1])
+R <- R[-which(is.na(R[,2])| R[,2] == "0"),]
+R <- R[-which(grepl("CHLOROPLAST", R[,2]) | grepl("CH00", R[,2])),]
+saveRDS(R, file = "R_potato_texas_round2.rds")
+
+# Z score + interpolation
+
+R_melt <- pivot_longer(as.data.frame(R), cols = 4:ncol(R))
+
+str(R_melt)
+R_melt$value <- as.numeric(R_melt$value)
+R_melt$Position <- as.numeric(R_melt$Position)
+
+temp <- R_melt %>% filter(name == "257-2_3" & grepl("ST4", Chr))
+#%>% filter(chr %in% c("ST4.03CH11", "ST4.03CH10"))
+p3 <- temp  %>% ggplot(aes(x=Position, y = value)) +
+  geom_point() +
+  facet_grid(.~ Chr, scales = "free")+ theme_bw() + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) + ylim(c(-10,10))
+
+
+# Try interpolation + Z score
+
+```
+
+```{r}
+library(vroom)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+
+fitpoly_potato_input <- readRDS("C:/Users/Rose_Lab/Documents/Cris_temp/TAMU-RoseLab/standalone_apps/ploidy_estimation/data/potato/fitpoly_potato_input.rds")
+baf <- vroom("C:/Users/Rose_Lab/Documents/Cris_temp/Qploidy_data/potato_texas/baf_potato_texas_round2.txt.gz")
+
+R_filt <- pivot_wider(fitpoly_potato_input[which(fitpoly_potato_input$MarkerName %in% baf$Name),-c(3,4,6)], names_from = "SampleName", values_from = "R")
+R_filt <- as.data.frame(R_filt)
+
+tetra <- vroom("tetraploids_after_round2", "\n")
+
+R_tetra <- R_filt %>% select(tetra$Sample)
+R_tetra_mean <- apply(R_tetra,1, function(x) mean(x, na.rm=TRUE))
+R_tetra_sd <- apply(R_tetra,1, function(x) sd(x, na.rm=TRUE))
+
+R_z_tetra <- list()
+for(i in 1:nrow(R_tetra)){
+  print(i)
+  R_z_tetra[[i]] <- (R_filt[i,-1] - R_tetra_mean[i])/R_tetra_sd[i]
+}
+
+test <- (R_filt[,-1] - R_tetra_mean)/R_tetra_sd
+
+R_z <- apply(R[,-c(1:3)], 1, function(x) {
+  y <- as.numeric(x)
+  (y - mean(y, na.rm = TRUE))/sd(y, na.rm = TRUE)
+  })
+R_z <- t(R_z)
+colnames(R_z) <- colnames(R[,-c(1:3)])
+
+
+geno.pos <- vroom("C:/Users/Rose_Lab/Documents/Cris_temp/TAMU-RoseLab/standalone_apps/ploidy_estimation/data/potato/Potato_SNP_Map.txt")
+
+chr <- geno.pos$Chromosome[match(R[,1],geno.pos$Name)]
+pos <- geno.pos$Position[match(R[,1],geno.pos$Name)]
+
+R_z_pos <- cbind(Name=R[,1], Chr = chr, Position = pos, R_z)
+R_z_pos_melt <- pivot_longer(as.data.frame(R_z_pos), cols = 4:ncol(R_z_pos))
+R_z_pos_melt$value <- as.numeric(R_z_pos_melt$value)
+R_z_pos_melt$name  <- as.factor(R_z_pos_melt$name)
+R_z_pos_melt$Position <- as.numeric(R_z_pos_melt$Position)
+
+data_plot  <- R_z_pos_melt %>% filter(name=="257-2_3" & grepl("ST4", Chr)) 
+
+p5 <- data_plot %>%  ggplot(aes(x=Position, y = value)) +
+  geom_point() +
+  facet_grid(.~ Chr)
+
+
+test <- (R_filt[,-1] - R_tetra_mean)/R_tetra_sd
+
+R_z_pos <- cbind(Name=R_filt[,1], Chr = chr, Position = pos, test)
+R_z_pos_melt <- pivot_longer(as.data.frame(R_z_pos), cols = 4:ncol(R_z_pos))
+R_z_pos_melt$value <- as.numeric(R_z_pos_melt$value)
+R_z_pos_melt$name  <- as.factor(R_z_pos_melt$name)
+R_z_pos_melt$Position <- as.numeric(R_z_pos_melt$Position)
+
+data_plot  <- R_z_pos_melt %>% filter(name=="257-2_3" & grepl("ST4", Chr)) 
+
+p3 <- data_plot %>%  ggplot(aes(x=Position, y = value)) +
+  geom_point() +
+  facet_grid(.~ Chr)
 
 ```
 

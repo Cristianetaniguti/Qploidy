@@ -14,25 +14,28 @@ testServer(
       grepl("test", ns("test"))
     )
 
-    # library(vroom)
-    # library(dplyr)
-    # library(tidyr)
-    # library(testthat)
-
     session$setInputs(load_summary = list(datapath = system.file("summary_example.txt", package = "Qploidy")),
                       load_ind_names = list(datapath = system.file("ind.names_example.txt", package = "Qploidy")),
-                      load_geno_pos = list(datapath = system.file("geno.pos_example.txt", package = "Qploidy")),
+                      load_geno_pos = list(datapath = system.file("geno.pos_example.tsv.gz", package = "Qploidy")),
                       fitpoly_scores = list(datapath = system.file("tetraploids_refs_scores.tsv.gz", package = "Qploidy")),
+                      zscores = list(datapath = system.file("zscore_example.tsv.gz", package = "Qploidy")),
                       refs = paste0("Tetra_", 1:50),
                       ploidy = 4,
                       n.cores = 1)
 
-    #Prepare Axiom file
+    # Prepare Axiom file
+    # library(vroom)
+    # library(dplyr)
+    # library(tidyr)
+    # library(testthat)
+    # library(Qploidy)
+    #
     # input <- list()
     # input$load_summary$datapath <- system.file("summary_example.txt", package = "Qploidy")
     # input$load_ind_names$datapath <- system.file("ind.names_example.txt", package = "Qploidy")
-    # input$load_geno_pos$datapath <- system.file("geno.pos_example.txt", package = "Qploidy")
+    # input$load_geno_pos$datapath <- system.file("geno.pos_example.tsv.gz", package = "Qploidy")
     # input$fitpoly_scores$datapath <- system.file("tetraploids_refs_scores.tsv.gz", package = "Qploidy")
+    # input$zscore$datapath <- system.file("zscore_example.tsv.gz", package = "Qploidy")
     # input$refs <- paste0("Tetra_", 1:50)
     # input$ploidy <- 4
     # input$n.cores <- 1
@@ -100,8 +103,8 @@ testServer(
     library(parallel)
     clust <- makeCluster(input$n.cores)
     ploidy <- input$ploidy
-    clusterExport(clust, c("par_fitpoly_interpolation"))
-    #clusterExport(clust, c("par_fitpoly_interpolation", "ploidy"))
+    #clusterExport(clust, c("par_fitpoly_interpolation"))
+    clusterExport(clust, c("par_fitpoly_interpolation", "ploidy"))
     clusters <- parLapply(clust, lst_interpolation, function(x) {
       library(ggplot2)
       par_fitpoly_interpolation(x, ploidy= ploidy, plot = FALSE)
@@ -140,40 +143,24 @@ testServer(
 
     keep.mks <- names(clusters_filt)
     # Getting logR and BAF for entire dataset
-    R_filt <- R_all[match(keep.mks, R_all$MarkerName),]
     theta_filt <- theta_all[match(keep.mks, theta_all$MarkerName),]
 
-    par <- rep(1:input$n.cores, each=round((nrow(R_filt)/input$n.cores)+1,0))[1:nrow(R_filt)]
+    par <- rep(1:input$n.cores, each=round((nrow(theta_filt)/input$n.cores)+1,0))[1:nrow(theta_filt)]
 
-    par_R <- split.data.frame(R_filt[,-1], par)
     par_theta <- split.data.frame(theta_filt[,-1], par)
     par_clusters_filt <- split(clusters_filt, par)
 
     par_all <- list()
     for(i in 1:input$n.cores){
       par_all[[i]] <- list()
-      par_all[[i]][[1]] <- par_R[[i]]
-      par_all[[i]][[2]] <- par_theta[[i]]
-      par_all[[i]][[3]] <- par_clusters_filt[[i]]
+      par_all[[i]][[1]] <- par_theta[[i]]
+      par_all[[i]][[2]] <- par_clusters_filt[[i]]
     }
-
-    clust <- makeCluster(input$n.cores)
-    clusterExport(clust, c("get_logR", "get_logR_par"))
-    #clusterExport(clust, c("get_logR", "get_logR_par", "ploidy"))
-    logRs_diplo <- parLapply(clust, par_all, function(x) {
-      get_logR_par(x, ploidy = ploidy)
-    })
-    stopCluster(clust)
-
-    logRs_diplod_lt <- unlist(logRs_diplo, recursive = F)
-    logRs_diplod_m <- do.call(rbind, logRs_diplod_lt)
-    rownames(logRs_diplod_m) <- keep.mks
-    logRs_diplod_m <- cbind(mks=rownames(logRs_diplod_m), logRs_diplod_m)
 
     # Get BAF
     clust <- makeCluster(input$n.cores)
-    clusterExport(clust, c("get_baf", "get_baf_par"))
-    #clusterExport(clust, c("get_baf", "get_baf_par", "ploidy"))
+    #clusterExport(clust, c("get_baf", "get_baf_par"))
+    clusterExport(clust, c("get_baf", "get_baf_par", "ploidy"))
     bafs_diplo <- parLapply(clust, par_all, function(x) {
       get_baf_par(x, ploidy = ploidy)
     })
@@ -182,12 +169,11 @@ testServer(
     bafs_diplo_lt <- unlist(bafs_diplo, recursive = F)
     bafs_diplo_m <- do.call(rbind, bafs_diplo_lt)
     rownames(bafs_diplo_m) <- keep.mks
-    colnames(bafs_diplo_m) <- colnames(logRs_diplod_m)[-1]
+    colnames(bafs_diplo_m) <- colnames(theta_filt)[-1]
     bafs_diplo_df <- as.data.frame(bafs_diplo_m)
     bafs_diplo_df <- cbind(mks=rownames(bafs_diplo_df), bafs_diplo_df)
 
     expect_equal(sum(bafs_diplo_df[,-1]), 25343, tolerance = 1)
-    expect_equal(round(sum(logRs_diplod_m[,-1], na.rm = T),0), 2066)
 
     geno.pos <- vroom(input$load_geno_pos$datapath, show_col_types = FALSE)
 
@@ -195,7 +181,13 @@ testServer(
     pos <- geno.pos$Position[match(bafs_diplo_df$mks,geno.pos$Name)]
 
     baf <- cbind(Name=bafs_diplo_df$mks, Chr = chr, Position = pos, bafs_diplo_df[,-1])
-    logR <- cbind(Name=logRs_diplod_m$mks, Chr = chr, Position = pos, logRs_diplod_m[,-1])
+
+    zscore <- vroom(input$zscore$datapath)
+
+    chr <- geno.pos$Chr[match(zscore$MarkerName,geno.pos$Name)]
+    pos <- geno.pos$Position[match(zscore$MarkerName,geno.pos$Name)]
+
+    zscore <- cbind(Name=zscore$MarkerName, Chr = chr, Position = pos, zscore[,-1])
   })
 
 test_that("module ui works", {

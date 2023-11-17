@@ -80,7 +80,7 @@ mod_interpolation_ui <- function(id){
                         numericInput(ns("n.cores"), label = "Number of cores to be used", value = 1),
                         numericInput(ns("ploidy"), label = "Interpolation model ploidy", value = 4),
                         downloadButton(ns("down_baf"), "Download BAF"),
-                        downloadButton(ns("down_logR"), "Download logR"),
+                        downloadButton(ns("down_z"), "Download z scores"),
                         downloadButton(ns("data_interpolation"), "Download interpolated data"),
                         hr()
                  )
@@ -408,16 +408,6 @@ mod_interpolation_server <- function(id){
 
           clust <- makeCluster(input$n.cores)
           ploidy_r <- input$ploidy
-          clusterExport(clust, c("get_logR", "get_logR_par"))
-          logRs_diplo <- parLapply(clust, par_all, function(x) {
-            get_logR_par(x, ploidy = ploidy_r)
-          })
-          stopCluster(clust)
-
-          logRs_diplod_lt <- unlist(logRs_diplo, recursive = F)
-          logRs_diplod_m <- do.call(rbind, logRs_diplod_lt)
-          rownames(logRs_diplod_m) <- keep.mks
-          logRs_diplod_m <- cbind(mks=rownames(logRs_diplod_m), logRs_diplod_m)
 
           # Get BAF
           clust <- makeCluster(input$n.cores)
@@ -430,27 +420,15 @@ mod_interpolation_server <- function(id){
           bafs_diplo_lt <- unlist(bafs_diplo, recursive = F)
           bafs_diplo_m <- do.call(rbind, bafs_diplo_lt)
           rownames(bafs_diplo_m) <- keep.mks
-          colnames(bafs_diplo_m) <- colnames(logRs_diplod_m)[-1]
           bafs_diplo_df <- as.data.frame(bafs_diplo_m)
           bafs_diplo_df <- cbind(mks=rownames(bafs_diplo_df), bafs_diplo_df)
 
-          return(list(logRs_diplod_m, bafs_diplo_df))
+          return(bafs_diplo_df)
         } else {
           return(NULL)
         }
       })
     })
-
-    output$down_logR <- downloadHandler(
-      filename = function() {
-        # Use the selected dataset as the suggested file name
-        temp <- sample(1:1000, 1)
-        paste0("logR_",temp, ".txt")
-      },
-      content = function(file) {
-        vroom_write(logR_BAF()[[1]], file = file)
-      }
-    )
 
     output$down_baf <- downloadHandler(
       filename = function() {
@@ -459,7 +437,7 @@ mod_interpolation_server <- function(id){
         paste0("BAF_",temp, ".txt")
       },
       content = function(file) {
-        vroom_write(logR_BAF()[[2]], file = file)
+        vroom_write(logR_BAF(), file = file)
       }
     )
   })

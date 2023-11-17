@@ -199,10 +199,9 @@ get_probs_polyorigin <- function(df, f1.codes, ind = NULL, ploidy = 4, n.cores= 
   melt_df_lst <- split(melt_df, melt_df$ind)
 
   clust <- makeCluster(n.cores)
-  clusterExport(clust, c("get_probs_sing"))
-  homoprob.lst <- parLapply(clust, melt_df_lst, function(x) get_probs_sing(melt_df = x,
-                                                                           f1.codes = f1.codes,
-                                                                           ploidy = ploidy))
+  homoprob.lst <- parLapply(clust, melt_df_lst, function(x) Qploidy::get_probs_sing(melt_df = x,
+                                                                                    f1.codes = f1.codes,
+                                                                                    ploidy = ploidy))
   stopCluster(clust)
 
   homoprob <- do.call(rbind, homoprob.lst)
@@ -220,10 +219,10 @@ get_probs_polyorigin_sd <- function(df, f1.codes, ind = NULL, ploidy = 4, n.core
   melt_df_lst <- split(melt_df, melt_df$ind)
 
   clust <- makeCluster(n.cores)
-  clusterExport(clust, c("get_probs_sing", "f1.codes"))
-  homoprob.lst <- parLapply(clust, melt_df_lst, function(x) get_probs_sing(melt_df = x,
-                                                                           f1.codes = f1.codes,
-                                                                           ploidy = ploidy))
+  clusterExport(clust, c("f1.codes"))
+  homoprob.lst <- parLapply(clust, melt_df_lst, function(x) Qploidy::get_probs_sing(melt_df = x,
+                                                                                    f1.codes = f1.codes,
+                                                                                    ploidy = ploidy))
   stopCluster(clust)
 
   homoprob <- do.call(rbind, homoprob.lst)

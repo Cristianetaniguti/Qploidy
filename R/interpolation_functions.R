@@ -157,6 +157,8 @@ plot_one_marker <- function(scores_temp, ploidy){
 #' @import tidyr
 #' @import vroom
 #' @import parallel
+#' @import lme4
+#' @import emmeans
 #'
 #' @export
 interpolate_BAFs <- function(data = NULL,
@@ -167,10 +169,12 @@ interpolate_BAFs <- function(data = NULL,
                              threshold.n.clusters = NULL,
                              n.cores =1,
                              baf_file_name,
+                             split_batches,
                              verbose = TRUE){
 
   if(is.null(threshold.n.clusters)) threshold.n.clusters <- ploidy.interpolation + 1
 
+  cat("Preparing data...")
   n.na <- genos %>% group_by(MarkerName) %>% summarize(n.na = (sum(is.na(geno))/length(geno)))
 
   rm.mks <- n.na$MarkerName[which(n.na$n.na > threshold.missing.geno)]
@@ -198,79 +202,164 @@ interpolate_BAFs <- function(data = NULL,
                                    theta = theta,
                                    geno = genos_filt$geno)
 
-  lst_interpolation <- split(data_interpolation, data_interpolation$mks)
+  # Check the samples that are too different from the rest for the intensities ratios in the heterozygous dosage
+  if(verbose) cat("Defining samples batches...")
+  dosages <- sort(unique(data_interpolation$geno))
+  dosages <- dosages[-c(1, length(dosages))]
+  #dosages <- median(dosages)
+  batches <- fixed.effects <- list()
+  time <- vector()
+  batches[[1]] <- unique(data_interpolation$ind)
+  for(i in 1:length(dosages)){
+    cat(i)
+    time[i] <- system.time({mod1 <- lmer(theta ~ 1 + ind + (1 | mks),
+                                         data = data_interpolation[which(data_interpolation$geno == dosages[i]),])})
+    fixed.effects[[i]] <- fixef(mod1)
+  }
+  fixed_m <- do.call(rbind, fixed.effects)
 
-  # Generate clusters
-  clust <- makeCluster(n.cores)
-  #clusterExport(clust, c("par_fitpoly_interpolation", "ploidy.interpolation", "threshold.n.clusters"))
-  clusterExport(clust, c("par_fitpoly_interpolation"))
-  clusters <- parLapply(clust, lst_interpolation, function(x) {
-    par_fitpoly_interpolation(x, ploidy= ploidy.interpolation, n.clusters.thr = threshold.n.clusters)
-  })
-  stopCluster(clust)
+  groups <- Mclust(t(fixed_m))
+  #   split(names(groups$classification),groups$classification)
+  #
+  #   tests <- emmeans(mod1, list(pairwise ~ind), adjust = "tukey")
+  #   tests.pair <- print(tests$`pairwise differences of ind`)
+  #   j <- 2
+  #   while(length(which(tests.pair$p.value < 0.01)) > 0){
+  #     ind.diff <- unlist(strsplit(tests.pair[which(tests.pair$p.value < 0.01),1], " - "))
+  #     ind.diff.count <- table(ind.diff)
+  #     batches[[j]] <- names(ind.diff.count)[which(ind.diff.count > length(unique(data_interpolation$ind))*0.05)]
+  #     mod1 <- lmer(theta ~ 1 + ind + (1 | mks),
+  #                  data = data_interpolation[which(data_interpolation$geno == dosages[i] & data_interpolation$ind %in% batches[[j]]),])
+  #   }
+  # }
+  #
+  # fix_ef_m <- do.call(rbind, fix_ef)
+  # colnames(fix_ef_m) <- gsub("ind", "", colnames(fix_ef_m))
+  # fix_ef_m[,1] <- 0
+  # colnames(fix_ef_m)[1] <- unique(data_interpolation$ind)[is.na(match(unique(data_interpolation$ind), colnames(fix_ef_m)))]
+  #
+  # fit <- Mclust(t(fix_ef_m))
+  #
+  # batches <- fit$classification
 
-  gc()
+  batches <- groups$classification
+  names(batches) <- gsub("ind", "", names(batches))
+  data_interpolation$batch <- batches[match(data_interpolation$ind, names(batches))]
 
-  # Filter by number of clusters
-  rm.mks <- sapply(clusters, function(x) x$rm != 0)
-
-  if(verbose) print(paste0("Markers remove because of smaller number of clusters than set threshold:", length(rm.mks)))
-
-  if(length(which(rm.mks)) > 0)  clusters_filt <- clusters[-which(rm.mks)] else clusters_filt <- clusters
-
-  keep.mks <- names(clusters_filt)
-  # Getting BAF for complete dataset
-  theta_filt <- pivot_wider(data[which(data$MarkerName %in% keep.mks),-c(3:5)], names_from = "SampleName", values_from = "ratio")
-
-  par <- rep(1:n.cores, each=round((nrow(theta_filt)/n.cores)+1,0))[1:nrow(theta_filt)]
-
-  par_theta <- split.data.frame(theta_filt[,-1], par)
-  par_clusters_filt <- split(clusters_filt, par)
-
-  if(length(par_theta) < n.cores) n.cores <- length(par_theta)
-  par_all <- list()
-  for(i in 1:n.cores){
-    par_all[[i]] <- list()
-    par_all[[i]][[1]] <- par_theta[[i]]
-    par_all[[i]][[2]] <- par_clusters_filt[[i]]
+  if(verbose) {
+    cat("Samples were split in", length(unique(batches)), "batches:")
+    print(split(names(batches), batches))
   }
 
-  # Get BAF
-  clust <- makeCluster(n.cores)
-  #clusterExport(clust, c("get_baf", "get_baf_par", "ploidy.interpolation"))
-  clusterExport(clust, c("get_baf", "get_baf_par"))
-  bafs <- parLapply(clust, par_all, function(x) {
-    get_baf_par(x, ploidy = ploidy.interpolation)
-  })
-  stopCluster(clust)
+  # rm.ind <- unique(unlist(rm.ind))
+  #
+  # if(length(rm.ind) > 0){
+  #   if(verbose) print(paste0("Individuals removed from interpolation because their ratio values differ from at least 5% of the samples (n=", length(rm.ind),"): ", paste(rm.ind, collapse = " ")))
+  #   data_interpolation <- data_interpolation[-which(data_interpolation$ind %in% rm.ind),]
+  # }
 
-  gc()
+  data_interpolation_batch <- split(data_interpolation, data_interpolation$batch)
 
-  bafs_lt <- unlist(bafs, recursive = F)
+  baf_lst <- list()
+  for(j in 1:length(data_interpolation_batch)){
+    cat(paste("Evaluating batch", j, "\n"))
+    lst_interpolation <- split(data_interpolation_batch[[j]], data_interpolation_batch[[j]]$mks)
 
-  # bugfix
-  legths <- sapply(bafs_lt, length)
-  keep.mks.n <- which(legths == names(which.max(table(legths))))
+    if(verbose) cat("(Parallel mode) Defining each marker clusters centroids...\n")
+    # Generate clusters
+    clust <- makeCluster(n.cores)
+    clusterExport(clust, c("par_fitpoly_interpolation", "ploidy.interpolation", "threshold.n.clusters"))
+    #clusterExport(clust, c("par_fitpoly_interpolation"))
+    clusters <- parLapply(clust, lst_interpolation, function(x) {
+      par_fitpoly_interpolation(x, ploidy= ploidy.interpolation, n.clusters.thr = threshold.n.clusters)
+    })
+    stopCluster(clust)
 
-  bafs_lt <- bafs_lt[keep.mks.n]
-  bafs_m <- do.call(rbind, bafs_lt)
-  rownames(bafs_m) <- theta_filt$MarkerName[keep.mks.n]
-  colnames(bafs_m) <- colnames(theta_filt)[-1]
-  bafs_df <- as.data.frame(bafs_m)
-  bafs_df <- cbind(mks=rownames(bafs_df), bafs_df)
+    gc(verbose = FALSE)
 
-  # Add chr and pos info
-  chr <- geno.pos$Chromosome[match(bafs_df$mks,geno.pos$MarkerName)]
-  pos <- geno.pos$Position[match(bafs_df$mks,geno.pos$MarkerName)]
+    if(verbose) cat("Filtering by number of clusters...\n")
+    rm.mks <- sapply(clusters, function(x) x$rm != 0)
 
-  baf <- cbind(Name=bafs_df$mks, Chr = chr, Position = pos, bafs_df[,-1])
+    if(verbose) print(paste0("Markers remove because of smaller number of clusters than set threshold:", length(which(rm.mks)), "\n"))
 
-  if(length(which(is.na(baf$Chr))) > 0)
-    baf <- baf[-which(is.na(baf$Chr)),]
+    if(length(which(rm.mks)) > 0)  clusters_filt <- clusters[-which(rm.mks)] else clusters_filt <- clusters
 
-  vroom_write(baf, file = baf_file_name)
+    keep.mks <- names(clusters_filt)
+
+    # Parei aqui! Fazer o calculo de BAF só no batch
+    #theta_filt <- pivot_wider(data[which(data$MarkerName %in% keep.mks),-c(3:5)], names_from = "SampleName", values_from = "ratio")
+    theta_filt <- pivot_wider(data_interpolation_batch[[j]][which(data_interpolation_batch[[j]]$mks %in% keep.mks),-c(4,5)], names_from = "ind", values_from = "theta")
+
+    par <- rep(1:n.cores, each=round((nrow(theta_filt)/n.cores)+1,0))[1:nrow(theta_filt)]
+
+    par_theta <- split.data.frame(theta_filt[,-1], par)
+    par_clusters_filt <- split(clusters_filt, par)
+
+    if(length(par_theta) < n.cores) n.cores <- length(par_theta)
+    par_all <- list()
+    for(i in 1:n.cores){
+      par_all[[i]] <- list()
+      par_all[[i]][[1]] <- par_theta[[i]]
+      par_all[[i]][[2]] <- par_clusters_filt[[i]]
+    }
+
+    if(verbose) cat("(Parallel mode) Getting BAFs ...\n")
+    # Get BAF
+    clust <- makeCluster(n.cores)
+    clusterExport(clust, c("get_baf", "get_baf_par", "ploidy.interpolation"))
+    #clusterExport(clust, c("get_baf", "get_baf_par"))
+    bafs <- parLapply(clust, par_all, function(x) {
+      get_baf_par(x, ploidy = ploidy.interpolation)
+    })
+    stopCluster(clust)
+
+    gc()
+
+    bafs_lt <- unlist(bafs, recursive = F)
+
+    # bugfix
+    legths <- sapply(bafs_lt, length)
+    keep.mks.n <- which(legths == names(which.max(table(legths))))
+
+    bafs_lt <- bafs_lt[keep.mks.n]
+    bafs_m <- do.call(rbind, bafs_lt)
+    #rownames(bafs_m) <- theta_filt$MarkerName[keep.mks.n]
+    rownames(bafs_m) <- theta_filt$mks[keep.mks.n]
+    colnames(bafs_m) <- colnames(theta_filt)[-1]
+    bafs_df <- as.data.frame(bafs_m)
+    bafs_df <- cbind(mks=rownames(bafs_df), bafs_df)
+
+    if(verbose) cat("Adding reference genome positions information...\n")
+    chr <- geno.pos$Chromosome[match(bafs_df$mks,geno.pos$MarkerName)]
+    pos <- geno.pos$Position[match(bafs_df$mks,geno.pos$MarkerName)]
+
+    baf <- cbind(Name=bafs_df$mks, Chr = chr, Position = pos, bafs_df[,-1])
+
+    if(length(which(is.na(baf$Chr))) > 0)
+      baf <- baf[-which(is.na(baf$Chr)),]
+
+    baf_lst[[j]] <- baf
+  }
+
+  if(length(baf_lst) > 1){
+    bafs_join <- full_join(baf_lst[[1]], baf_lst[[2]])
+    if(length(baf_lst) > 2){
+    for(i in 3:length(baf_lst))
+      bafs_join <- full_join(bafs_join, baf_lst[[i]])
+    }
+  } else bafs_join <- bafs_lst[[1]]
+
+  baf_melt <- pivot_longer(bafs_join, cols = 4:ncol(bafs_join), names_to = "SampleName", values_to = "baf")
+  colnames(data_interpolation)[1:2] <- c("Name", "SampleName")
+  baf_melt <- left_join(baf_melt, data_interpolation, c("Name", "SampleName"))
+
+  vroom_write(bafs_join, file = baf_file_name)
+  if(verbose) cat("Done!")
+  return(list(baf_melt, rm.ind))
 }
 
+#' Calculates z scores
+#'
 #' @param data data.frame with columns:1) MarkeName: markers IDs;2) SampleName: Samples IDs;3) X: reference allele intensities or counts;4) Y: alternative allele intensities or counts,5) R: sum of the intensities; and 6)ratio: Y/(X+Y)
 #'
 #' @param geno.pos data.frame with columns: 1) MarkerName: markers IDs; Chromosome: chromosome where the marker is located; Position: position on the chromosome the marker is located (bp).
@@ -297,4 +386,5 @@ get_zscore <- function(data = NULL,
     zscore <- zscore[-which(is.na(zscore$Chr)),]
 
   vroom_write(zscore, file = zscore_file_name)
+  return(zscore)
 }

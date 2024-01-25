@@ -14,15 +14,20 @@ mod_all_ui <- function(id){
            box(width= 12, solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,  status="info", title = "Upload files", label = tags$b("Upload files"),
 
                box(width= 6, solidHeader = FALSE, collapsible = TRUE, collapsed = FALSE,  status="info", title = "Upload BAF file", label = tags$b("Upload BAF file"),
-                   #fileInput(ns("load_logR"), label = "Upload logR file"),
+                   fileInput(ns("load_zscore"), label = "Upload zscore file"),
                    fileInput(ns("load_baf"), label = "Upload BAF file")
                ),
                box(width= 6, solidHeader = FALSE, collapsible = TRUE, collapsed = FALSE,  status="info", title = "Choose examples", label = tags$b("Choose examples"),
                    radioButtons(ns("example_data"), label = "Choose example data set",
                                 choices = c("Example data" = "example_data",
-                                            "Roses Texas" = "roses_texas",
-                                            "Roses France" = "roses_france",
-                                            "Potatoes Texas" = "potatoes"),
+                                            "Alfalfa" = "alfalfa",
+                                            "Roses texas" = "roses",
+                                            "Roses texas clust" = "roses_texas_clust",
+                                            "Roses texas min 2 clust" = "roses_texas_clust2",
+                                            "Roses france" = "roses_france",
+                                            "Roses france clust" = "roses_france_clust",
+                                            "Roses france WGS" = "roses_france_wgs",
+                                            "Potatoes" = "potatoes"),
                                 selected = "example_data")),
                box(width= 12, solidHeader = FALSE, collapsible = TRUE, collapsed = FALSE,  status="info", title = "Load linkage map", label = tags$b("Linkage map"),
                    column(6,
@@ -42,7 +47,7 @@ mod_all_ui <- function(id){
              tabPanel("Tables - Overall analysis",
                       box(width= 12, solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,  status="info", title = "Overall estimations options", label = tags$b("Overall estimations options"),
                           column(6,
-                                 sliderInput(ns("ploidys"), label = "select ploidy", min = 2, max = 8, value = c(2,5), step = 1),
+                                 sliderInput(ns("ploidys"), label = "select ploidy", min = 1, max = 8, value = c(1,5), step = 1),
                                  numericInput(ns("area"), label = "Total area", value = 0.75, step = 0.1),
                                  numericInput(ns("filter_diff"), label = "Minimum filter difference", value = 0, step = 0.01),
                           ),
@@ -50,8 +55,8 @@ mod_all_ui <- function(id){
                                  numericInput(ns("filter_corr"), label = "Minimum correlation between estimated and expected peaks", value = 0, step = 0.01),
                                  pickerInput(ns("samples"),
                                              label = "Select samples for overall analysis",
-                                             choices = "This will be updated with files in data/joint_logR_BAF",
-                                             selected = "This will be updated with files in data/joint_logR_BAF",
+                                             choices = "This will be updated with files in data/joint_zscore_baf",
+                                             selected = "This will be updated with files in data/joint_zscore_baf",
                                              options = pickerOptions(
                                                size = 8,
                                                `selected-text-format` = "count > 3",
@@ -144,7 +149,7 @@ mod_all_ui <- function(id){
                                              multiple = FALSE),
                                  p("Ploidy estimation options:"),
                                  numericInput(ns("area_single"), label = "Total area", value = 0.75, step = 0.1),
-                                 sliderInput(ns("ploidys_single"), label = "select ploidy", min = 2, max = 8, value = c(2,5), step = 1),
+                                 sliderInput(ns("ploidys_single"), label = "select ploidy", min = 1, max = 8, value = c(1,5), step = 1),
                                  p("or user-defined ploidy:"),
                                  textInput(ns("ploidy"), label = "Input ploidy", value = NULL),
                           ),
@@ -156,7 +161,7 @@ mod_all_ui <- function(id){
                                  ),
                                  column(6,
                                         checkboxInput(ns("add_estimated_peaks"), label = "Add estimated peaks lines", value = FALSE),
-                                        checkboxInput(ns("add_expected_peaks"), label = "Add expected peaks lines", value = TRUE),
+                                        checkboxInput(ns("add_expected_peaks"), label = "Add expected peaks lines", value = FALSE),
                                  ),
                                  pickerInput(ns("dis.chr"),
                                              label = "Select chromosomes for graphics",
@@ -182,6 +187,7 @@ mod_all_ui <- function(id){
                       box(width = 12, solidHeader = TRUE, collapsible = TRUE,  collapsed = TRUE, status="primary", title = "BAF plot",
                           column(12,
                                  br(),
+                                 plotOutput(ns("plot_z")), br(),
                                  plotOutput(ns("plot_lines")), br(),
                                  plotOutput(ns("plot_hist"))
                           ),
@@ -209,14 +215,13 @@ mod_all_server <- function(id){
   moduleServer(id, function(input, output, session){
     ns <- session$ns
 
-    input_logR_baf <- reactive({
+    input_zscore_baf <- reactive({
       withProgress(message = 'Working:', value = 0, {
         incProgress(0.5, detail = paste("Loading BAF file..."))
 
         #if(!is.null(input$load_logR) & !is.null(input$load_baf)){
         if(!is.null(input$load_baf)){
-          #logR <- vroom(input$load_logR$datapath, show_col_types = FALSE)
-          logR <- NULL
+          zscore <- vroom(input$zscore$datapath, show_col_types = FALSE)
           baf <- vroom(input$load_baf$datapath, show_col_types = FALSE)
           if(!is.null(input$load_mappoly)){
             haplo_mappoly <- load(input$load_mappoly$datapath)
@@ -229,7 +234,10 @@ mod_all_server <- function(id){
                                                      f1.codes = f1.codes,
                                                      ploidy = input$ploidy_polyorigin, n.cores = 2)
           } else haplo_polyorigin <- NULL
-          return(list(logR, baf, haplo_mappoly, haplo_polyorigin))
+
+          zscore_long <- pivot_longer(zscore, cols = 4:ncol(zscore), names_to = "SampleName", values_to = "z")
+
+          return(list(zscore_long, baf, haplo_mappoly, haplo_polyorigin))
         } else {
           return(NULL)
         }
@@ -240,27 +248,29 @@ mod_all_server <- function(id){
       withProgress(message = 'Working:', value = 0, {
         incProgress(0.3, detail = paste("Loading BAF file..."))
 
-        if(is.null(input_logR_baf())){
+        if(is.null(input_zscore_baf())){
           if(input$example_data == "example_data"){
-            #logR <- vroom(system.file("logR.example.txt", package = "Qploidy"), show_col_types = FALSE)
-            logR <- NULL
+            zscore <- vroom(system.file("zscore_example.tsv.gz", package = "Qploidy"), show_col_types = FALSE)
+            zscore_long <- pivot_longer(zscore, cols = 4:ncol(zscore), names_to = "SampleName", values_to = "z")
+
             baf <- vroom(system.file("baf.example.txt", package = "Qploidy"), show_col_types = FALSE)
             temp <- load(system.file("mappoly.homoprob.ex.RData", package = "Qploidy"))
             haplo_mappoly <- get(temp)
             polyorigin  <- vroom(system.file("genofile_sub.csv", package = "Qploidy"), show_col_types = FALSE)
             f1.codes <- vroom(system.file("F1codes.polyorigin.txt", package = "Qploidy"), show_col_types = FALSE)
-            ploidy <- 4
             haplo_polyorigin <- get_probs_polyorigin(polyorigin,
                                                      f1.codes = f1.codes,
                                                      ploidy = 4, n.cores = 2)
-            return(list(logR, baf, haplo_mappoly, haplo_polyorigin))
-          } else if(input$example_data == "roses_texas"){
-            #logR <- vroom("C:/Users/Rose_Lab/Documents/Cris_temp/Qploidy_data/roses_texas/fitpoly/logR_roses_texas.txt", show_col_types = FALSE)
-            logR <- NULL
-            baf <- vroom("C:/Users/Rose_Lab/Documents/Cris_temp/Qploidy_data/roses_texas/fitpoly/baf_roses_texas.txt", show_col_types = FALSE)
+            return(list(zscore_long, baf, haplo_mappoly, haplo_polyorigin))
+          } else if(input$example_data == "alfalfa"){
+            zscore <- vroom("~/alfafa_dart/zscore_alfalfa.txt.gz", show_col_types = FALSE)
+            baf <- vroom("~/alfafa_dart/baf_alfalfa_round2.txt.gz", show_col_types = FALSE)
+            zscore_long <- pivot_longer(zscore, cols = 4:ncol(zscore), names_to = "SampleName", values_to = "z")
+
             incProgress(0.3, detail = paste("Loading MAPpoly file..."))
 
-            haplo_mappoly <- readRDS("C:/Users/Rose_Lab/Documents/Cris_temp/TAMU-RoseLab/standalone_apps/ploidy_estimation/data/count_breaks_poly/homoprob_normal.RDS")
+            haplo_mappoly <- NULL
+            #haplo_mappoly <- readRDS("C:/Users/Rose_Lab/Documents/Cris_temp/TAMU-RoseLab/standalone_apps/ploidy_estimation/data/count_breaks_poly/homoprob_normal.RDS")
             # polyorigin  <- read_polyOrigin("C:/Users/Rose_Lab/Documents/Cris_temp/Qploidy_data/roses_texas/5pop_compareprob2_fulldata_polyancestry.csv")
             # f1.codes <- vroom(system.file("F1codes.polyorigin.txt", package = "Qploidy"), show_col_types = FALSE)
             # ploidy <- 4
@@ -269,14 +279,184 @@ mod_all_server <- function(id){
             #                                          ploidy = 4, n.cores = 20)
             # saveRDS(haplo_polyorigin, file = "homoprob_polyorigin.rds")
             incProgress(0.3, detail = paste("Loading PolyOrigin file..."))
-            haplo_polyorigin <- readRDS("C:/Users/Rose_Lab/Documents/Cris_temp/Qploidy_data/roses_texas/homoprob_polyorigin.rds")
-            return(list(logR, baf, haplo_mappoly, haplo_polyorigin))
+
+            #haplo_polyorigin <- readRDS("C:/Users/Rose_Lab/Documents/Cris_temp/Qploidy_data/roses_texas/homoprob_polyorigin.rds")
+            haplo_polyorigin <- NULL
+            return(list(zscore_long, baf, haplo_mappoly, haplo_polyorigin))
+
+          } else if(input$example_data == "roses"){
+            zscore <- vroom("C:/Users/Rose_Lab/Documents/Cris_temp/Qploidy_data/roses_texas/zscore_roses_texas.tsv.gz", show_col_types = FALSE)
+            baf <- vroom("C:/Users/Rose_Lab/Documents/Cris_temp/Qploidy_data/roses_texas/fitpoly/baf_roses_texas.txt", show_col_types = FALSE)
+
+            colnames(zscore)[1:3] <- c("Name", "Chr", "Position")
+            colnames(zscore) <- gsub("^X", "", colnames(zscore))
+            colnames(baf) <- gsub("^X", "",colnames(baf))
+            colnames(baf) <- gsub(" ", ".",colnames(baf))
+
+            #baf <- vroom("C:/Users/Rose_Lab/Documents/Cris_temp/TAMU-RoseLab/standalone_apps/ploidy_estimation/data/Axiom_graph_results/baf3.txt", show_col_types = FALSE)
+
+            zscore_long <- pivot_longer(zscore, cols = 4:ncol(zscore), names_to = "SampleName", values_to = "z")
+
+
+            incProgress(0.3, detail = paste("Loading MAPpoly file..."))
+
+            haplo_mappoly <- NULL
+            #haplo_mappoly <- readRDS("C:/Users/Rose_Lab/Documents/Cris_temp/TAMU-RoseLab/standalone_apps/ploidy_estimation/data/count_breaks_poly/homoprob_normal.RDS")
+            # polyorigin  <- read_polyOrigin("C:/Users/Rose_Lab/Documents/Cris_temp/Qploidy_data/roses_texas/5pop_compareprob2_fulldata_polyancestry.csv")
+            # f1.codes <- vroom(system.file("F1codes.polyorigin.txt", package = "Qploidy"), show_col_types = FALSE)
+            # ploidy <- 4
+            # haplo_polyorigin <- Qploidy:::get_probs_polyorigin_sd(polyorigin,
+            #                                          f1.codes = f1.codes,
+            #                                          ploidy = 4, n.cores = 20)
+            # saveRDS(haplo_polyorigin, file = "homoprob_polyorigin.rds")
+            incProgress(0.3, detail = paste("Loading PolyOrigin file..."))
+
+            #haplo_polyorigin <- readRDS("C:/Users/Rose_Lab/Documents/Cris_temp/Qploidy_data/roses_texas/homoprob_polyorigin.rds")
+            haplo_polyorigin <- NULL
+            return(list(zscore_long, baf, haplo_mappoly, haplo_polyorigin))
+          } else if(input$example_data == "roses_texas_clust"){
+            zscore <- vroom("C:/Users/Rose_Lab/Documents/Cris_temp/Qploidy_data/roses_texas/zscore_roses_texas2.tsv.gz", show_col_types = FALSE)
+            baf <- vroom("C:/Users/Rose_Lab/Documents/Cris_temp/Qploidy_data/roses_texas/final_bafs/baf_texas_input4clust2.tsv.gz", show_col_types = FALSE)
+
+            colnames(zscore)[1:3] <- c("Name", "Chr", "Position")
+            colnames(zscore) <- gsub("^X", "", colnames(zscore))
+            colnames(zscore) <- gsub("[.]", "_", colnames(zscore))
+
+            colnames(baf)[is.na(match(colnames(zscore), colnames(baf)))]
+            colnames(zscore)[is.na(match(colnames(zscore), colnames(baf)))]
+
+
+            colnames(baf) <- gsub("^X", "",colnames(baf))
+            colnames(baf) <- gsub("[:]", "_",colnames(baf))
+            colnames(baf) <- gsub("-", "_",colnames(baf))
+
+            zscore_long <- pivot_longer(zscore, cols = 4:ncol(zscore), names_to = "SampleName", values_to = "z")
+
+            incProgress(0.3, detail = paste("Loading MAPpoly file..."))
+
+            haplo_mappoly <- NULL
+            #haplo_mappoly <- readRDS("C:/Users/Rose_Lab/Documents/Cris_temp/TAMU-RoseLab/standalone_apps/ploidy_estimation/data/count_breaks_poly/homoprob_normal.RDS")
+            # polyorigin  <- read_polyOrigin("C:/Users/Rose_Lab/Documents/Cris_temp/Qploidy_data/roses_texas/5pop_compareprob2_fulldata_polyancestry.csv")
+            # f1.codes <- vroom(system.file("F1codes.polyorigin.txt", package = "Qploidy"), show_col_types = FALSE)
+            # ploidy <- 4
+            # haplo_polyorigin <- Qploidy:::get_probs_polyorigin_sd(polyorigin,
+            #                                          f1.codes = f1.codes,
+            #                                          ploidy = 4, n.cores = 20)
+            # saveRDS(haplo_polyorigin, file = "homoprob_polyorigin.rds")
+            incProgress(0.3, detail = paste("Loading PolyOrigin file..."))
+
+            #haplo_polyorigin <- readRDS("C:/Users/Rose_Lab/Documents/Cris_temp/Qploidy_data/roses_texas/homoprob_polyorigin.rds")
+            haplo_polyorigin <- NULL
+            return(list(zscore_long, baf, haplo_mappoly, haplo_polyorigin))
+
+          } else if(input$example_data == "roses_texas_clust2"){
+            zscore <- vroom("C:/Users/Rose_Lab/Documents/Cris_temp/Qploidy_data/roses_texas/zscore_roses_texas2.tsv.gz", show_col_types = FALSE)
+            baf <- vroom("C:/Users/Rose_Lab/Documents/Cris_temp/Qploidy_data/roses_texas/final_bafs/baf_texas_input2clust.tsv.gz", show_col_types = FALSE)
+
+            colnames(zscore)[1:3] <- c("Name", "Chr", "Position")
+            colnames(zscore) <- gsub("^X", "", colnames(zscore))
+            colnames(zscore) <- gsub("[.]", "_", colnames(zscore))
+
+            colnames(baf)[is.na(match(colnames(zscore), colnames(baf)))]
+            colnames(zscore)[is.na(match(colnames(zscore), colnames(baf)))]
+
+
+            colnames(baf) <- gsub("^X", "",colnames(baf))
+            colnames(baf) <- gsub("[:]", "_",colnames(baf))
+            colnames(baf) <- gsub("-", "_",colnames(baf))
+
+            zscore_long <- pivot_longer(zscore, cols = 4:ncol(zscore), names_to = "SampleName", values_to = "z")
+
+            incProgress(0.3, detail = paste("Loading MAPpoly file..."))
+
+            haplo_mappoly <- NULL
+            #haplo_mappoly <- readRDS("C:/Users/Rose_Lab/Documents/Cris_temp/TAMU-RoseLab/standalone_apps/ploidy_estimation/data/count_breaks_poly/homoprob_normal.RDS")
+            # polyorigin  <- read_polyOrigin("C:/Users/Rose_Lab/Documents/Cris_temp/Qploidy_data/roses_texas/5pop_compareprob2_fulldata_polyancestry.csv")
+            # f1.codes <- vroom(system.file("F1codes.polyorigin.txt", package = "Qploidy"), show_col_types = FALSE)
+            # ploidy <- 4
+            # haplo_polyorigin <- Qploidy:::get_probs_polyorigin_sd(polyorigin,
+            #                                          f1.codes = f1.codes,
+            #                                          ploidy = 4, n.cores = 20)
+            # saveRDS(haplo_polyorigin, file = "homoprob_polyorigin.rds")
+            incProgress(0.3, detail = paste("Loading PolyOrigin file..."))
+
+            #haplo_polyorigin <- readRDS("C:/Users/Rose_Lab/Documents/Cris_temp/Qploidy_data/roses_texas/homoprob_polyorigin.rds")
+            haplo_polyorigin <- NULL
+            return(list(zscore_long, baf, haplo_mappoly, haplo_polyorigin))
           } else if(input$example_data == "roses_france"){
-            cat("Developing")
-          } else if(input$example_data == "potatoes") {
-            #logR <- vroom("C:/Users/Rose_Lab/Documents/Cris_temp/Qploidy_data/roses_texas/fitpoly/logR_roses_texas.txt", show_col_types = FALSE)
-            logR <- NULL
-            baf <- vroom("C:/Users/Rose_Lab/Documents/Cris_temp/Qploidy_data/potato_texas/baf_potato_texas_round2.txt.gz", show_col_types = FALSE)
+            zscore <- vroom("C:/Users/Rose_Lab/Documents/Cris_temp/Qploidy_data/roses_texas/zscore_roses_france.tsv.gz", show_col_types = FALSE)
+            colnames(zscore)[1:3] <- c("Name", "Chr", "Position")
+            zscore_long <- pivot_longer(zscore, cols = 4:ncol(zscore), names_to = "SampleName", values_to = "z")
+
+            baf <- vroom("C:/Users/Rose_Lab/Documents/Cris_temp/Qploidy_data/roses_texas/baf_france_roses_diplo_int.tsv.gz", show_col_types = FALSE)
+
+            incProgress(0.3, detail = paste("Loading MAPpoly file..."))
+
+            haplo_mappoly <- NULL
+            #haplo_mappoly <- readRDS("C:/Users/Rose_Lab/Documents/Cris_temp/TAMU-RoseLab/standalone_apps/ploidy_estimation/data/count_breaks_poly/homoprob_normal.RDS")
+            # polyorigin  <- read_polyOrigin("C:/Users/Rose_Lab/Documents/Cris_temp/Qploidy_data/roses_texas/5pop_compareprob2_fulldata_polyancestry.csv")
+            # f1.codes <- vroom(system.file("F1codes.polyorigin.txt", package = "Qploidy"), show_col_types = FALSE)
+            # ploidy <- 4
+            # haplo_polyorigin <- Qploidy:::get_probs_polyorigin_sd(polyorigin,
+            #                                          f1.codes = f1.codes,
+            #                                          ploidy = 4, n.cores = 20)
+            # saveRDS(haplo_polyorigin, file = "homoprob_polyorigin.rds")
+            incProgress(0.3, detail = paste("Loading PolyOrigin file..."))
+
+            #haplo_polyorigin <- readRDS("C:/Users/Rose_Lab/Documents/Cris_temp/Qploidy_data/roses_texas/homoprob_polyorigin.rds")
+            haplo_polyorigin <- NULL
+            return(list(zscore_long, baf, haplo_mappoly, haplo_polyorigin))
+          } else if(input$example_data == "roses_france_clust"){
+            zscore <- vroom("C:/Users/Rose_Lab/Documents/Cris_temp/Qploidy_data/roses_texas/zscore_roses_france.tsv.gz", show_col_types = FALSE)
+            colnames(zscore)[1:3] <- c("Name", "Chr", "Position")
+            zscore_long <- pivot_longer(zscore, cols = 4:ncol(zscore), names_to = "SampleName", values_to = "z")
+
+            baf <- vroom("C:/Users/Rose_Lab/Documents/Cris_temp/Qploidy_data/roses_texas/final_bafs/baf_france_roses_tetra_all_clust_min4.tsv.gz", show_col_types = FALSE)
+
+            incProgress(0.3, detail = paste("Loading MAPpoly file..."))
+
+            haplo_mappoly <- NULL
+            #haplo_mappoly <- readRDS("C:/Users/Rose_Lab/Documents/Cris_temp/TAMU-RoseLab/standalone_apps/ploidy_estimation/data/count_breaks_poly/homoprob_normal.RDS")
+            # polyorigin  <- read_polyOrigin("C:/Users/Rose_Lab/Documents/Cris_temp/Qploidy_data/roses_texas/5pop_compareprob2_fulldata_polyancestry.csv")
+            # f1.codes <- vroom(system.file("F1codes.polyorigin.txt", package = "Qploidy"), show_col_types = FALSE)
+            # ploidy <- 4
+            # haplo_polyorigin <- Qploidy:::get_probs_polyorigin_sd(polyorigin,
+            #                                          f1.codes = f1.codes,
+            #                                          ploidy = 4, n.cores = 20)
+            # saveRDS(haplo_polyorigin, file = "homoprob_polyorigin.rds")
+            incProgress(0.3, detail = paste("Loading PolyOrigin file..."))
+
+            #haplo_polyorigin <- readRDS("C:/Users/Rose_Lab/Documents/Cris_temp/Qploidy_data/roses_texas/homoprob_polyorigin.rds")
+            haplo_polyorigin <- NULL
+            return(list(zscore_long, baf, haplo_mappoly, haplo_polyorigin))
+          } else if(input$example_data == "roses_france_wgs"){
+            zscore <- vroom("C:/Users/Rose_Lab/Documents/Cris_temp/Qploidy_data/roses_texas/zscore_wgs_france.tsv.gz", show_col_types = FALSE)
+            colnames(zscore)[1:3] <- c("Name", "Chr", "Position")
+            zscore_long <- pivot_longer(zscore, cols = 4:ncol(zscore), names_to = "SampleName", values_to = "z")
+
+            baf <- vroom("C:/Users/Rose_Lab/Documents/Cris_temp/Qploidy_data/roses_texas/baf_32_WGS_france.tsv.gz", show_col_types = FALSE)
+
+            incProgress(0.3, detail = paste("Loading MAPpoly file..."))
+
+            haplo_mappoly <- NULL
+            #haplo_mappoly <- readRDS("C:/Users/Rose_Lab/Documents/Cris_temp/TAMU-RoseLab/standalone_apps/ploidy_estimation/data/count_breaks_poly/homoprob_normal.RDS")
+            # polyorigin  <- read_polyOrigin("C:/Users/Rose_Lab/Documents/Cris_temp/Qploidy_data/roses_texas/5pop_compareprob2_fulldata_polyancestry.csv")
+            # f1.codes <- vroom(system.file("F1codes.polyorigin.txt", package = "Qploidy"), show_col_types = FALSE)
+            # ploidy <- 4
+            # haplo_polyorigin <- Qploidy:::get_probs_polyorigin_sd(polyorigin,
+            #                                          f1.codes = f1.codes,
+            #                                          ploidy = 4, n.cores = 20)
+            # saveRDS(haplo_polyorigin, file = "homoprob_polyorigin.rds")
+            incProgress(0.3, detail = paste("Loading PolyOrigin file..."))
+
+            #haplo_polyorigin <- readRDS("C:/Users/Rose_Lab/Documents/Cris_temp/Qploidy_data/roses_texas/homoprob_polyorigin.rds")
+            haplo_polyorigin <- NULL
+            return(list(zscore_long, baf, haplo_mappoly, haplo_polyorigin))
+          } else if(input$example_data == "potatoes"){
+            zscore <- vroom("C:/Users/Rose_Lab/Documents/Cris_temp/TAMU-RoseLab/Qploidy_analysis/data/zscore_potato.txt.gz", show_col_types = FALSE)
+            zscore_long <- pivot_longer(zscore, cols = 4:ncol(zscore), names_to = "SampleName", values_to = "z")
+
+            baf <- vroom("C:/Users/Rose_Lab/Documents/Cris_temp/TAMU-RoseLab/Qploidy_analysis/data/baf_potato_texas_mp.txt.gz", show_col_types = FALSE)
             incProgress(0.3, detail = paste("Loading MAPpoly file..."))
 
             haplo_mappoly <- NULL
@@ -289,7 +469,8 @@ mod_all_server <- function(id){
             # saveRDS(haplo_polyorigin, file = "homoprob_polyorigin.rds")
             incProgress(0.3, detail = paste("Loading PolyOrigin file..."))
             haplo_polyorigin <- NULL
-            return(list(logR, baf, haplo_mappoly, haplo_polyorigin))
+
+            return(list(zscore_long, baf, haplo_mappoly, haplo_polyorigin))
           }
         } else {
           return(NULL)
@@ -297,27 +478,27 @@ mod_all_server <- function(id){
       })
     })
 
-    logR_baf <- reactive({
-      if(is.null(input_logR_baf())){
-        logR_baf <- loadExample()[1:2]
+    zscore_baf <- reactive({
+      if(is.null(input_zscore_baf())){
+        zscore_baf <- loadExample()[1:2]
       } else {
-        logR_baf <- input_logR_baf()[1:2]
+        zscore_baf <- input_zscore_baf()[1:2]
       }
-      return(logR_baf)
+      return(zscore_baf)
     })
 
     haplo <- reactive({
-      if(is.null(input_logR_baf()$haplo_mappoly) & is.null(input_logR_baf()$haplo_polyorigin)){
+      if(is.null(input_zscore_baf()$haplo_mappoly) & is.null(input_zscore_baf()$haplo_polyorigin)){
         haplo <- loadExample()[3:4]
       } else {
-        haplo <- input_logR_baf()[3:4]
+        haplo <- input_zscore_baf()[3:4]
       }
       return(haplo)
     })
 
     observe({
-      choices_names <- as.list(unique(colnames(logR_baf()[[2]])[-c(1:3)]))
-      names(choices_names) <- unique(colnames(logR_baf()[[2]])[-c(1:3)])
+      choices_names <- as.list(unique(colnames(zscore_baf()[[2]])[-c(1:3)]))
+      names(choices_names) <- unique(colnames(zscore_baf()[[2]])[-c(1:3)])
 
       updatePickerInput(session, "samples",
                         label = "Select samples for overall analysis",
@@ -328,8 +509,7 @@ mod_all_server <- function(id){
     est.ploidy.chr_df <- eventReactive(input$run_overal,{
       withProgress(message = 'Working:', value = 0, {
         incProgress(0.5, detail = paste("Estimating ploidy..."))
-
-        data_sample <- logR_baf()[[2]][,c(2,3,which(colnames(logR_baf()[[2]]) %in% c(input$samples)))]
+        data_sample <- zscore_baf()[[2]][,c(2,3,which(colnames(zscore_baf()[[2]]) %in% c(input$samples)))]
 
         data_sample <- data_sample[order(data_sample$Chr, data_sample$Position),]
 
@@ -341,7 +521,13 @@ mod_all_server <- function(id){
     })
 
     output$result.ploidy <- DT::renderDataTable({
-      DT::datatable(est.ploidy.chr_df()[[1]], extensions = 'Buttons',
+
+      ploidies_m <- as.matrix(est.ploidy.chr_df()[[1]])
+      ploidies_diff <- as.matrix(est.ploidy.chr_df()[[3]])
+      idx <- which(ploidies_diff < input$filter_diff)
+      if(length(idx) > 0) ploidies_m[idx] <- NA
+
+      DT::datatable(ploidies_m, extensions = 'Buttons',
                     options = list(
                       scrollX = TRUE,
                       dom = 'Bfrtlp',
@@ -353,7 +539,12 @@ mod_all_server <- function(id){
     output$result.ploidy_download <- downloadHandler(
       filename = "table.csv",
       content = function(file) {
-        write.csv(est.ploidy.chr_df()[[1]], file = file)
+        ploidies_m <- as.matrix(est.ploidy.chr_df()[[1]])
+        ploidies_diff <- as.matrix(est.ploidy.chr_df()[[3]])
+        idx <- which(ploidies_diff < input$filter_diff)
+        if(length(idx) > 0) ploidies_m[idx] <- NA
+
+        write.csv(ploidies_m, file = file)
       }
     )
 
@@ -571,15 +762,15 @@ mod_all_server <- function(id){
     )
 
     observe({
-      choices_names <- as.list(unique(colnames(logR_baf()[[2]])[-c(1:3)]))
-      names(choices_names) <- unique(colnames(logR_baf()[[2]])[-c(1:3)])
+      choices_names <- as.list(unique(colnames(zscore_baf()[[2]])[-c(1:3)]))
+      names(choices_names) <- unique(colnames(zscore_baf()[[2]])[-c(1:3)])
 
       updatePickerInput(session, "graphics",
                         label = "Select sample for the graphic",
                         choices = choices_names,
                         selected=unlist(choices_names)[1])
 
-      chrs <- sort(unique(as.data.frame(logR_baf()[[2]])[,2]))
+      chrs <- sort(unique(as.data.frame(zscore_baf()[[2]])[,2]))
       chrs_lst <- as.list(chrs)
       names(chrs_lst) <- chrs
 
@@ -610,7 +801,7 @@ mod_all_server <- function(id){
         # input$dis.chr <- 5
         # data_sample <- baf[,c(2,3,which(colnames(baf) %in% c(input$graphics)))]
 
-        data_sample <- logR_baf()[[2]][,c(2,3,which(colnames(logR_baf()[[2]]) %in% c(input$graphics)))]
+        data_sample <- zscore_baf()[[2]][,c(2,3,which(colnames(zscore_baf()[[2]]) %in% c(input$graphics)))]
         colnames(data_sample)[3] <- "sample"
         data_sample <- data_sample %>% filter(Chr %in% input$dis.chr)
 
@@ -619,8 +810,6 @@ mod_all_server <- function(id){
                                                       ploidys = input$ploidys_single,
                                                       area = input$area_single)
 
-          # idx <- which(est.ploidy[[2]] < input$filter_diff) # apply filter required adaptation
-          # if(length(idx) > 0) est.ploidy[[1]][idx] <- NA
           ploidy <- est.ploidy[[1]]
 
         } else {
@@ -644,7 +833,16 @@ mod_all_server <- function(id){
                                 add_estimated_peaks = input$add_estimated_peaks,
                                 add_expected_peaks = input$add_expected_peaks)
 
-        return(list(p_baf, p_hist))
+        # Zscore graphic
+        zscore_sample <- zscore_baf()[[1]] %>% filter(SampleName %in% input$graphics)
+        p_z <- zscore_sample  %>%
+          ggplot(aes(x = Position , y = z)) +
+          facet_grid(.~Chr, scales = "free") +
+          geom_smooth(method = "gam") +
+          theme_bw() + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+          geom_hline(yintercept=median(zscore_sample$z), linetype="dashed")
+
+        return(list(p_baf, p_hist, p_z))
       })
     })
 
@@ -684,6 +882,10 @@ mod_all_server <- function(id){
 
         return(list(all_haplo_mappoly, all_haplo_polyorigin))
       })
+    })
+
+    output$plot_z <- renderPlot({
+      graphics_baf()[[3]]
     })
 
     output$plot_lines <- renderPlot({

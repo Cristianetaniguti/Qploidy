@@ -14,7 +14,6 @@ testServer(
       grepl("test", ns("test"))
     )
 
-
     session$setInputs(samples = c("Diplo_1", "Diplo_2","Tetra_1","Tetra_2","Unknow_1"),
                       ploidys = c(2,5),
                       area = 0.75,
@@ -32,6 +31,7 @@ testServer(
 
     # library(vroom)
     # library(tidyr)
+    # library(ggpubr)
     #
     # input <- list()
     # input$samples <- c("Diplo_1", "Diplo_2","Tetra_1","Tetra_2","Unknow_1")
@@ -49,13 +49,12 @@ testServer(
 
     # upload files
     baf <- vroom(system.file("baf.example.txt", package = "Qploidy"), show_col_types = FALSE)
-    #logR <- vroom(system.file("logR.example.txt", package = "Qploidy"), show_col_types = FALSE)
-    logR <- NULL
+    scores <- vroom(system.file("zscore_example.tsv.gz", package = "Qploidy"), show_col_types = FALSE)
 
-    logR_baf <- list(logR, baf)
+    zscore_baf <- list(scores, baf)
 
     # Get overall ploidy estimation tables
-    data_sample <- logR_baf[[2]][,c(2,3,which(colnames(logR_baf[[2]]) %in% c(input$samples)))]
+    data_sample <- zscore_baf[[2]][,c(2,3,which(colnames(zscore_baf[[2]]) %in% c(input$samples)))]
 
     data_sample <- data_sample[order(data_sample$Chr, data_sample$Position),]
 
@@ -80,9 +79,9 @@ testServer(
                                              f1.codes = f1.codes,
                                              ploidy = 4, n.cores = 2)
 
-    #     haplo_polyorigin <- Qploidy:::get_probs_polyorigin_sd(polyorigin,
-    #                                                           f1.codes = f1.codes,
-    #                                                           ploidy = 4, n.cores = 2)
+        # haplo_polyorigin <- Qploidy:::get_probs_polyorigin_sd(polyorigin,
+        #                                                       f1.codes = f1.codes,
+        #                                                       ploidy = 4, n.cores = 2)
 
     ## MAPpoly
     p_m_df <- count_breaks_df(homoprob = haplo_mappoly$homoprob,
@@ -93,9 +92,10 @@ testServer(
     p_p_df <- count_breaks_df(homoprob = haplo_polyorigin$homoprob, aneuploids = aneuploids)
 
     # Single individual analysis
-    data_sample <- logR_baf[[2]][,c(2,3,which(colnames(logR_baf[[2]]) %in% c(input$graphics)))]
+    data_sample <- zscore_baf[[2]][,c(2,3,which(colnames(zscore_baf[[2]]) %in% c(input$graphics)))]
     colnames(data_sample)[3] <- "sample"
 
+    # BAF plots
     p_baf <- plot_baf(data_sample,
                       input$area_single,
                       input$ploidy,
@@ -107,6 +107,17 @@ testServer(
                             ploidy = input$ploidy,
                             colors = input$colors)
     p_hist
+
+    # zscore plot
+    zscore_long <- pivot_longer(zscore, cols = 4:ncol(zscore), names_to = "SampleName", values_to = "z")
+
+    zscore_sample <- zscore_long %>% filter(SampleName %in% input$graphics)
+    p_z <- zscore_sample  %>%
+      ggplot(aes(x = Position , y = z)) +
+      facet_grid(.~Chr, scales = "free") +
+      geom_smooth(method = "gam") +
+      theme_bw() + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+      geom_hline(yintercept=median(zscore_sample$z), linetype="dashed")
 
     if(any(unique(haplo_mappoly$homoprob$individual) %in% input$graphics)){
       haplo_lst <- list()

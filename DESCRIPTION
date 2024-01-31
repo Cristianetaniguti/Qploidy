@@ -37,7 +37,7 @@ Imports:
     ggpubr
 Encoding: UTF-8
 LazyData: true
-RoxygenNote: 7.1.2
+RoxygenNote: 7.2.3
 Suggests: 
     covr,
     spelling,

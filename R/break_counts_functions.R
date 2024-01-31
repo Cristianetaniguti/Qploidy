@@ -143,6 +143,7 @@ count_breaks_plot <- function(counts, n.graphics=NULL,
 #' @param ... unused arguments
 #'
 #' @import ggplot2
+#' @method plot mappoly.homoprob
 #'
 #' @export
 plot.mappoly.homoprob <- function(x, stack = FALSE, lg = NULL,

@@ -12,7 +12,7 @@ interpolate_BAFs(
   ploidy.interpolation = NULL,
   threshold.n.clusters = NULL,
   n.cores = 1,
-  baf_file_name,
+  baf_file_name = NULL,
   verbose = TRUE
 )
 }
@@ -21,9 +21,21 @@ interpolate_BAFs(
 
 \item{genos}{data.frame with genotype information for individuals to be used as reference for interpolation. We suggest to select for these individuals that are euploid and all have same ploidy. For array technologies, we suggest using fitpoly for obtaining the dosages, and for sequencing technologies, updog. This file has as columns: 1) MarkerName: markers IDs; 2) SampleName: Samples IDs; 3) geno: dosage.}
 
-\item{geno.pos}{data.frame with columns: 1) MarkerName: markers IDs; Chromosome: chromosome where the marker is located; Position: position on the chromosome the marker is located (bp).}
+
+\item{geno.pos}{data.frame with columns: 1) MarkerName: markers IDs; 2) Chromosome: chromosome where the marker is located; 3) Position: position on the chromosome the marker is located (bp).}
 
 \item{threshold.missing.geno}{fraction of missing genotype information allowed by marker. Markers with higher fraction are discarted}
+
+\item{ploidy.interpolation}{ploidy of the reference samples defined in `genos`}
+
+\item{threshold.n.clusters}{minimum number of dosage clusters (heterozygous classes) to account with the marker for interpolation}
+
+\item{n.cores}{number of cores to be used in parallelized processes}
+
+\item{baf_file_name}{BAF file output name}
+
+\item{verbose}{If TRUE display informative messages}
+
 }
 \description{
 Performs interpolation and returns normalized BAFs

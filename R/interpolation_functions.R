@@ -67,11 +67,10 @@ get_baf_par <- function(par_all_item, ploidy=2){
 #'
 #' @param scores_temp fitpoly scores output file
 #' @param ploidy integer defining ploidy
-#' @param plot logical to create or not the interpolation plot
 #' @param n.clusters.thr minimum number of clusters required. If clusters < ploidy + 1, the missing clusters will be imputed.
 #'
 #' @export
-par_fitpoly_interpolation <- function(scores_temp, ploidy, n.clusters.thr = 0){
+par_fitpoly_interpolation <- function(scores_temp, ploidy, n.clusters.thr = NULL){
 
   if(is.null(n.clusters.thr)) n.clusters.thr <- ploidy + 1
 
@@ -79,18 +78,18 @@ par_fitpoly_interpolation <- function(scores_temp, ploidy, n.clusters.thr = 0){
 
   scores_temp$geno <- as.factor(scores_temp$geno)
 
-  centers <- lapply(plot_data_split, function(x) apply(x[,3:4], 2, mean))
+  centers <- lapply(plot_data_split, function(x) apply(x[,3:4], 2, median))
 
   if(length(centers) == 0 | length(centers) < n.clusters.thr) {
-    return(list(rm= {if(length(centers) == 0) 1 else
-      if(length(centers) < n.clusters.thr) 2 else 0},
-      probe_name = unique(scores_temp$mks),
-      n.clusters = length(centers)))
+    return(list(rm= {if(length(centers) == 0) 1 else if(length(centers) < n.clusters.thr) 2},
+                centers_theta = centers,
+                probe_name = unique(scores_temp$mks),
+                n.clusters = length(centers)))
   } else {
     centers_df <- data.frame(dose = names(centers), do.call(rbind, centers))
 
     # If one or more cluster is missing, this code will input using the mean distance between the other clusters
-    if(length(centers) != ploidy + 1){
+    if(length(centers) < ploidy + 1){
       doses <- 0:ploidy
       input <- mean(diff(centers_df$theta)/diff(as.numeric(names(centers))))
       new_centers_df <- data.frame(dose = doses)
@@ -149,9 +148,19 @@ plot_one_marker <- function(scores_temp, ploidy){
 #'
 #' @param genos data.frame with genotype information for individuals to be used as reference for interpolation. We suggest to select for these individuals that are euploid and all have same ploidy. For array technologies, we suggest using fitpoly for obtaining the dosages, and for sequencing technologies, updog. This file has as columns: 1) MarkerName: markers IDs; 2) SampleName: Samples IDs; 3) geno: dosage.
 #'
-#' @param geno.pos data.frame with columns: 1) MarkerName: markers IDs; Chromosome: chromosome where the marker is located; Position: position on the chromosome the marker is located (bp).
+#' @param geno.pos data.frame with columns: 1) MarkerName: markers IDs; 2) Chromosome: chromosome where the marker is located; 3) Position: position on the chromosome the marker is located (bp).
 #'
 #' @param threshold.missing.geno fraction of missing genotype information allowed by marker. Markers with higher fraction are discarted
+#'
+#' @param ploidy.interpolation ploidy of the reference samples defined in `genos`
+#'
+#' @param threshold.n.clusters minimum number of dosage clusters (heterozygous classes) to account with the marker for interpolation
+#'
+#' @param n.cores number of cores to be used in parallelized processes
+#'
+#' @param baf_file_name BAF file output name
+#'
+#' @param verbose If TRUE display informative messages
 #'
 #' @import dplyr
 #' @import tidyr
@@ -168,7 +177,7 @@ interpolate_BAFs <- function(data = NULL,
                              ploidy.interpolation = NULL,
                              threshold.n.clusters = NULL,
                              n.cores =1,
-                             baf_file_name,
+                             baf_file_name = NULL,
                              split_batches,
                              verbose = TRUE){
 
@@ -186,7 +195,7 @@ interpolate_BAFs <- function(data = NULL,
   } else genos_filt <- genos
 
   data_id <- paste0(data$SampleName, data$MarkerName)
-  genos_id <- paste0(genos$SampleName, genos$MarkerName)
+  genos_id <- paste0(genos_filt$SampleName, genos_filt$MarkerName)
 
   data_filt <- data[match(genos_id, data_id),]
 
@@ -353,7 +362,7 @@ interpolate_BAFs <- function(data = NULL,
   colnames(data_interpolation)[1:2] <- c("Name", "SampleName")
   baf_melt <- left_join(baf_melt, data_interpolation, c("Name", "SampleName"))
 
-  vroom_write(bafs_join, file = baf_file_name)
+  if(!is.null(baf_file_name)) vroom_write(bafs_join, file = baf_file_name)
   if(verbose) cat("Done!")
   return(list(baf_melt, rm.ind))
 }
@@ -363,6 +372,8 @@ interpolate_BAFs <- function(data = NULL,
 #' @param data data.frame with columns:1) MarkeName: markers IDs;2) SampleName: Samples IDs;3) X: reference allele intensities or counts;4) Y: alternative allele intensities or counts,5) R: sum of the intensities; and 6)ratio: Y/(X+Y)
 #'
 #' @param geno.pos data.frame with columns: 1) MarkerName: markers IDs; Chromosome: chromosome where the marker is located; Position: position on the chromosome the marker is located (bp).
+#'
+#' @param zscore_file_name zscore output filename
 #'
 #' @import tidyr
 #' @import dplyr
@@ -385,6 +396,7 @@ get_zscore <- function(data = NULL,
   if(length(which(is.na(zscore$Chr)))> 0)
     zscore <- zscore[-which(is.na(zscore$Chr)),]
 
-  vroom_write(zscore, file = zscore_file_name)
+  if(!is.null(zscore_file_name))  vroom_write(zscore, file = zscore_file_name)
+
   return(zscore)
 }

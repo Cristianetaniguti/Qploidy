@@ -32,10 +32,7 @@ mod_interpolation_ui <- function(id){
                  ),
                  box(width= 12, solidHeader = FALSE, collapsible = TRUE, collapsed = FALSE,  status="primary", title = "Or choose an example dataset", label = tags$b("Or choose an example dataset"),
                      radioButtons(ns("example_data"), label = "Choose example data set",
-                                  choices = c("Example data" = "example_data",
-                                              "Roses Texas" = "roses_texas",
-                                              "Roses France" = "roses_france",
-                                              "Potatoes Texas" = "potatoes"),
+                                  choices = c("Example data" = "example_data"),
                                   selected = "example_data")
                  )
              )
@@ -155,24 +152,6 @@ mod_interpolation_server <- function(id){
             incProgress(0.5, detail = paste("Loading example data..."))
             result <- readRDS(system.file("summary_result_example.rds", package = "Qploidy"))
             return(result)
-          } else if(input$example_data == "roses_texas"){
-            incProgress(0.5, detail = paste("Loading roses data..."))
-
-            summary <- vroom("C:/Users/Rose_Lab/Documents/Cris_temp/Qploidy_data/roses_texas/summary_roses_texas.txt", show_col_types = FALSE)
-            ind.names <- vroom("C:/Users/Rose_Lab/Documents/Cris_temp/Qploidy_data/roses_texas/ind.names_roses_texas.txt", show_col_types = FALSE)
-
-            cleaned_summary <- clean_summary(summary_df = summary)
-
-            R_theta <- get_R_theta(cleaned_summary, ind.names)
-            R_all <- R_theta[[1]]
-            theta_all <- R_theta[[2]]
-            fitpoly_input <- summary_to_fitpoly(R_all, theta_all)
-            result <- list(fitpoly_input=fitpoly_input, R_all=R_all, theta_all=theta_all)
-            return(result)
-          } else if(input$example_data == "roses_france"){
-            cat("Developing")
-          } else if(input$example_data == "potatoes") {
-            cat("Developing")
           }
         } else {
           return(NULL)
@@ -282,7 +261,7 @@ mod_interpolation_server <- function(id){
           clust <- makeCluster(input$n.cores)
           clusterExport(clust, c("par_fitpoly_interpolation"))
           clusters <- parLapply(clust, lst_interpolation()[[1]], function(x) {
-            par_fitpoly_interpolation(x, ploidy= ploidy_r , plot = FALSE)
+            par_fitpoly_interpolation(x, ploidy= ploidy_r)
           })
           stopCluster(clust)
           return(clusters)

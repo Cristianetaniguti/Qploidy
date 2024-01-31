@@ -1,5 +1,3 @@
-# Qploidy
-
 <!-- badges: start -->
 [![Development](https://img.shields.io/badge/development-active-blue.svg)](https://img.shields.io/badge/development-active-blue.svg)
 [![License: GPL v3](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
@@ -7,11 +5,11 @@
 
 <!-- badges: end -->
 
-The goal of Qploidy is to perform ploidy and aneuploid estimation using data from Axiom and Illumina array genotyping platforms. The package has a shiny interface to facilitate and provide graphics visualization of the two steps: i) Interpolation; ii) Ploidy estimation. 
+# Qploidy <img src="https://github.com/Cristianetaniguti/Qploidy/assets/7572527/88ef9fad-7f86-4a84-9e1a-5dd4625dd1c8" align="right" width="230"/>
+
+`Qploidy` is and R package and Shiny app to perform ploidy and aneuploid estimation using genotyping platforms data such as intensities (normalized X and Y) from Axiom and Illumina array genotyping platforms and read counts for each allele from target sequencing platforms. 
 
 ## Installation
-
-You can install the development version of Qploidy like so:
 
 ``` r
 #install.packages("devtools")
@@ -27,7 +25,7 @@ library(Qploidy)
 run_app()
 ```
 
-Or you can also use its functions individually. Access furthers instructions for that in its tutorial:
+Or you can also use its functions individually.
 
 * [Interpolation and ploidy estimation - code version]()
 

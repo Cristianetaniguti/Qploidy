@@ -4,14 +4,14 @@
 \alias{par_fitpoly_interpolation}
 \title{Clusterization using fitpoly}
 \usage{
-par_fitpoly_interpolation(scores_temp, ploidy, plot = TRUE)
+par_fitpoly_interpolation(scores_temp, ploidy, n.clusters.thr = NULL)
 }
 \arguments{
 \item{scores_temp}{fitpoly scores output file}
 
 \item{ploidy}{integer defining ploidy}
 
-\item{plot}{logical to create or not the interpolation plot}
+\item{n.clusters.thr}{minimum number of clusters required. If clusters < ploidy + 1, the missing clusters will be imputed.}
 }
 \description{
 Clusterization using fitpoly

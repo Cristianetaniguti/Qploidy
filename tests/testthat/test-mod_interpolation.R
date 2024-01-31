@@ -103,30 +103,29 @@ testServer(
     library(parallel)
     clust <- makeCluster(input$n.cores)
     ploidy <- input$ploidy
-    #clusterExport(clust, c("par_fitpoly_interpolation"))
-    clusterExport(clust, c("par_fitpoly_interpolation", "ploidy"))
+    clusterExport(clust, c("par_fitpoly_interpolation"))
+    #clusterExport(clust, c("par_fitpoly_interpolation", "ploidy"))
     clusters <- parLapply(clust, lst_interpolation, function(x) {
       library(ggplot2)
-      par_fitpoly_interpolation(x, ploidy= ploidy, plot = FALSE)
+      par_fitpoly_interpolation(x, ploidy= ploidy)
     })
     stopCluster(clust)
 
     # Filter by number of clusters
-    rm.mks <- sapply(clusters, function(x) is.null(x$mod))
+    rm.mks <- sapply(clusters, function(x) x$rm != 0)
     wrong_n_clusters <- sum(rm.mks)
     clusters_filt <- clusters[-which(rm.mks)]
 
     # Filtered markers table
-    filtered.markers <- data.frame(nrow(cleaned_summary[[1]]),
+    filtered.markers <- data.frame(n.mk.start = nrow(cleaned_summary[[1]]),
                                    missing.data,
                                    wrong_n_clusters,
-                                   length(clusters_filt))
+                                   n.mk.selected = length(clusters_filt))
 
-    colnames(filtered.markers) <- c("n.mk.start", "missing.data", "wrong_n_clusters", "n.mk.selected")
     expect_equal(c(nrow(cleaned_summary[[1]]),
                    missing.data,
                    wrong_n_clusters,
-                   length(clusters_filt)), c(2379, 294, 1348, 725))
+                   length(clusters_filt)), c(2379, 294, 741, 1332))
 
     mks <- names(clusters)
     mks[which(rm.mks)] <- paste(mks[which(rm.mks)], "(discarded)")
@@ -159,8 +158,8 @@ testServer(
 
     # Get BAF
     clust <- makeCluster(input$n.cores)
-    #clusterExport(clust, c("get_baf", "get_baf_par"))
-    clusterExport(clust, c("get_baf", "get_baf_par", "ploidy"))
+    clusterExport(clust, c("get_baf", "get_baf_par"))
+    #clusterExport(clust, c("get_baf", "get_baf_par", "ploidy"))
     bafs_diplo <- parLapply(clust, par_all, function(x) {
       get_baf_par(x, ploidy = ploidy)
     })
@@ -182,12 +181,8 @@ testServer(
 
     baf <- cbind(Name=bafs_diplo_df$mks, Chr = chr, Position = pos, bafs_diplo_df[,-1])
 
-    zscore <- vroom(input$zscore$datapath)
-
-    chr <- geno.pos$Chr[match(zscore$MarkerName,geno.pos$Name)]
-    pos <- geno.pos$Position[match(zscore$MarkerName,geno.pos$Name)]
-
-    zscore <- cbind(Name=zscore$MarkerName, Chr = chr, Position = pos, zscore[,-1])
+    colnames(geno.pos)[2] <- "Chromosome"
+    zscore <- get_zscore(data = fitpoly_input, geno.pos = geno.pos)
   })
 
 test_that("module ui works", {

@@ -49,9 +49,10 @@ testServer(
 
     # upload files
     baf <- vroom(system.file("baf.example.txt", package = "Qploidy"), show_col_types = FALSE)
-    scores <- vroom(system.file("zscore_example.tsv.gz", package = "Qploidy"), show_col_types = FALSE)
+    zscore <- vroom(system.file("zscore_example.tsv.gz", package = "Qploidy"), show_col_types = FALSE)
+    zscore_long <- pivot_longer(zscore, cols = 4:ncol(zscore), names_to = "SampleName", values_to = "z")
 
-    zscore_baf <- list(scores, baf)
+    zscore_baf <- list(zscore_long, baf)
 
     # Get overall ploidy estimation tables
     data_sample <- zscore_baf[[2]][,c(2,3,which(colnames(zscore_baf[[2]]) %in% c(input$samples)))]
@@ -109,9 +110,7 @@ testServer(
     p_hist
 
     # zscore plot
-    zscore_long <- pivot_longer(zscore, cols = 4:ncol(zscore), names_to = "SampleName", values_to = "z")
-
-    zscore_sample <- zscore_long %>% filter(SampleName %in% input$graphics)
+    zscore_sample <- zscore_baf[[1]] %>% filter(SampleName %in% input$graphics)
     p_z <- zscore_sample  %>%
       ggplot(aes(x = Position , y = z)) +
       facet_grid(.~Chr, scales = "free") +

@@ -4,7 +4,9 @@
 \alias{par_fitpoly_interpolation}
 \title{Clusterization using fitpoly}
 \usage{
+
 par_fitpoly_interpolation(scores_temp, ploidy, n.clusters.thr = NULL)
+
 }
 \arguments{
 \item{scores_temp}{fitpoly scores output file}

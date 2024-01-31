@@ -1,6 +1,7 @@
 <!-- badges: start -->
 [![Development](https://img.shields.io/badge/development-active-blue.svg)](https://img.shields.io/badge/development-active-blue.svg)
 [![License: GPL v3](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![R-CMD-check](https://github.com/Cristianetaniguti/Qploidy/workflows/R-CMD-check/badge.svg)](https://github.com/Cristianetaniguti/Qploidy/actions)
 [![codecov](https://codecov.io/github/cristianetaniguti/qploidy/branch/main/graphs/badge.svg)](https://codecov.io/github/cristianetaniguti/qploidy)
 
 <!-- badges: end -->

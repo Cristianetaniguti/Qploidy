@@ -4,12 +4,14 @@
 \alias{get_zscore}
 \title{Calculates z scores}
 \usage{
-get_zscore(data = NULL, geno.pos = NULL, zscore_file_name = NULL)
+get_zscore(data = NULL, geno.pos = NULL)
 }
 \arguments{
-\item{data}{data.frame with columns:1) MarkeName: markers IDs;2) SampleName: Samples IDs;3) X: reference allele intensities or counts;4) Y: alternative allele intensities or counts,5) R: sum of the intensities; and 6)ratio: Y/(X+Y)}
+\item{data}{data.frame with columns: 1) MarkeName: markers IDs; 2) SampleName: Samples IDs; 3) X: reference allele intensities or counts; 4) Y: alternative allele intensities or counts, 5) R: sum of the intensities; and 6) ratio: Y/(X+Y)}
 
-\item{geno.pos}{data.frame with columns: 1) MarkerName: markers IDs; Chromosome: chromosome where the marker is located; Position: position on the chromosome the marker is located (bp).}
+\item{geno.pos}{data.frame with columns: 1) MarkerName: markers IDs; 2) Chromosome: chromosome where the marker is located; 3) Position: position on the chromosome the marker is located (bp).}
+
+\item{zscore_file_name}{zscore output filename}
 }
 \description{
 Calculates z scores

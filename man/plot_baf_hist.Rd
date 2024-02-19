@@ -10,7 +10,8 @@ plot_baf_hist(
   ploidy,
   colors = FALSE,
   add_estimated_peaks = TRUE,
-  add_expected_peaks = FALSE
+  add_expected_peaks = FALSE,
+  BAF_hist_overall = TRUE
 )
 }
 \arguments{
@@ -25,6 +26,8 @@ plot_baf_hist(
 \item{add_estimated_peaks}{add expected peaks lines}
 
 \item{add_expected_peaks}{add estimated peaks}
+
+\item{BAF_hist_overall}{if TRUE it plots the BAF histogram for entire genome}
 }
 \description{
 Plot BAF histogram

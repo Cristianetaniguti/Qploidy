@@ -433,9 +433,9 @@ interpolate <- function(data = NULL,
   qploidy_data <- full_join(data, data_interpolation[,-3], c("MarkerName", "SampleName"))
 
   qploidy_data <- full_join(qploidy_data,baf_melt, c("MarkerName", "SampleName"))
-  qploidy_data <- full_join(qploidy_data, zscore, c("MarkerName", "SampleName", "Chr", "Position"))
+  qploidy_data <- full_join(qploidy_data[,-c(8,9)], zscore, c("MarkerName", "SampleName"))
 
-  if(!is.null(baf_file_name)) vroom_write(qploidy_data, file = out_filename)
+  if(!is.null(out_filename)) vroom_write(qploidy_data, file = out_filename)
   if(verbose) cat("Done!\n")
   return(structure(list(info = c(threshold.missing.geno = threshold.missing.geno,
                                  threshold.geno.prob = threshold.geno.prob,
@@ -467,6 +467,7 @@ print.qploidy_interpolation <- function(x, ...){
   cat("This is on object of class 'ploidy_interpolation'\n")
   cat("--------------------------------------------------------------------\n")
   cat("The following parameters were used to generate it:\n")
+  cat("Interpolation type:", x$info["type"], "\n")
   cat("Ploidy:", x$info["ploidy.interpolation"], "\n")
   cat("Minimum number of heterozygous classes (clusters) present:", x$info["threshold.n.clusters"], "\n")
   cat("Maximum number of missing genotype by marker:",  1 - as.numeric(x$info["threshold.missing.geno"]), "\n")
@@ -489,7 +490,24 @@ print.qploidy_interpolation <- function(x, ...){
 #' PLot method for object of class 'qploidy_interpolation'
 #'
 #' @param x object of class 'qploidy_interpolation'
-#' @param type
+#' @param sample character indicating sample ID
+#' @param area_single area around the expected peak to be considered
+#' @param ploidy expected ploidy
+#' @param add_estimated_peaks add expected peaks lines
+#' @param add_expected_peaks add estimated peaks
+#' @param colors add area colors
+#' @param type character defining the graphic type. "all" plots all graphics,
+#'             it is equivalent to "het","ratio","BAF","zscore","BAF_hist", "BAF_hist_overall".
+#'             "het" plots the heterozygous locus counts inside genomic positions window defined in 'window_size'.
+#'             "ratio" plots raw Y/(X+Y) or alternative count/(alternative counts + reference counts).
+#'             "BAF" plots interpolated ratios. "zscore" is the smoothed conditional means curve of standardized sum of intensities/counts.
+#'             "BAF_hist" is the histogram of interpolated ratios. "BAF_hist_overall" add the histogram including all markers.
+#' @param window_size genomic position window to calculate the number of heterozygous locus
+#'
+#' @importFrom ggpubr ggarrange
+#' @import dplyr
+#' @import tidyr
+#' @import ggplot2
 #'
 #' @return printed information about Qploidy interpolation process
 #'
@@ -497,38 +515,113 @@ print.qploidy_interpolation <- function(x, ...){
 #'
 #' @export
 plot.qploidy_interpolation <- function(x,
-                                       sample,
-                                       area_single,
-                                       ploidy,
+                                       sample = NULL,
+                                       chr = NULL,
+                                       type = c("all", "het","ratio","BAF","zscore","BAF_hist", "BAF_hist_overall"),
+                                       area_single = 0.75,
+                                       ploidy = 4,
                                        dot.size = 1,
                                        add_estimated_peaks = FALSE,
                                        add_expected_peaks = FALSE,
                                        centromeres = NULL,
                                        add_centromeres = FALSE,
-                                       colors = FALSE){
+                                       colors = FALSE,
+                                       window_size = 2000000){
 
-}
+  if(!inherits(x, "qploidy_interpolation")) stop("Object is not of class qploidy_interpolation")
 
-plot_baf <- function(data_sample,
-                     area_single,
-                     ploidy,
-                     dot.size = 1,
-                     add_estimated_peaks = FALSE,
-                     add_expected_peaks = FALSE,
-                     centromeres = NULL,
-                     add_centromeres = FALSE,
-                     colors = FALSE){}
+  if(is.null(sample)) stop("Define sample ID")
 
-plot_baf_hist <- function(data_sample,
+  sample <- "Pioneer_2276.001_G02.c18"
+  ploidy <- 4
+  area_single <- 0.75
+
+  if(is.numeric(chr)) chr <- sort(unique(x$data$Chr))[chr] else if(is.null(chr)) chr <- sort(unique(x$data$Chr))
+
+  data_sample <- x$data %>% select(MarkerName, SampleName, Chr, Position, baf, z, ratio) %>% filter(SampleName == sample & Chr %in% chr)
+  baf_sample <- data_sample %>% pivot_wider(names_from = SampleName, values_from = baf)
+  zscore_sample <- data_sample %>% pivot_wider(names_from = SampleName, values_from = z)
+
+  colnames(baf_sample)[ncol(baf_sample)] <-  "sample"
+
+  baf_point <- baf_hist <- p_z <- raw_ratio <- het_rate <- NULL
+
+  if(any(type == "all" | type == "BAF")){
+    baf_point <- plot_baf(baf_sample,
                           area_single,
                           ploidy,
-                          colors = FALSE,
-                          add_estimated_peaks = TRUE,
-                          add_expected_peaks = FALSE){}
+                          dot.size = 1,
+                          add_estimated_peaks,
+                          add_expected_peaks,
+                          centromeres,
+                          add_centromeres,
+                          colors)
+  }
 
-p_z <- zscore_sample  %>%
-  ggplot(aes(x = Position , y = z)) +
-  facet_grid(.~Chr, scales = "free") +
-  geom_smooth(method = "gam") +
-  theme_bw() + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
-  geom_hline(yintercept=median(zscore_sample$z), linetype="dashed")
+  if(any(type == "BAF_hist")){
+    baf_hist <- plot_baf_hist(baf_sample,
+                              area_single,
+                              ploidy,
+                              colors,
+                              add_estimated_peaks,
+                              add_expected_peaks,
+                              BAF_hist_overall = FALSE)
+
+  } else if(any(type == "all" | type == "BAF_hist_overall")){
+    baf_hist <- plot_baf_hist(baf_sample,
+                              area_single,
+                              ploidy,
+                              colors,
+                              add_estimated_peaks,
+                              add_expected_peaks,
+                              BAF_hist_overall = TRUE)
+  }
+
+  if(any(type == "zscore")){
+    colnames(zscore_sample)[ncol(zscore_sample)] <- "z"
+    p_z <- zscore_sample  %>%
+      ggplot(aes(x = Position , y = z)) +
+      facet_grid(.~Chr, scales = "free") +
+      geom_smooth(method = "gam") +
+      theme_bw() + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+      geom_hline(yintercept=median(zscore_sample$z), linetype="dashed")
+
+  }
+
+  if(any(type == "ratio")){
+    raw_ratio <- data_sample %>%  ggplot(aes(x = Position, y = ratio)) + geom_point(alpha =0.7, size=dot.size) +
+      facet_grid(.~Chr, scales = "free") + theme_bw() +
+      theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+  }
+
+  if(any(type == "het")){
+    data_sample$het_rate <- NA
+    data_sample$het_rate[data_sample$ratio <= 0.01 | data_sample$ratio >= 0.99] <- 0
+    data_sample$het_rate[data_sample$ratio > 0.01 & data_sample$ratio < 0.99] <- 1
+
+    data_sample_lst <- split.data.frame(data_sample, data_sample$Chr)
+
+    for(j in 1:length(data_sample_lst)){
+      intervals_start <- c(seq(1,max(data_sample_lst[[j]]$Position), window_size))
+      intervals_end <- c(seq(1,max(data_sample_lst[[j]]$Position), window_size) - 1, max(data_sample_lst[[j]]$Position))
+      intervals_end <- intervals_end[-1]
+      data_sample_lst[[j]]$window <- NA
+      for(i in 1:length(intervals_start)){
+        data_sample_lst[[j]]$window[which(data_sample_lst[[j]]$Position >= intervals_start[i] & data_sample_lst[[j]]$Position <= intervals_end[i])] <- intervals_start[i]
+      }
+    }
+
+    data_sample <- do.call(rbind, data_sample_lst)
+
+    het_rate <- data_sample %>%  group_by(Chr, window) %>% summarise(n_het = sum(het_rate, na.rm = TRUE)) %>%
+      ggplot(aes(x = window, y = n_het, color = n_het)) + geom_line() +
+      scale_color_gradient(low = "black", high = "red") +
+      facet_grid(.~Chr, scales = "free") + theme_bw() + ylab("# heterozygous locus") + xlab("Position")+
+      theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1), legend.position = "none")
+  }
+
+  p_all <- list(het_rate, raw_ratio, baf_point, baf_hist, p_z)
+
+  p_result <- ggarrange(plotlist = p_all, ncol = 1)
+  return(p_result)
+}

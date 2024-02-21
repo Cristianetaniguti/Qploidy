@@ -1,9 +1,9 @@
 globalVariables(c("theta", "R", "geno", "Var1"))
 
-#' Get centers for interpolation using updog estimated bias
+#' Get centers for standardization using updog estimated bias
 #'
 #' @param multidog.obj object of class multidog (from updog)
-#' @param threshold.n.clusters minimum number of dosage clusters (heterozygous classes) to account with the marker for interpolation
+#' @param threshold.n.clusters minimum number of dosage clusters (heterozygous classes) to account with the marker for standardization
 #' @param rm.mks vector for logical indicating which markers should be removed, names of the vector are names of the markers
 #'
 updog_centers <- function(multidog.obj, threshold.n.clusters=2, rm.mks){
@@ -34,7 +34,7 @@ updog_centers <- function(multidog.obj, threshold.n.clusters=2, rm.mks){
 
 #' Create BAF According to Wang 2007
 #'
-#' @param theta_subject numeric theta to be interpolated
+#' @param theta_subject numeric theta to be standardized
 #' @param centers_theta theta centroids defined by clusterization
 #' @param ploidy integer defining ploidy
 #'
@@ -65,22 +65,15 @@ get_baf <- function(theta_subject, centers_theta, ploidy){
 #'
 #' @export
 get_baf_par <- function(par_all_item, ploidy=2){
-  par_all_item <- par_all[[2]]
   baf <- list()
   for(i in 1:nrow(par_all_item[[1]])){
     baf[[i]] <- get_baf(theta_subject = as.numeric(par_all_item[[1]][i,-1]),
                         centers_theta = as.numeric(par_all_item[[2]][i,-1]),
                         ploidy = ploidy)
   }
-  hist(as.numeric(par_all_item[[1]][i,-1]))
 
   return(baf)
 }
-
-data_interpolation <- data.frame(mks = data_filt$MarkerName,
-                                 ind = data_filt$SampleName,
-                                 theta = theta,
-                                 geno = genos_filt$geno)
 
 #' Define cluster centers
 #'
@@ -248,11 +241,11 @@ rm_outlier <- function(plot_data_split_one, alpha=0.05){
   }
 }
 
-#' Performs interpolation and returns standardized BAF and z score
+#' Performs standardization and returns BAF and z score
 #'
 #' @param data data.frame with columns: 1) MarkeName: markers IDs; 2) SampleName: Samples IDs; 3) X: reference allele intensities or counts; 4) Y: alternative allele intensities or counts; 5) R: sum of the intensities; and 6) ratio: Y/(X+Y)
 #'
-#' @param genos data.frame with genotype information for individuals to be used as reference for interpolation. We suggest to select for these individuals that are euploid and all have same ploidy. For array technologies, we suggest using fitpoly for obtaining the dosages, and for sequencing technologies, updog. This file has as columns: 1) MarkerName: markers IDs; 2) SampleName: Samples IDs; 3) geno: dosage.
+#' @param genos data.frame with genotype information for individuals to be used as reference for standardization. We suggest to select for these individuals that are euploid and all have same ploidy. For array technologies, we suggest using fitpoly for obtaining the dosages, and for sequencing technologies, updog. This file has as columns: 1) MarkerName: markers IDs; 2) SampleName: Samples IDs; 3) geno: dosage.
 #'
 #' @param geno.pos data.frame with columns: 1) MarkerName: markers IDs; 2) Chromosome: chromosome where the marker is located; 3) Position: position on the chromosome the marker is located (bp).
 #'
@@ -260,9 +253,9 @@ rm_outlier <- function(plot_data_split_one, alpha=0.05){
 #'
 #' @param threshold.geno.prob minimum genotype probability allowed. Genotypes with lower probability will be replaced by NA
 #'
-#' @param ploidy.interpolation ploidy of the reference samples defined in `genos`
+#' @param ploidy.standardization ploidy of the reference samples defined in `genos`
 #'
-#' @param threshold.n.clusters minimum number of dosage clusters (heterozygous classes) to account with the marker for interpolation
+#' @param threshold.n.clusters minimum number of dosage clusters (heterozygous classes) to account with the marker for standardization
 #'
 #' @param n.cores number of cores to be used in parallelized processes
 #'
@@ -278,24 +271,22 @@ rm_outlier <- function(plot_data_split_one, alpha=0.05){
 #' @import emmeans
 #'
 #' @export
-interpolate <- function(data = NULL,
+standardize <- function(data = NULL,
                         genos = NULL,
                         geno.pos = NULL,
                         threshold.missing.geno=0.90,
                         threshold.geno.prob=0.8,
-                        ploidy.interpolation = NULL,
+                        ploidy.standardization = NULL,
                         threshold.n.clusters = NULL,
                         n.cores =1,
                         out_filename = NULL,
                         type = "intensities",
                         multidog.obj = NULL,
+                        parallel.type = "PSOCK",
                         verbose = TRUE){
 
-  # Z score
-  zscore <- get_zscore(data, geno.pos)
-
-  # BAF
-  if(is.null(threshold.n.clusters)) threshold.n.clusters <- ploidy.interpolation + 1
+  if(verbose) cat("Generating standardize BAFs...\n")
+  if(is.null(threshold.n.clusters)) threshold.n.clusters <- ploidy.standardization + 1
 
   ## Filter by prob
   idx <- genos$prob < threshold.geno.prob
@@ -322,42 +313,34 @@ interpolate <- function(data = NULL,
   }
 
   # Organize data
-  data_id <- paste0(data_filt$SampleName, data_filt$MarkerName)
-  genos_id <- paste0(genos_filt$SampleName, genos_filt$MarkerName)
+  data_standardization <- inner_join(data_filt[,-c(3,4,5)], genos_filt[,-4], by = c("MarkerName", "SampleName"))
 
-  data_filt <- data_filt[match(genos_id, data_id),]
+  if(dim(data_standardization)[1] == 0) stop("Individuals in `data` and `genos` don't have same ID.")
 
-  theta <- data_filt$ratio
+  colnames(data_standardization)[3] <- "theta"
 
-  rm.na <- which(is.na(genos_filt$geno))
+  rm.na <- which(is.na(data_standardization$geno))
   if(length(rm.na) > 0){
-    theta[rm.na] <- NA
+    data_standardization$theta[rm.na] <- NA
   }
 
-  if(all(is.na(theta))) stop("Individuals in `data` and `genos` don't have same ID.")
-
-  data_interpolation <- data.frame(MarkerName = data_filt$MarkerName,
-                                   SampleName = data_filt$SampleName,
-                                   theta = theta,
-                                   geno = genos_filt$geno)
-
   if(is.null(multidog.obj)){
-    lst_interpolation <- split(data_interpolation, data_interpolation$MarkerName)
+    lst_standardization <- split(data_standardization, data_standardization$MarkerName)
 
     if(verbose) cat("Going to parallel mode...\n")
-    clust <- makeCluster(n.cores)
-    clusterExport(clust, c("get_centers", "ploidy.interpolation", "threshold.n.clusters", "type"))
-    #clusterExport(clust, c("get_centers"))
-    clusters <- parLapply(clust, lst_interpolation, function(x) {
-      get_centers(ratio_geno = x,
-                  ploidy= ploidy.interpolation,
-                  n.clusters.thr = threshold.n.clusters,
-                  type = type)
-    })
+    clust <- makeCluster(n.cores, type = parallel.type)
+    clusterExport(clust, c("get_centers"))
+    clusters <- parLapply(clust, lst_standardization, get_centers,
+                          ploidy= ploidy.standardization,
+                          n.clusters.thr = threshold.n.clusters,
+                          type = type)
+
     stopCluster(clust)
+
     if(verbose) cat("Back to single core usage\n")
 
     gc(verbose = FALSE)
+
   } else { # centers defined using updog bias
     clusters <- updog_centers(multidog.obj, threshold.n.clusters = threshold.n.clusters, rm.mks = rm.mks)
   }
@@ -394,12 +377,10 @@ interpolate <- function(data = NULL,
   # Get BAF
   if(verbose) cat("Going to parallel mode...\n")
 
-  clust <- makeCluster(n.cores)
-  clusterExport(clust, c("get_baf", "get_baf_par", "ploidy.interpolation", "par_all"))
-  #clusterExport(clust, c("get_baf", "get_baf_par"))
-  bafs <- parLapply(clust, par_all, function(x) {
-    get_baf_par(x, ploidy = ploidy.interpolation)
-  })
+  clust <- makeCluster(n.cores, type = parallel.type)
+  clusterExport(clust, c("get_baf_par"))
+  bafs <- parLapply(clust, par_all, get_baf_par, ploidy = ploidy.standardization)
+
   stopCluster(clust)
 
   if(verbose) cat("Back to single core usage\n")
@@ -417,7 +398,7 @@ interpolate <- function(data = NULL,
   rownames(bafs_m) <- theta_filt$MarkerName[keep.mks.n]
   colnames(bafs_m) <- colnames(theta_filt)[-1]
   bafs_df <- as.data.frame(bafs_m)
-  bafs_df <- cbind(mks=rownames(bafs_df), bafs_df)
+  bafs_df <- cbind(mks = theta_filt$MarkerName[keep.mks.n], bafs_df)
 
   # Add chr and pos info
   chr <- geno.pos$Chromosome[match(bafs_df$mks,geno.pos$MarkerName)]
@@ -430,45 +411,57 @@ interpolate <- function(data = NULL,
     bafs_join <- bafs_join[-which(is.na(bafs_join$Chr)),]
 
   baf_melt <- pivot_longer(bafs_join, cols = 4:ncol(bafs_join), names_to = "SampleName", values_to = "baf")
-  qploidy_data <- full_join(data, data_interpolation[,-3], c("MarkerName", "SampleName"))
+  if(verbose) cat("BAFs ready!\n")
 
+  # Z score
+  if(verbose) cat("Generating z scores...\n")
+  zscore <- get_zscore(data, geno.pos)
+  if(verbose) cat("Z scores ready!\n")
+
+  if(verbose) cat("Merging results into qploidy_standardization object...\n")
+  qploidy_data <- full_join(data, data_standardization[,-3], c("MarkerName", "SampleName"))
   qploidy_data <- full_join(qploidy_data,baf_melt, c("MarkerName", "SampleName"))
   qploidy_data <- full_join(qploidy_data[,-c(8,9)], zscore, c("MarkerName", "SampleName"))
 
-  if(!is.null(out_filename)) vroom_write(qploidy_data, file = out_filename)
+  if(!is.null(out_filename)) {
+    if(verbose) cat(paste0("Writting Qploidy app input file:", out_filename))
+    vroom_write(qploidy_data, file = out_filename)
+  }
+
+  result <- structure(list(info = c(threshold.missing.geno = threshold.missing.geno,
+                                    threshold.geno.prob = threshold.geno.prob,
+                                    ploidy.standardization = ploidy.standardization,
+                                    threshold.n.clusters = threshold.n.clusters,
+                                    out_filename = out_filename,
+                                    type = if(!is.null(multidog.obj)) "updog" else type),
+                           filters = c(n.markers.start = length(unique(data$MarkerName)),
+                                       geno.prob.rm = prob.rm,
+                                       miss.rm = mis.rm,
+                                       clusters.rm= clusters.rm,
+                                       no.geno.info.rm = no.geno.info,
+                                       n.markers.end = length(unique(baf_melt$MarkerName))),
+                           data = qploidy_data), class = "qploidy_standardization")
   if(verbose) cat("Done!\n")
-  return(structure(list(info = c(threshold.missing.geno = threshold.missing.geno,
-                                 threshold.geno.prob = threshold.geno.prob,
-                                 ploidy.interpolation = ploidy.interpolation,
-                                 threshold.n.clusters = threshold.n.clusters,
-                                 out_filename = out_filename,
-                                 type = if(!is.null(multidog.obj)) "updog" else type),
-                        filters = c(n.markers.start = length(unique(data$MarkerName)),
-                                    geno.prob.rm = prob.rm,
-                                    miss.rm = mis.rm,
-                                    clusters.rm= clusters.rm,
-                                    no.geno.info.rm = no.geno.info,
-                                    n.markers.end = length(unique(baf_melt$MarkerName))),
-                        data = qploidy_data), class = "qploidy_interpolation"))
+  return(result)
 }
 
 
-#' Print method for object of class 'qploidy_interpolation'
+#' Print method for object of class 'qploidy_standardization'
 #'
-#' @param x object of class 'qploidy_interpolation'
+#' @param x object of class 'qploidy_standardization'
 #' @param ...
 #'
-#' @return printed information about Qploidy interpolation process
+#' @return printed information about Qploidy standardization process
 #'
-#' @method print qploidy_interpolation
+#' @method print qploidy_standardization
 #'
 #' @export
-print.qploidy_interpolation <- function(x, ...){
-  cat("This is on object of class 'ploidy_interpolation'\n")
+print.qploidy_standardization <- function(x, ...){
+  cat("This is on object of class 'ploidy_standardization'\n")
   cat("--------------------------------------------------------------------\n")
   cat("The following parameters were used to generate it:\n")
-  cat("Interpolation type:", x$info["type"], "\n")
-  cat("Ploidy:", x$info["ploidy.interpolation"], "\n")
+  cat("standardization type:", x$info["type"], "\n")
+  cat("Ploidy:", x$info["ploidy.standardization"], "\n")
   cat("Minimum number of heterozygous classes (clusters) present:", x$info["threshold.n.clusters"], "\n")
   cat("Maximum number of missing genotype by marker:",  1 - as.numeric(x$info["threshold.missing.geno"]), "\n")
   cat("Minimum genotype probability:", x$info["threshold.geno.prob"], "\n")
@@ -487,9 +480,9 @@ print.qploidy_interpolation <- function(x, ...){
 }
 
 
-#' PLot method for object of class 'qploidy_interpolation'
+#' PLot method for object of class 'qploidy_standardization'
 #'
-#' @param x object of class 'qploidy_interpolation'
+#' @param x object of class 'qploidy_standardization'
 #' @param sample character indicating sample ID
 #' @param area_single area around the expected peak to be considered
 #' @param ploidy expected ploidy
@@ -500,41 +493,37 @@ print.qploidy_interpolation <- function(x, ...){
 #'             it is equivalent to "het","ratio","BAF","zscore","BAF_hist", "BAF_hist_overall".
 #'             "het" plots the heterozygous locus counts inside genomic positions window defined in 'window_size'.
 #'             "ratio" plots raw Y/(X+Y) or alternative count/(alternative counts + reference counts).
-#'             "BAF" plots interpolated ratios. "zscore" is the smoothed conditional means curve of standardized sum of intensities/counts.
-#'             "BAF_hist" is the histogram of interpolated ratios. "BAF_hist_overall" add the histogram including all markers.
+#'             "BAF" plots standardized ratios. "zscore" is the smoothed conditional means curve of standardized sum of intensities/counts.
+#'             "BAF_hist" is the histogram of standardized ratios. "BAF_hist_overall" add the histogram including all markers.
 #' @param window_size genomic position window to calculate the number of heterozygous locus
 #'
-#' @importFrom ggpubr ggarrange
+#' @importFrom ggpubr ggarrange annotate_figure text_grob
 #' @import dplyr
 #' @import tidyr
 #' @import ggplot2
 #'
-#' @return printed information about Qploidy interpolation process
+#' @return printed information about Qploidy standardization process
 #'
-#' @method plot qploidy_interpolation
+#' @method plot qploidy_standardization
 #'
 #' @export
-plot.qploidy_interpolation <- function(x,
-                                       sample = NULL,
-                                       chr = NULL,
-                                       type = c("all", "het","ratio","BAF","zscore","BAF_hist", "BAF_hist_overall"),
-                                       area_single = 0.75,
-                                       ploidy = 4,
-                                       dot.size = 1,
-                                       add_estimated_peaks = FALSE,
-                                       add_expected_peaks = FALSE,
-                                       centromeres = NULL,
-                                       add_centromeres = FALSE,
-                                       colors = FALSE,
-                                       window_size = 2000000){
+plot.qploidy_standardization <- function(x,
+                                         sample = NULL,
+                                         chr = NULL,
+                                         type = c("all", "het","ratio","BAF","zscore","BAF_hist", "BAF_hist_overall"),
+                                         area_single = 0.75,
+                                         ploidy = 4,
+                                         dot.size = 1,
+                                         add_estimated_peaks = FALSE,
+                                         add_expected_peaks = FALSE,
+                                         centromeres = NULL,
+                                         add_centromeres = FALSE,
+                                         colors = FALSE,
+                                         window_size = 2000000){
 
-  if(!inherits(x, "qploidy_interpolation")) stop("Object is not of class qploidy_interpolation")
+  if(!inherits(x, "qploidy_standardization")) stop("Object is not of class qploidy_standardization")
 
   if(is.null(sample)) stop("Define sample ID")
-
-  sample <- "Pioneer_2276.001_G02.c18"
-  ploidy <- 4
-  area_single <- 0.75
 
   if(is.numeric(chr)) chr <- sort(unique(x$data$Chr))[chr] else if(is.null(chr)) chr <- sort(unique(x$data$Chr))
 
@@ -622,6 +611,12 @@ plot.qploidy_interpolation <- function(x,
 
   p_all <- list(het_rate, raw_ratio, baf_point, baf_hist, p_z)
 
+  rm <- which(sapply(p_all, is.null))
+  if(length(rm) != 0) p_all <- p_all[-rm]
+
   p_result <- ggarrange(plotlist = p_all, ncol = 1)
+
+  annotate_figure(p_result, top = text_grob(sample, face = "bold", size = 14))
+
   return(p_result)
 }

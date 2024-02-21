@@ -1,5 +1,42 @@
 globalVariables(c("ind", "zscore", "chr"))
 
+
+#' Converts axiom array summary file to Qploidy and fitpoly input data
+#'
+#' @param summary_file Axiom summary file
+#' @param ind_names if the summary file columns does not have the desirable sample names, provide a file with two columns: Plate_name: with sample IDs contained in the summary file; Sample_Name: with desirable sample names to be replaced
+#' @param sd.normalization logical. If TRUE performs standard normalization
+#' @param atan logical. If TRUE calculates the theta using atan2
+#'
+#' @import vroom
+#'
+#' @export
+read_axiom <- function(summary_file, ind_names = NULL, sd.normalization = FALSE, atan = FALSE){
+
+  header_line <- system(paste("grep -Fn 'probeset_id'", summary_file), intern = TRUE)
+  header_line <- sapply(strsplit(header_line, ":"), "[[", 1)
+
+  raw <- vroom(summary_file, skip = as.numeric(header_line) -1)
+
+  # Guarantee that every A has a B
+  summary_filt <- clean_summary(raw)
+
+  if(!is.null(ind_names)){
+    ind.names <- vroom(ind_names)
+
+    new.names <- ind.names$Sample_Name[match(colnames(summary_filt$A_probes), ind.names$Plate_Name)]
+    colnames(summary_filt$A_probes)[which(!is.na(new.names))] <- new.names[which(!is.na(new.names))]
+    colnames(summary_filt$B_probes)[which(!is.na(new.names))] <- new.names[which(!is.na(new.names))]
+  }
+
+  R_theta <- get_R_theta(cleaned_summary = summary_filt, sd.normalization, atan)
+
+  fitpoly_input <- summary_to_fitpoly(R_theta$R_all, R_theta$theta_all)
+
+  return(fitpoly_input)
+}
+
+
 #' Edit Axiom Summary file
 #'
 #' Remove consecutive A allele probe from the summary file
@@ -23,7 +60,6 @@ clean_summary <- function(summary_df){
 #' Get R and theta values from summary file with option to do standard normalization by plate and markers
 #'
 #' @param cleaned_summary summary object from clean_summary function. List with A and B intensities.
-#' @param ind.names data.frame with individual names correspondence
 #' @param sd.normalization logical. If TRUE performs standard normalization
 #' @param atan logical. If TRUE calculates the theta using atan2
 #'
@@ -31,7 +67,7 @@ clean_summary <- function(summary_df){
 #' @importFrom dplyr mutate
 #'
 #' @export
-get_R_theta <- function(cleaned_summary, ind.names, sd.normalization = FALSE, atan = FALSE){
+get_R_theta <- function(cleaned_summary, sd.normalization = FALSE, atan = FALSE){
   R_all <- as.data.frame(cleaned_summary$A_probes[,-1] + cleaned_summary$B_probes[,-1])
   if(atan){
     theta_all <- as.data.frame((atan2(as.matrix(cleaned_summary$B_probes[,-1]), as.matrix(cleaned_summary$A_probes[,-1])))/(pi/2))
@@ -44,14 +80,6 @@ get_R_theta <- function(cleaned_summary, ind.names, sd.normalization = FALSE, at
 
   R_all <- cbind(MarkerName = probes_names, R_all)
   theta_all <- cbind(MarkerName = probes_names, theta_all)
-
-  array.id <- colnames(R_all)
-  ind.names <- as.data.frame(ind.names)
-  ids <- ind.names[,2][match(colnames(R_all), ind.names[,1])]
-  colnames(R_all) <- ids
-
-  ids <- ind.names[,2][match(colnames(theta_all), ind.names[,1])]
-  colnames(theta_all) <- ids
 
   colnames(theta_all)[1] <- colnames(R_all)[1] <- "MarkerName"
 

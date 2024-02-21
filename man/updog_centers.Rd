@@ -2,17 +2,17 @@
 % Please edit documentation in R/interpolation_functions.R
 \name{updog_centers}
 \alias{updog_centers}
-\title{Get centers for interpolation using updog estimated bias}
+\title{Get centers for standardization using updog estimated bias}
 \usage{
 updog_centers(multidog.obj, threshold.n.clusters = 2, rm.mks)
 }
 \arguments{
 \item{multidog.obj}{object of class multidog (from updog)}
 
-\item{threshold.n.clusters}{minimum number of dosage clusters (heterozygous classes) to account with the marker for interpolation}
+\item{threshold.n.clusters}{minimum number of dosage clusters (heterozygous classes) to account with the marker for standardization}
 
 \item{rm.mks}{vector for logical indicating which markers should be removed, names of the vector are names of the markers}
 }
 \description{
-Get centers for interpolation using updog estimated bias
+Get centers for standardization using updog estimated bias
 }

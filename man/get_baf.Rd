@@ -7,7 +7,7 @@
 get_baf(theta_subject, centers_theta, ploidy)
 }
 \arguments{
-\item{theta_subject}{numeric theta to be interpolated}
+\item{theta_subject}{numeric theta to be standardized}
 
 \item{centers_theta}{theta centroids defined by clusterization}
 

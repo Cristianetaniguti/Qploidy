@@ -4,10 +4,10 @@
 \alias{updog_centers}
 \title{Get centers for standardization using updog estimated bias}
 \usage{
-updog_centers(multidog.obj, threshold.n.clusters = 2, rm.mks)
+updog_centers(multidog_obj, threshold.n.clusters = 2, rm.mks)
 }
 \arguments{
-\item{multidog.obj}{object of class multidog (from updog)}
+\item{multidog_obj}{object of class multidog (from updog)}
 
 \item{threshold.n.clusters}{minimum number of dosage clusters (heterozygous classes) to account with the marker for standardization}
 

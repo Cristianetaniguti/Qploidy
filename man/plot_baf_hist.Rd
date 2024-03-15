@@ -11,7 +11,8 @@ plot_baf_hist(
   colors = FALSE,
   add_estimated_peaks = TRUE,
   add_expected_peaks = FALSE,
-  BAF_hist_overall = TRUE
+  BAF_hist_overall = TRUE,
+  rm_homozygous = FALSE
 )
 }
 \arguments{

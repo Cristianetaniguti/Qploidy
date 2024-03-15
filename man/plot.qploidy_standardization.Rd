@@ -2,13 +2,13 @@
 % Please edit documentation in R/interpolation_functions.R
 \name{plot.qploidy_standardization}
 \alias{plot.qploidy_standardization}
-\title{PLot method for object of class 'qploidy_standardization'}
+\title{Plot method for object of class 'qploidy_standardization'}
 \usage{
 \method{plot}{qploidy_standardization}(
   x,
   sample = NULL,
   chr = NULL,
-  type = c("all", "het", "ratio", "BAF", "zscore", "BAF_hist", "BAF_hist_overall"),
+  type = c("all", "het", "BAF", "zscore", "BAF_hist", "BAF_hist_overall"),
   area_single = 0.75,
   ploidy = 4,
   dot.size = 1,
@@ -17,7 +17,9 @@
   centromeres = NULL,
   add_centromeres = FALSE,
   colors = FALSE,
-  window_size = 2e+06
+  window_size = 2e+06,
+  het_interval = 0.1,
+  rm_homozygous = FALSE
 )
 }
 \arguments{
@@ -43,10 +45,12 @@ it is equivalent to "het","ratio","BAF","zscore","BAF_hist", "BAF_hist_overall".
 \item{colors}{add area colors}
 
 \item{window_size}{genomic position window to calculate the number of heterozygous locus}
+
+\item{het_interval}{interval to be considered as heterozygous (heterozygous ratio > 1 - het_interval and heterozygous ratio < 0 + het_interval)}
 }
 \value{
 printed information about Qploidy standardization process
 }
 \description{
-PLot method for object of class 'qploidy_standardization'
+Plot method for object of class 'qploidy_standardization'
 }

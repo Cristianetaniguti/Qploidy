@@ -2,18 +2,18 @@ globalVariables(c("theta", "R", "geno", "Var1"))
 
 #' Get centers for standardization using updog estimated bias
 #'
-#' @param multidog.obj object of class multidog (from updog)
+#' @param multidog_obj object of class multidog (from updog)
 #' @param threshold.n.clusters minimum number of dosage clusters (heterozygous classes) to account with the marker for standardization
 #' @param rm.mks vector for logical indicating which markers should be removed, names of the vector are names of the markers
 #'
-updog_centers <- function(multidog.obj, threshold.n.clusters=2, rm.mks){
+updog_centers <- function(multidog_obj, threshold.n.clusters=2, rm.mks){
 
-  n.clusters.df <- multidog.obj$inddf %>%
+  n.clusters.df <- multidog_obj$inddf %>%
     filter(!(snp %in% rm.mks)) %>%
     group_by(snp) %>%
     summarize(n.clusters = length(table(geno)))
 
-  if(length(rm.mks) >0) snpdf <- multidog.obj$snpdf[-which(multidog.obj$snpdf$snp %in% rm.mks),] else snpdf <- multidog.obj$snpdf
+  if(length(rm.mks) >0) snpdf <- multidog_obj$snpdf[-which(multidog_obj$snpdf$snp %in% rm.mks),] else snpdf <- multidog_obj$snpdf
   ploidy <- snpdf$ploidy
   seq <- snpdf$seq
   bias <- snpdf$bias
@@ -91,22 +91,27 @@ get_centers <- function(ratio_geno,
                         ploidy,
                         n.clusters.thr = NULL,
                         type = c("intensities", "counts"),
-                        rm_outlier = TRUE){
+                        rm_outlier = TRUE,
+                        cluster_median = TRUE){
 
-  if(is.null(n.clusters.thr)) n.clusters.thr <- ploidy + 1
+  if(all(is.na(ratio_geno$theta))) centers <- which(!is.na(ratio_geno$theta)) else {
+    if(is.null(n.clusters.thr)) n.clusters.thr <- ploidy + 1
 
-  # Adjust codification
-  ad <- ratio_geno %>% filter(!is.na(theta) & !is.na(geno)) %>% group_by(geno) %>% summarise(mean = mean(theta))
-  if(ad$mean[1] > ad$mean[nrow(ad)]) {
-    genos = data.frame(geno = 0:ploidy, geno.new = ploidy:0)
-    ratio_geno$geno <- genos$geno.new[match(ratio_geno$geno,genos$geno)]
+    # Adjust codification
+    ad <- ratio_geno %>% filter(!is.na(theta) & !is.na(geno)) %>% group_by(geno) %>% summarise(mean = mean(theta))
+    if(ad$mean[1] > ad$mean[nrow(ad)]) {
+      genos = data.frame(geno = 0:ploidy, geno.new = ploidy:0)
+      ratio_geno$geno <- genos$geno.new[match(ratio_geno$geno,genos$geno)]
+    }
+
+    plot_data_split <- split(ratio_geno, ratio_geno$geno)
+
+    if(rm_outlier) plot_data_split <- lapply(plot_data_split, function(x) rm_outlier(x))
+
+    if(cluster_median){
+      centers <- lapply(plot_data_split, function(x) apply(x[,3:4], 2, function(y) median(y, na.rm = TRUE)))
+    } else centers <- lapply(plot_data_split, function(x) apply(x[,3:4], 2, function(y) mean(y, na.rm = TRUE)))
   }
-
-  plot_data_split <- split(ratio_geno, ratio_geno$geno)
-
-  if(rm_outlier) plot_data_split <- lapply(plot_data_split, function(x) rm_outlier(x))
-
-  centers <- lapply(plot_data_split, function(x) apply(x[,3:4], 2, function(y) median(y, na.rm = TRUE)))
 
   if(length(centers) == 0 | length(centers) < n.clusters.thr) {
     return(list(rm= {if(length(centers) == 0) 1 else if(length(centers) < n.clusters.thr) 2},
@@ -259,6 +264,8 @@ rm_outlier <- function(plot_data_split_one, alpha=0.05){
 #'
 #' @param n.cores number of cores to be used in parallelized processes
 #'
+#' @param type method to determine the clusters centers for each marker. It can be "intensities" if array data, "counts" if sequencing data or "updog" if multidog object is provided in multidog_obj argument
+#' @param multidog_obj object of class multidog from updog package analysis
 #' @param out_filename output file name
 #'
 #' @param verbose If TRUE display informative messages
@@ -281,9 +288,20 @@ standardize <- function(data = NULL,
                         n.cores =1,
                         out_filename = NULL,
                         type = "intensities",
-                        multidog.obj = NULL,
+                        multidog_obj = NULL,
                         parallel.type = "PSOCK",
-                        verbose = TRUE){
+                        verbose = TRUE,
+                        rm_outlier = TRUE,
+                        cluster_median = TRUE){
+
+  if(is.null(data) | is.null(genos) | is.null(geno.pos) | is.null(ploidy.standardization) | is.null(threshold.n.clusters)) stop("Not all required inputs were defined.")
+
+  if(!all(colnames(data) %in% c("MarkerName", "SampleName", "X", "Y", "R", "ratio"))) stop("Column names of the provided data object does not match the required.")
+  if(!all(colnames(genos) %in% c("MarkerName", "SampleName", "geno", "prob"))) stop("Column names of the provided genos object does not match the required.")
+  if(!all(colnames(geno.pos) %in% c("MarkerName", "SampleName", "Chromosome", "Position"))) stop("Column names of the provided geno.pos object does not match the required.")
+
+  dose <- max(genos$geno, na.rm = T)
+  if(dose != ploidy.standardization) stop("Ploidy of the provided reference samples do not match with the one defined in the ploidy.standardization parameter.")
 
   if(verbose) cat("Generating standardize BAFs...\n")
   if(is.null(threshold.n.clusters)) threshold.n.clusters <- ploidy.standardization + 1
@@ -324,7 +342,7 @@ standardize <- function(data = NULL,
     data_standardization$theta[rm.na] <- NA
   }
 
-  if(is.null(multidog.obj)){
+  if(is.null(multidog_obj)){
     lst_standardization <- split(data_standardization, data_standardization$MarkerName)
 
     if(verbose) cat("Going to parallel mode...\n")
@@ -333,7 +351,9 @@ standardize <- function(data = NULL,
     clusters <- parLapply(clust, lst_standardization, get_centers,
                           ploidy= ploidy.standardization,
                           n.clusters.thr = threshold.n.clusters,
-                          type = type)
+                          type = type,
+                          rm_outlier = rm_outlier,
+                          cluster_median = cluster_median)
 
     stopCluster(clust)
 
@@ -342,7 +362,7 @@ standardize <- function(data = NULL,
     gc(verbose = FALSE)
 
   } else { # centers defined using updog bias
-    clusters <- updog_centers(multidog.obj, threshold.n.clusters = threshold.n.clusters, rm.mks = rm.mks)
+    clusters <- updog_centers(multidog_obj, threshold.n.clusters = threshold.n.clusters, rm.mks = rm.mks)
   }
 
   # Filter by number of clusters
@@ -352,6 +372,8 @@ standardize <- function(data = NULL,
   if(verbose) print(paste0("Markers remove because of smaller number of clusters than set threshold:",clusters.rm))
 
   if(length(which(rm.mks)) > 0)  clusters_filt <- clusters[-which(rm.mks)] else clusters_filt <- clusters
+
+  if(length(clusters_filt) == 0) stop("All markers were filtered, adapt filtering parameters.")
 
   keep.mks <- sapply(clusters_filt, function(x) x$MarkerName)
 
@@ -423,9 +445,27 @@ standardize <- function(data = NULL,
   qploidy_data <- full_join(qploidy_data,baf_melt, c("MarkerName", "SampleName"))
   qploidy_data <- full_join(qploidy_data[,-c(8,9)], zscore, c("MarkerName", "SampleName"))
 
+  result <- structure(list(info = c(threshold.missing.geno = threshold.missing.geno,
+                                    threshold.geno.prob = threshold.geno.prob,
+                                    ploidy.standardization = ploidy.standardization,
+                                    threshold.n.clusters = threshold.n.clusters,
+                                    out_filename = out_filename,
+                                    type = if(!is.null(multidog_obj)) "updog" else type),
+                           filters = c(n.markers.start = length(unique(data$MarkerName)),
+                                       geno.prob.rm = prob.rm,
+                                       miss.rm = mis.rm,
+                                       clusters.rm= clusters.rm,
+                                       no.geno.info.rm = no.geno.info,
+                                       n.markers.end = length(unique(baf_melt$MarkerName))),
+                           data = qploidy_data), class = "qploidy_standardization")
+
   if(!is.null(out_filename)) {
     if(verbose) cat(paste0("Writting Qploidy app input file:", out_filename))
-    vroom_write(qploidy_data, file = out_filename)
+    info = data.frame(t(result$info))
+    filters = data.frame(t(result$filters))
+    vroom_write(info, file = out_filename, col_names = T)
+    vroom_write(filters, file = out_filename, append = TRUE, col_names = T)
+    vroom_write(result$data, file = out_filename, append = TRUE, col_names = T)
   }
 
   result <- structure(list(info = c(threshold.missing.geno = threshold.missing.geno,
@@ -433,7 +473,7 @@ standardize <- function(data = NULL,
                                     ploidy.standardization = ploidy.standardization,
                                     threshold.n.clusters = threshold.n.clusters,
                                     out_filename = out_filename,
-                                    type = if(!is.null(multidog.obj)) "updog" else type),
+                                    type = if(!is.null(multidog_obj)) "updog" else type),
                            filters = c(n.markers.start = length(unique(data$MarkerName)),
                                        geno.prob.rm = prob.rm,
                                        miss.rm = mis.rm,
@@ -457,30 +497,48 @@ standardize <- function(data = NULL,
 #'
 #' @export
 print.qploidy_standardization <- function(x, ...){
+
+  info <- data.frame(c1 = c("standardization type:", "Ploidy:",
+                            "Minimum number of heterozygous classes (clusters) present:",
+                            "Maximum number of missing genotype by marker:",
+                            "Minimum genotype probability:"),
+                     c2 = c(x$info["type"], x$info["ploidy.standardization"],
+                            x$info["threshold.n.clusters"],
+                            1 - as.numeric(x$info["threshold.missing.geno"]),
+                            x$info["threshold.geno.prob"]))
+
+  format.df <- data.frame(c1 = c("Number of markers at raw data:",
+                                 "Percentage of filtered genotypes by probability threshold:",
+                                 "Number of markers filtered by missing data:",
+                                 "Number of markers filtered for not having the minimum number of clusters:",
+                                 "Number of markers filtered for not having genomic information:",
+                                 "Number of markers with estimated BAF:"),
+                          c2 = c(x$filters["n.markers.start"],
+                                 "-",
+                                 x$filters["miss.rm"],
+                                 x$filters["clusters.rm"],
+                                 x$filters["no.geno.info.rm"],
+                                 x$filters["n.markers.end"]),
+                          c3 = c("(100%)",
+                                 paste0("(",x$filters["geno.prob.rm"], " %)"),
+                                 paste0("(",round(x$filters["miss.rm"]/x$filters["n.markers.start"]*100,2)," %)"),
+                                 paste0("(", round(x$filters["clusters.rm"]/x$filters["n.markers.start"]*100,2)," %)"),
+                                 paste0("(", round(x$filters["no.geno.info.rm"]/x$filters["n.markers.start"]*100,2)," %)"),
+                                 paste0("(", round(x$filters["n.markers.end"]/x$filters["n.markers.start"]*100,2)," %)")))
+
+  colnames(info) <- rownames(info) <- colnames(format.df) <- rownames(format.df) <- NULL
+
   cat("This is on object of class 'ploidy_standardization'\n")
   cat("--------------------------------------------------------------------\n")
-  cat("The following parameters were used to generate it:\n")
-  cat("standardization type:", x$info["type"], "\n")
-  cat("Ploidy:", x$info["ploidy.standardization"], "\n")
-  cat("Minimum number of heterozygous classes (clusters) present:", x$info["threshold.n.clusters"], "\n")
-  cat("Maximum number of missing genotype by marker:",  1 - as.numeric(x$info["threshold.missing.geno"]), "\n")
-  cat("Minimum genotype probability:", x$info["threshold.geno.prob"], "\n")
+  cat("Parameters\n")
+  print(format(info, justify="left", digit = 2))
   cat("--------------------------------------------------------------------\n")
-  cat("Number of markers after filters applied:\n")
-  cat("Number of markers at raw data:", x$filters["n.markers.start"], " (100%)\n")
-  cat("Percentage of filtered genotypes by probability threshold:", x$filters["geno.prob.rm"], " % \n")
-  cat("Number of markers filtered by missing data:", x$filters["miss.rm"], " (",
-      round(x$filters["miss.rm"]/x$filters["n.markers.start"]*100,2),"%)", "\n")
-  cat("Number of markers filtered for not having the minimum number of clusters:", x$filters["clusters.rm"], " (",
-      round(x$filters["clusters.rm"]/x$filters["n.markers.start"]*100,2),"%)", "\n")
-  cat("Number of markers filtered for not having genomic information:", x$filters["no.geno.info.rm"], " (",
-      round(x$filters["no.geno.info.rm"]/x$filters["n.markers.start"]*100,2),"%)", "\n")
-  cat("Number of markers with estimated BAF:", x$filters["n.markers.end"], " (",
-      round(x$filters["n.markers.end"]/x$filters["n.markers.start"]*100,2),"%)", "\n")
+  cat("Filters\n")
+  print(format(format.df, justify="left", digit = 2))
 }
 
 
-#' PLot method for object of class 'qploidy_standardization'
+#' Plot method for object of class 'qploidy_standardization'
 #'
 #' @param x object of class 'qploidy_standardization'
 #' @param sample character indicating sample ID
@@ -496,6 +554,7 @@ print.qploidy_standardization <- function(x, ...){
 #'             "BAF" plots standardized ratios. "zscore" is the smoothed conditional means curve of standardized sum of intensities/counts.
 #'             "BAF_hist" is the histogram of standardized ratios. "BAF_hist_overall" add the histogram including all markers.
 #' @param window_size genomic position window to calculate the number of heterozygous locus
+#' @param het_interval interval to be considered as heterozygous (heterozygous ratio > 1 - het_interval and heterozygous ratio < 0 + het_interval)
 #'
 #' @importFrom ggpubr ggarrange annotate_figure text_grob
 #' @import dplyr
@@ -510,7 +569,7 @@ print.qploidy_standardization <- function(x, ...){
 plot.qploidy_standardization <- function(x,
                                          sample = NULL,
                                          chr = NULL,
-                                         type = c("all", "het","ratio","BAF","zscore","BAF_hist", "BAF_hist_overall"),
+                                         type = c("all", "het", "BAF","zscore","BAF_hist", "BAF_hist_overall"),
                                          area_single = 0.75,
                                          ploidy = 4,
                                          dot.size = 1,
@@ -519,7 +578,9 @@ plot.qploidy_standardization <- function(x,
                                          centromeres = NULL,
                                          add_centromeres = FALSE,
                                          colors = FALSE,
-                                         window_size = 2000000){
+                                         window_size = 2000000,
+                                         het_interval = 0.1,
+                                         rm_homozygous = FALSE){
 
   if(!inherits(x, "qploidy_standardization")) stop("Object is not of class qploidy_standardization")
 
@@ -528,6 +589,9 @@ plot.qploidy_standardization <- function(x,
   if(is.numeric(chr)) chr <- sort(unique(x$data$Chr))[chr] else if(is.null(chr)) chr <- sort(unique(x$data$Chr))
 
   data_sample <- x$data %>% select(MarkerName, SampleName, Chr, Position, baf, z, ratio) %>% filter(SampleName == sample & Chr %in% chr)
+
+  if(nrow(data_sample) == 0) stop("Sample or chromosome not found.")
+
   baf_sample <- data_sample %>% pivot_wider(names_from = SampleName, values_from = baf)
   zscore_sample <- data_sample %>% pivot_wider(names_from = SampleName, values_from = z)
 
@@ -547,14 +611,40 @@ plot.qploidy_standardization <- function(x,
                           colors)
   }
 
+  if(add_centromeres){
+    #centromeres <- c("1 = 49130338, 5 = 49834357")
+    if(length(centromeres) == 1 & any(grepl(",", centromeres))){
+      centromeres <- gsub("\ ", "", centromeres)
+      centromeres <- unlist(strsplit(centromeres, ","))
+      centromeres <- sapply(centromeres, function(x) strsplit(x, "="))
+      centromeres_df <- data.frame(Chr = sapply(centromeres, "[[", 1), value = sapply(centromeres, "[[", 2))
+    } else {
+      centromeres_df <- data.frame(Chr = names(centromeres), value = centromeres)
+    }
+
+    for(i in 1:length(centromeres)){
+      idx <- which(baf_sample$Chr == centromeres_df$Chr[i] & baf_sample$Position < centromeres_df$value[i])
+      baf_sample$Chr[idx] <- paste0(baf_sample$Chr[idx], ".1")
+      idx <- which(baf_sample$Chr == centromeres_df$Chr[i] & baf_sample$Position >= centromeres_df$value[i])
+      baf_sample$Chr[idx] <- paste0(baf_sample$Chr[idx], ".2")
+      if(any(type == "zscore")){
+        idx <- which(zscore_sample$Chr == centromeres_df$Chr[i] & zscore_sample$Position < centromeres_df$value[i])
+        zscore_sample$Chr[idx] <- paste0(zscore_sample$Chr[idx], ".1")
+        idx <- which(zscore_sample$Chr == centromeres_df$Chr[i] & zscore_sample$Position >= centromeres_df$value[i])
+        zscore_sample$Chr[idx] <- paste0(zscore_sample$Chr[idx], ".2")
+      }
+    }
+  }
+
   if(any(type == "BAF_hist")){
-    baf_hist <- plot_baf_hist(baf_sample,
+    baf_hist <- plot_baf_hist(data_sample = baf_sample,
                               area_single,
                               ploidy,
                               colors,
                               add_estimated_peaks,
                               add_expected_peaks,
-                              BAF_hist_overall = FALSE)
+                              BAF_hist_overall = FALSE,
+                              rm_homozygous = rm_homozygous)
 
   } else if(any(type == "all" | type == "BAF_hist_overall")){
     baf_hist <- plot_baf_hist(baf_sample,
@@ -563,7 +653,8 @@ plot.qploidy_standardization <- function(x,
                               colors,
                               add_estimated_peaks,
                               add_expected_peaks,
-                              BAF_hist_overall = TRUE)
+                              BAF_hist_overall = TRUE,
+                              rm_homozygous = rm_homozygous)
   }
 
   if(any(type == "zscore")){
@@ -585,16 +676,17 @@ plot.qploidy_standardization <- function(x,
 
   if(any(type == "het")){
     data_sample$het_rate <- NA
-    data_sample$het_rate[data_sample$ratio <= 0.01 | data_sample$ratio >= 0.99] <- 0
-    data_sample$het_rate[data_sample$ratio > 0.01 & data_sample$ratio < 0.99] <- 1
+    data_sample$het_rate[which(data_sample$ratio <= 0+het_interval | data_sample$ratio >= 1 - het_interval)] <- 0
+    data_sample$het_rate[which(data_sample$ratio > 0+het_interval & data_sample$ratio < 1 - het_interval)] <- 1
 
     data_sample_lst <- split.data.frame(data_sample, data_sample$Chr)
 
     for(j in 1:length(data_sample_lst)){
+      data_sample_lst[[j]]$window <- 1
+      if(length(unique(data_sample_lst[[j]]$Position)) == 1) next()
       intervals_start <- c(seq(1,max(data_sample_lst[[j]]$Position), window_size))
       intervals_end <- c(seq(1,max(data_sample_lst[[j]]$Position), window_size) - 1, max(data_sample_lst[[j]]$Position))
       intervals_end <- intervals_end[-1]
-      data_sample_lst[[j]]$window <- NA
       for(i in 1:length(intervals_start)){
         data_sample_lst[[j]]$window[which(data_sample_lst[[j]]$Position >= intervals_start[i] & data_sample_lst[[j]]$Position <= intervals_end[i])] <- intervals_start[i]
       }
@@ -602,10 +694,10 @@ plot.qploidy_standardization <- function(x,
 
     data_sample <- do.call(rbind, data_sample_lst)
 
-    het_rate <- data_sample %>%  group_by(Chr, window) %>% summarise(n_het = sum(het_rate, na.rm = TRUE)) %>%
-      ggplot(aes(x = window, y = n_het, color = n_het)) + geom_line() +
+    het_rate <- data_sample %>%  group_by(Chr, window) %>% summarise(prop_het = sum(het_rate, na.rm = TRUE)/length(which(het_rate == 1 | het_rate == 0))) %>%
+      ggplot(aes(x = window, y = prop_het, color = prop_het)) + geom_line() +
       scale_color_gradient(low = "black", high = "red") +
-      facet_grid(.~Chr, scales = "free") + theme_bw() + ylab("# heterozygous locus") + xlab("Position")+
+      facet_grid(.~Chr, scales = "free") + theme_bw() + ylab("proportion of heterozygous loci") + xlab("Position")+
       theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1), legend.position = "none")
   }
 
@@ -616,7 +708,28 @@ plot.qploidy_standardization <- function(x,
 
   p_result <- ggarrange(plotlist = p_all, ncol = 1)
 
-  annotate_figure(p_result, top = text_grob(sample, face = "bold", size = 14))
+  p_result <- annotate_figure(p_result, top = text_grob(sample, face = "bold", size = 14))
 
   return(p_result)
+}
+
+#' Read file generated by standardize function
+#'
+#' @param qploidy_standardization_file path to file generated by standardize function
+#'
+#' @import vroom
+#'
+#' @export
+read_qploidy_standardization <- function(qploidy_standardization_file){
+  info <- vroom(qploidy_standardization_file,n_max = 1)
+  info_v <- as.character(info)
+  names(info_v) <- colnames(info)
+  filters <- vroom(qploidy_standardization_file, skip = 2, n_max=1)
+  filters_v <- as.numeric(filters)
+  names(filters_v) <- colnames(filters)
+  data <- vroom(qploidy_standardization_file, skip = 4)
+
+  return(structure(list(info = info_v,
+                        filters = filters_v,
+                        data = data), class = "qploidy_standardization"))
 }

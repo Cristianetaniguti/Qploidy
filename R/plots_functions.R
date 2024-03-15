@@ -26,10 +26,14 @@ plot_baf <- function(data_sample,
 
   if(add_centromeres){
     #centromeres <- c("1 = 49130338, 5 = 49834357")
-    centromeres <- gsub("\ ", "", centromeres)
-    centromeres <- unlist(strsplit(centromeres, ","))
-    centromeres <- sapply(centromeres, function(x) strsplit(x, "="))
-    centromeres_df <- data.frame(Chr = sapply(centromeres, "[[", 1), value = sapply(centromeres, "[[", 2))
+    if(length(centromeres) == 1 & any(grepl(",", centromeres))){
+      centromeres <- gsub("\ ", "", centromeres)
+      centromeres <- unlist(strsplit(centromeres, ","))
+      centromeres <- sapply(centromeres, function(x) strsplit(x, "="))
+      centromeres_df <- data.frame(Chr = sapply(centromeres, "[[", 1), value = sapply(centromeres, "[[", 2))
+    } else {
+      centromeres_df <- data.frame(Chr = names(centromeres), value = centromeres)
+    }
   }
 
   if(add_estimated_peaks | add_expected_peaks | colors){
@@ -101,8 +105,8 @@ plot_baf_hist <- function(data_sample,
                           colors = FALSE,
                           add_estimated_peaks = TRUE,
                           add_expected_peaks = FALSE,
-                          BAF_hist_overall = TRUE){
-
+                          BAF_hist_overall = TRUE,
+                          rm_homozygous = FALSE){
 
   if(add_estimated_peaks | add_expected_peaks | colors){
     if(length(ploidy) == 1) {
@@ -147,6 +151,8 @@ plot_baf_hist <- function(data_sample,
     data_sample2 <- data_sample
   }
 
+  if(rm_homozygous) data_sample2 <- data_sample2 %>% filter(sample != 0 & sample != 1)
+
   p_hist <- data_sample2 %>% ggplot(aes(x=sample)) +
     {if(colors) geom_histogram(aes(fill = color)) else  geom_histogram()} +
     #scale_x_continuous(breaks = round(seq(0, 1, 1/ploidy),2)) +
@@ -173,6 +179,8 @@ plot_baf_hist <- function(data_sample,
     {if(colors) labs(fill= "Area")}
 
   if(BAF_hist_overall){
+    if(rm_homozygous) data_sample <- data_sample %>% filter(sample != 0 & sample != 1)
+
     p_hist_all <- data_sample %>% ggplot(aes(x=sample)) + geom_histogram() +
       scale_color_manual(values = c("blue", "purple")) +
       scale_linetype_manual(values = c("dashed", "solid"), guide="none") +
@@ -181,8 +189,49 @@ plot_baf_hist <- function(data_sample,
       theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
             legend.position="bottom")
 
-    p_hist <- ggarrange(p_hist_all, p_hist, widths = c(1,length(unique(data_sample$Chr))))
+    p_hist <- p_hist_all
   }
 
   return(p_hist)
+}
+
+
+#' 3D plot to check raw data allele intensities (if array) or depth (if sequencing) data properties
+#' Qploidy can be used if that is not much variation among the individuals for the same marker.
+#' So we expect that the overall structure of the resulting graphic is a ramp.
+#'
+#' @param data_qploidy data.frame input for Qploidy
+#' @param R_lim limit the sum of intensities/depth axis to adjust the dimentions in case there are outliers
+#'
+#' @importFrom plotly plot_ly layout
+#' @import tidyr
+#'
+#' @export
+plot_check <- function(data_qploidy, R_lim = NULL, n = 3000){
+
+  plot_df <- pivot_wider(data_qploidy[,c(1,2,5)], names_from = SampleName, values_from = R)
+  mk_names <- plot_df$MarkerName
+  plot_df <- as.matrix(plot_df[,-1])
+  rownames(plot_df) <- mk_names
+
+  plot_df <- plot_df[sample(1:nrow(plot_df), n, replace =FALSE),]
+  plot_df <- plot_df[order(apply(plot_df, 1, sum)),]
+
+  if(!is.null(R_lim)) {
+    plot_df[which(plot_df > R_lim)] <- NA
+    rm.mk <- apply(plot_df, 1, function(x) sum(is.na(x))/length(x))
+    rm.mk <- which(rm.mk > 0.5)
+    if(length(rm.mk)>0) plot_df <- plot_df[-rm.mk,]
+  }
+
+  axx <- list(title = "Individuals")
+  axy <- list(title = "Markers")
+  axz <- list(title = "Sum of intensities/depth")
+
+  cat("Values summary:\n")
+  print(summary(as.numeric(plot_df)))
+
+  p <- plot_ly(z=plot_df, type="surface") %>%
+    layout(scene = list(xaxis=axx,yaxis=axy,zaxis=axz))
+  return(p)
 }

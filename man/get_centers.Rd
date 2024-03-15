@@ -9,7 +9,8 @@ get_centers(
   ploidy,
   n.clusters.thr = NULL,
   type = c("intensities", "counts"),
-  rm_outlier = TRUE
+  rm_outlier = TRUE,
+  cluster_median = TRUE
 )
 }
 \arguments{

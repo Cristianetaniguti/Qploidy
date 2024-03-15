@@ -15,9 +15,11 @@ standardize(
   n.cores = 1,
   out_filename = NULL,
   type = "intensities",
-  multidog.obj = NULL,
+  multidog_obj = NULL,
   parallel.type = "PSOCK",
-  verbose = TRUE
+  verbose = TRUE,
+  rm_outlier = TRUE,
+  cluster_median = TRUE
 )
 }
 \arguments{
@@ -38,6 +40,10 @@ standardize(
 \item{n.cores}{number of cores to be used in parallelized processes}
 
 \item{out_filename}{output file name}
+
+\item{type}{method to determine the clusters centers for each marker. It can be "intensities" if array data, "counts" if sequencing data or "updog" if multidog object is provided in multidog_obj argument}
+
+\item{multidog_obj}{object of class multidog from updog package analysis}
 
 \item{verbose}{If TRUE display informative messages}
 }

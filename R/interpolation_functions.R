@@ -569,7 +569,7 @@ print.qploidy_standardization <- function(x, ...){
 plot.qploidy_standardization <- function(x,
                                          sample = NULL,
                                          chr = NULL,
-                                         type = c("all", "het", "BAF","zscore","BAF_hist", "BAF_hist_overall"),
+                                         type = c("all", "het", "BAF","zscore","BAF_hist", "BAF_hist_overall", "Ratio_hist_overall"),
                                          area_single = 0.75,
                                          ploidy = 4,
                                          dot.size = 1,
@@ -597,7 +597,7 @@ plot.qploidy_standardization <- function(x,
 
   colnames(baf_sample)[ncol(baf_sample)] <-  "sample"
 
-  baf_point <- baf_hist <- p_z <- raw_ratio <- het_rate <- NULL
+  baf_point <- baf_hist <- p_z <- raw_ratio <- het_rate <- baf_hist_overall <- NULL
 
   if(any(type == "all" | type == "BAF")){
     baf_point <- plot_baf(baf_sample,
@@ -636,7 +636,7 @@ plot.qploidy_standardization <- function(x,
     }
   }
 
-  if(any(type == "BAF_hist")){
+  if(any(type == "all" | type == "BAF_hist")){
     baf_hist <- plot_baf_hist(data_sample = baf_sample,
                               area_single,
                               ploidy,
@@ -645,9 +645,10 @@ plot.qploidy_standardization <- function(x,
                               add_expected_peaks,
                               BAF_hist_overall = FALSE,
                               rm_homozygous = rm_homozygous)
+  }
 
-  } else if(any(type == "all" | type == "BAF_hist_overall")){
-    baf_hist <- plot_baf_hist(baf_sample,
+  if(any(type == "all" | type == "BAF_hist_overall")){
+    baf_hist_overall <- plot_baf_hist(data_sample = baf_sample,
                               area_single,
                               ploidy,
                               colors,
@@ -655,6 +656,18 @@ plot.qploidy_standardization <- function(x,
                               add_expected_peaks,
                               BAF_hist_overall = TRUE,
                               rm_homozygous = rm_homozygous)
+  }
+
+  if(any(type == "all" | type == "Ratio_hist_overall")){
+    baf_hist_overall <- plot_baf_hist(data_sample = baf_sample,
+                                      area_single,
+                                      ploidy,
+                                      colors,
+                                      add_estimated_peaks,
+                                      add_expected_peaks,
+                                      BAF_hist_overall = TRUE,
+                                      ratio = TRUE,
+                                      rm_homozygous = rm_homozygous)
   }
 
   if(any(type == "zscore")){
@@ -701,7 +714,7 @@ plot.qploidy_standardization <- function(x,
       theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1), legend.position = "none")
   }
 
-  p_all <- list(het_rate, raw_ratio, baf_point, baf_hist, p_z)
+  p_all <- list(het_rate, raw_ratio, baf_point, baf_hist,baf_hist_overall, p_z)
 
   rm <- which(sapply(p_all, is.null))
   if(length(rm) != 0) p_all <- p_all[-rm]

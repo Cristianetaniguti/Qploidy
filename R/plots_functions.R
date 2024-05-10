@@ -105,7 +105,8 @@ plot_baf_hist <- function(data_sample,
                           colors = FALSE,
                           add_estimated_peaks = TRUE,
                           add_expected_peaks = FALSE,
-                          BAF_hist_overall = TRUE,
+                          BAF_hist_overall = FALSE,
+                          ratio = FALSE,
                           rm_homozygous = FALSE){
 
   if(add_estimated_peaks | add_expected_peaks | colors){
@@ -114,16 +115,24 @@ plot_baf_hist <- function(data_sample,
     } else if(length(ploidy) != 1 & length(ploidy) != length(unique(data_sample$Chr)))
       stop("Provide a ploidy for each chromosome.")
 
+    if(BAF_hist_overall) Chrs <- "all" else Chrs = sort(unique(data_sample$Chr))
     data_sample2 <- modes.df3 <- data.frame()
-    for(z in 1:length(unique(data_sample$Chr))){
+    for(z in 1:length(Chrs)){
       ymin <- seq(0, 1, 1/ploidy[z]) - (area_single/(ploidy[z]*2))
       ymax <- seq(0, 1, 1/ploidy[z]) + (area_single/(ploidy[z]*2))
 
       ymin[which(ymin < 0)] <- 0
       ymax[which(ymax > 1)] <- 1
-      rets <- data.frame(ymin, ymax, xmax = Inf, xmin = -Inf, Chr = sort(unique(data_sample$Chr))[z])
+      rets <- data.frame(ymin, ymax, xmax = Inf, xmin = -Inf, Chr = Chrs[z])
 
-      split_data <- data_sample[which(data_sample$Chr == sort(unique(data_sample$Chr))[z]),]
+      if(all(Chrs == "all")) {
+        split_data <- data_sample
+      } else {
+        split_data <- data_sample[which(data_sample$Chr == sort(unique(data_sample$Chr))[z]),]
+      }
+
+      if(ratio) split_data$sample <- split_data$ratio
+
       idx_tot <- FALSE
       modes.df2 <- data.frame()
       for(i in 1:nrow(rets)) {
@@ -132,7 +141,7 @@ plot_baf_hist <- function(data_sample,
 
         estimated <- mode(split_data$sample[which(split_data$sample > rets$ymin[i] & split_data$sample < rets$ymax[i])])
         expected <- seq(0, 1, 1/ploidy[z])[i]
-        modes.df <- cbind(Chr = unique(split_data$Chr), pivot_longer(data.frame(estimated, expected), cols = 1:2))
+        modes.df <- cbind(Chr = Chrs[z], pivot_longer(data.frame(estimated, expected), cols = 1:2))
         modes.df2 <- rbind(modes.df2, modes.df)
       }
 
@@ -152,42 +161,62 @@ plot_baf_hist <- function(data_sample,
   }
 
   if(rm_homozygous) data_sample2 <- data_sample2 %>% filter(sample != 0 & sample != 1)
+  if(ratio) data_sample2$sample <- data_sample2$ratio
 
-  p_hist <- data_sample2 %>% ggplot(aes(x=sample)) +
-    {if(colors) geom_histogram(aes(fill = color)) else  geom_histogram()} +
-    #scale_x_continuous(breaks = round(seq(0, 1, 1/ploidy),2)) +
-    {if(add_estimated_peaks) geom_vline(data = modes.df3[which(modes.df3$name == "estimated"),],
-                                        aes(xintercept= value,
-                                            color = name,
-                                            linetype = name,
-                                            alpha = alpha),
-                                        linewidth = 0.8)} +
-    {if(add_expected_peaks) geom_vline(data = modes.df3[which(modes.df3$name == "expected"),],
-                                       aes(xintercept= value,
-                                           color = name,
-                                           linetype = name,
-                                           alpha = alpha),
-                                       linewidth = 0.8)} +
-    {if(colors) scale_fill_manual(values = c("red", "black"))} +
-    {if(add_expected_peaks | add_estimated_peaks) scale_color_manual(values = c("blue", "purple"))}+
-    scale_linetype_manual(values = c("dashed", "solid"), guide="none") +
-    scale_alpha(range = c(0.7, 1), guide="none") +
-    facet_grid(~ Chr, scales = "free_x") + theme_bw() +  xlab("BAF") +
-    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
-          legend.position="bottom") +
-    {if(add_expected_peaks | add_estimated_peaks) labs(color= "Peaks")} +
-    {if(colors) labs(fill= "Area")}
-
-  if(BAF_hist_overall){
-    if(rm_homozygous) data_sample <- data_sample %>% filter(sample != 0 & sample != 1)
-
-    p_hist_all <- data_sample %>% ggplot(aes(x=sample)) + geom_histogram() +
-      scale_color_manual(values = c("blue", "purple")) +
+  if(!BAF_hist_overall){
+    p_hist <- data_sample2 %>% ggplot(aes(x=sample)) +
+      {if(colors) geom_histogram(aes(fill = color)) else  geom_histogram()} +
+      #scale_x_continuous(breaks = round(seq(0, 1, 1/ploidy),2)) +
+      {if(add_estimated_peaks) geom_vline(data = modes.df3[which(modes.df3$name == "estimated"),],
+                                          aes(xintercept= value,
+                                              color = name,
+                                              linetype = name,
+                                              alpha = alpha),
+                                          linewidth = 0.8)} +
+      {if(add_expected_peaks) geom_vline(data = modes.df3[which(modes.df3$name == "expected"),],
+                                         aes(xintercept= value,
+                                             color = name,
+                                             linetype = name,
+                                             alpha = alpha),
+                                         linewidth = 0.8)} +
+      {if(colors) scale_fill_manual(values = c("red", "black"))} +
+      {if(add_expected_peaks | add_estimated_peaks) scale_color_manual(values = c("blue", "purple"))}+
       scale_linetype_manual(values = c("dashed", "solid"), guide="none") +
       scale_alpha(range = c(0.7, 1), guide="none") +
-      theme_bw() +  xlab("BAF") +
+      facet_grid(~ Chr, scales = "free_x") + theme_bw() +  xlab("BAF") +
       theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
-            legend.position="bottom")
+            legend.position="bottom") +
+      {if(add_expected_peaks | add_estimated_peaks) labs(color= "Peaks")} +
+      {if(colors) labs(fill= "Area")}
+
+  } else {
+    if(rm_homozygous) data_sample <- data_sample %>% filter(sample != 0 & sample != 1)
+    if(ratio) data_sample$sample <- data_sample$ratio
+
+    p_hist_all <- data_sample %>% ggplot(aes(x=sample)) + geom_histogram() +
+      {if(colors) geom_histogram(aes(fill = color)) else  geom_histogram()} +
+      #scale_x_continuous(breaks = round(seq(0, 1, 1/ploidy),2)) +
+      {if(add_estimated_peaks) geom_vline(data = modes.df3[which(modes.df3$name == "estimated"),],
+                                          aes(xintercept= value,
+                                              color = name,
+                                              linetype = name,
+                                              alpha = alpha),
+                                          linewidth = 0.8)} +
+      {if(add_expected_peaks) geom_vline(data = modes.df3[which(modes.df3$name == "expected"),],
+                                         aes(xintercept= value,
+                                             color = name,
+                                             linetype = name,
+                                             alpha = alpha),
+                                         linewidth = 0.8)} +
+      {if(colors) scale_fill_manual(values = c("red", "black"))} +
+      {if(add_expected_peaks | add_estimated_peaks) scale_color_manual(values = c("blue", "purple"))}+
+      scale_linetype_manual(values = c("dashed", "solid"), guide="none") +
+      scale_alpha(range = c(0.7, 1), guide="none") +
+      theme_bw() +  {if(ratio) xlab("ratio") else xlab("BAF")} +
+      theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+            legend.position="bottom") +
+      {if(add_expected_peaks | add_estimated_peaks) labs(color= "Peaks")} +
+      {if(colors) labs(fill= "Area")}
 
     p_hist <- p_hist_all
   }

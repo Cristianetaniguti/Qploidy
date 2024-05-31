@@ -61,9 +61,11 @@ count_breaks_df <- function(homoprob,
 #' @importFrom RColorBrewer brewer.pal
 #' @importFrom grDevices colorRampPalette
 #' @importFrom ggpubr ggarrange
+#' @import dplyr
 #'
 #' @export
-count_breaks_plot <- function(counts, n.graphics=NULL,
+count_breaks_plot <- function(counts,
+                              n.graphics=NULL,
                               ncol=NULL,
                               by_LG = TRUE){
   p <- list()
@@ -91,29 +93,29 @@ count_breaks_plot <- function(counts, n.graphics=NULL,
 
   counts$individual <- factor(as.character(counts$individual), levels = sort(as.character(unique(counts$individual))))
   counts$LG <- as.factor(counts$LG)
-  counts$ploidy <- as.factor(counts$ploidy)
+  if(any(colnames(counts) == "ploidy")) counts$ploidy <- as.factor(counts$ploidy)
 
-  ploidycolors <- brewer.pal(9, "Set1")[1:length(unique(counts$ploidy))]
+  if(any(colnames(counts) == "ploidy")) ploidycolors <- brewer.pal(9, "Set1")[1:length(unique(counts$ploidy))]
   mycolors <- colorRampPalette(brewer.pal(12, "Paired"))(length(unique(counts$LG)))
   set.seed(20)
   mycolors <- sample(mycolors)
-  ploidycolors <- sample(ploidycolors)
-  names(ploidycolors) <- levels(counts$ploidy)
+  if(any(colnames(counts) == "ploidy")) ploidycolors <- sample(ploidycolors)
+  if(any(colnames(counts) == "ploidy")) names(ploidycolors) <- levels(counts$ploidy)
   names(mycolors) <- levels(counts$LG)
 
   p_list <- counts %>% ungroup() %>%  mutate(div.n.graphics = div.n.graphics) %>%
     split(., .$div.n.graphics) %>%
     lapply(., function(x) ggplot(x, aes(x=.data$parent, y=.data$total_counts, fill = .data$LG)) +
-             {if(by_LG) geom_bar(stat = "identity", aes(fill = .data$LG)) else geom_bar(stat = "identity", aes(fill = .data$ploidy))}+
+             {if(by_LG) geom_bar(stat = "identity", aes(fill = .data$LG)) else if(any(colnames(counts) == "ploidy")) geom_bar(stat = "identity", aes(fill = .data$ploidy)) else geom_bar(stat = "identity")}+
              coord_flip() +
-             {if(by_LG) scale_fill_manual(values=mycolors) else scale_fill_manual(values=ploidycolors)} +
+             {if(by_LG) scale_fill_manual(values=mycolors) else if(any(colnames(counts) == "ploidy")) scale_fill_manual(values=ploidycolors)} +
              theme(axis.title.y = element_blank(),
                    axis.title.x = element_blank(),
                    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
                    legend.key.size = unit(1, 'cm'),
                    strip.text.y.right = element_text(angle = 0)) +
              {if(!by_LG) facet_grid(.data$individual ~ .data$LG) else facet_grid(.data$individual ~ .)} +
-             {if(by_LG) labs(fill="groups") else labs(fill="ploidy")})
+             {if(by_LG) labs(fill="groups") else if(any(colnames(counts) == "ploidy")) labs(fill="ploidy")})
 
   p <- ggarrange(plotlist = p_list, common.legend = T, ncol = ncol, nrow = round(n.graphics/ncol,0))
 

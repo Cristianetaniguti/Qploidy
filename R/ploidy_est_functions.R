@@ -5,23 +5,76 @@ globalVariables(c("color", "xmax", "xmin", "value", "name",
 
 #' Estimate ploidy using area method
 #'
-#' @param data_sample data.frame with BAF values and genomic position information
-#' @param ploidys range of ploidies to by tested
+#' @param qploidy_standardization object of class qploidy_standardization
+#' @param samples if "all" all samples contained in the qploidy_standardization object will be evaluate. If vector with sample names is provided, only those will be evaluated.
+#' @param level character identifying the level of the analysis. If `chromosome` the number of copies will be estimated by chromosome, if `sample` it will be by sample; if `chromosome-arm` it will be peformed by chromosome arm (only if `centromeres` argument is defined.)
+#' @param ploidies range of ploidies to by tested
 #' @param area area around the expected peak to be considered
+#' @param centromeres vector with centromeres genomic position in bp. The vector should be named with the chromosomes ID. The information will only be used if `chromosome-arm` level is defined.
+#'
+#' @import tidyr
+#' @import dplyr
 #'
 #' @export
-area_estimate_ploidy_by_chr <- function(data_sample, ploidys, area){
+area_estimate_ploidy <- function(qploidy_standardization = NULL,
+                                 samples = "all",
+                                 level = "chromosome",
+                                 ploidies = NULL,
+                                 area = 0.75,
+                                 centromeres= NULL){
 
-  by_chr <- split(data_sample, data_sample$Chr)
+  if(all(samples == "all")) {
+    data_sample <- qploidy_standardization$data[,c(9,10,2,8)] %>% filter(!is.na(baf))
+  } else {
+    data_sample <- qploidy_standardization$data[,c(9,10,2,8)] %>% filter(SampleName %in% samples & !is.na(baf))
+  }
 
-  freq <- pascalTriangle(ploidys[2])
+  if(length(unique(data_sample$Position)) != length(data_sample$Position)) {
+    warning("There are duplicated marker positions. Only the first one will be kept.")
+    data_sample <- data_sample %>% group_by(SampleName) %>% filter(!duplicated(Position))
+  }
+
+  data_sample <- pivot_wider(data_sample, names_from = SampleName, values_from = baf)
+
+  if(is.null(data_sample) | is.null(ploidies)) stop("Define data_sample and ploidies arguments")
+
+  if(level == "chromosome" | level == "chromosome-arm"){
+    by_chr <- split(data_sample, data_sample$Chr)
+
+    if(!is.null(centromeres) & level == "chromosome-arm"){
+      chrs <- match(names(centromeres), names(by_chr))
+      if(length(chrs) == 0) stop("Chromosome names in centromeres vector do not match the ones in dataset.")
+      for(i in 1:length(chrs)){
+        idx <- which(by_chr[[chrs[i]]]$Position <= centromeres[i])
+        by_chr[[chrs[i]]]$Chr[idx] <- paste0(by_chr[[chrs[i]]]$Chr[idx],".1")
+        idx <- which(by_chr[[chrs[i]]]$Position > centromeres[i])
+        by_chr[[chrs[i]]]$Chr[idx] <- paste0(by_chr[[chrs[i]]]$Chr[idx],".2")
+        by_chr[[chrs[i]]] <- split(by_chr[[chrs[i]]], by_chr[[chrs[i]]]$Chr)
+      }
+      names(by_chr) <- NULL
+      skip <- which(sapply(by_chr, length) != 2)
+      if(length(skip) != 0){
+        for(i in 1:length(skip)){
+          by_chr[[i]] <- list(by_chr[[i]])
+          names(by_chr[[i]]) <- unique(by_chr[[i]][[1]]$Chr)
+        }
+      } else if(level == "chromosome-arm") stop("Provide centromeres genomic position information to analyse chromosome-arm level copy number variation.")
+
+      by_chr <- unlist(by_chr, recursive = F)
+    }
+  } else if(level == "sample"){
+    by_chr <- list(data_sample)
+  }
+
+  freq <- pascalTriangle(ploidies[2])
   freq <- freq[-1]
-  ploidys <- ploidys[1]:ploidys[2]
+  ploidies <- ploidies[1]:ploidies[2]
+  ploidies <- unique(c(1, ploidies))
   dots.int_tot <- corr_tot <- max_sd_tot <- modes_paste_tot <- as.list(rep(NA, length(by_chr)))
-  for(j in 1:length(ploidys)){
+  for(j in 1:length(ploidies)){
     # Area method
-    ymin <- seq(0, 1, 1/ploidys[j]) - (area/(ploidys[j]*2))
-    ymax <- seq(0, 1, 1/ploidys[j]) + (area/(ploidys[j]*2))
+    ymin <- seq(0, 1, 1/ploidies[j]) - (area/(ploidies[j]*2))
+    ymax <- seq(0, 1, 1/ploidies[j]) + (area/(ploidies[j]*2))
 
     ymin[which(ymin < 0)] <- 0
     ymax[which(ymax > 1)] <- 1
@@ -50,7 +103,7 @@ area_estimate_ploidy_by_chr <- function(data_sample, ploidys, area){
       modes_paste <- apply(modes_tot[[z]], 2, function(x) paste0(round(x[-1],3), collapse = "/"))
       modes_paste_tot[[z]] <- rbind(modes_paste_tot[[z]], modes_paste)
 
-      corr <- apply(modes_tot[[z]], 2, function(x) cor(x = x[-1], y = seq(0,1,1/ploidys[j])))
+      corr <- apply(modes_tot[[z]], 2, function(x) cor(x = x[-1], y = seq(0,1,1/ploidies[j])))
       corr_tot[[z]] <- rbind(corr_tot[[z]], corr)
 
       max_sd <- apply(sd_areas_tot[[z]], 2, function(x) max(x[-1]))
@@ -67,23 +120,20 @@ area_estimate_ploidy_by_chr <- function(data_sample, ploidys, area){
   result.ploidy  <- diff.count <- second <- diff.second <- diff.first.second <- list()
   for(z in 1:length(dots.int_tot)){
     if(is.null(rownames(dots.int_tot[[z]]))) {
-      names(dots.int_tot[[z]]) <- ploidys
-      result.ploidy[[z]] <- ploidys[order(dots.int_tot[[z]], decreasing =T)][1]
+      names(dots.int_tot[[z]]) <- ploidies
+      result.ploidy[[z]] <- ploidies[order(dots.int_tot[[z]], decreasing =T)][1]
 
       diff.count[[z]] <- dots.int_tot[[z]][order(dots.int_tot[[z]], decreasing =T)][1]
-      second[[z]] <- ploidys[order(dots.int_tot[[z]], decreasing =T)][2]
+      second[[z]] <- ploidies[order(dots.int_tot[[z]], decreasing =T)][2]
       diff.second[[z]] <- dots.int_tot[[z]][order(dots.int_tot[[z]], decreasing =T)][2]
     } else {
-      rownames(dots.int_tot[[z]]) <- ploidys
-      result.ploidy[[z]] <- apply(dots.int_tot[[z]], 2, function(x) ploidys[order(x, decreasing =T)][1])
+      rownames(dots.int_tot[[z]]) <- ploidies
+      result.ploidy[[z]] <- apply(dots.int_tot[[z]], 2, function(x) ploidies[order(x, decreasing =T)][1])
       diff.count[[z]] <- apply(dots.int_tot[[z]], 2, function(x) x[order(x, decreasing =T)][1])
-      second[[z]] <- apply(dots.int_tot[[z]], 2, function(x) ploidys[order(x, decreasing =T)][2])
+      second[[z]] <- apply(dots.int_tot[[z]], 2, function(x) ploidies[order(x, decreasing =T)][2])
       diff.second[[z]] <- apply(dots.int_tot[[z]], 2, function(x) x[order(x, decreasing =T)][2])
     }
     diff.first.second[[z]] <- diff.count[[z]] - diff.second[[z]]
-    # filt <- which((diff.count[[z]] - diff.second[[z]]) < filter)
-    # result.ploidy[[z]][filt] <- NA
-    # second[[z]][filt] <- NA
   }
 
   result.ploidy <- do.call(rbind, result.ploidy)
@@ -104,10 +154,10 @@ area_estimate_ploidy_by_chr <- function(data_sample, ploidys, area){
   sd_tot_mt <- corr_tot_mt <- dots.int_tot_mt <- modes_paste_tot_mt <- matrix(NA, nrow = dim(result.ploidy)[1], ncol = dim(result.ploidy)[2])
   for(i in 1:dim(result.ploidy)[2]){ # Ind
     for(j in 1:dim(result.ploidy)[1]){ # Chr
-      sd_tot_mt[j, i] <- max_sd_tot[[j]][which(ploidys == result.ploidy[j,i]),i]
-      corr_tot_mt[j,i] <- corr_tot[[j]][which(ploidys == result.ploidy[j,i]),i]
-      modes_paste_tot_mt[j,i] <- modes_paste_tot[[j]][which(ploidys == result.ploidy[j,i]),i]
-      dots.int_tot_mt[j,i] <- dots.int_tot[[j]][which(ploidys == result.ploidy[j,i]),i]
+      sd_tot_mt[j, i] <- max_sd_tot[[j]][which(ploidies == result.ploidy[j,i]),i]
+      corr_tot_mt[j,i] <- corr_tot[[j]][which(ploidies == result.ploidy[j,i]),i]
+      modes_paste_tot_mt[j,i] <- modes_paste_tot[[j]][which(ploidies == result.ploidy[j,i]),i]
+      dots.int_tot_mt[j,i] <- dots.int_tot[[j]][which(ploidies == result.ploidy[j,i]),i]
     }
   }
 
@@ -124,13 +174,92 @@ area_estimate_ploidy_by_chr <- function(data_sample, ploidys, area){
   rownames(diff.first.second) <- rownames(result.ploidy)
   rownames(sd_tot_mt) <- rownames(corr_tot_mt) <- rownames(modes_paste_tot_mt) <- rownames(dots.int_tot_mt) <- rownames(result.ploidy)
 
-  est.ploidy.chr_df <- list(result.ploidy,         # Estimated ploidy by area method
-                            dots.int_tot_mt,       # Proportion of dots inside selected area
-                            diff.first.second,     # Difference between first and second place in area method
-                            sd_tot_mt,             # standard deviation inside area
-                            corr_tot_mt,           # Highest correlation
-                            modes_paste_tot_mt)    # Modes inside areas
-  return(est.ploidy.chr_df)
+  # Find homozygous
+  idx <- which(result.ploidy == 1)
+  if(length(idx) > 0) result.ploidy[idx] <- NA
+
+  est.ploidy.chr_df <- list(ploidy = result.ploidy,                  # Estimated ploidy by area method
+                            prop_inside_area = dots.int_tot_mt,      # Proportion of dots inside selected area
+                            diff_first_second = diff.first.second,   # Difference between first and second place in area method
+                            sd_inside_area = sd_tot_mt,              # standard deviation inside area
+                            highest_correlation_modes = corr_tot_mt, # Highest correlation
+                            modes_inside_area = modes_paste_tot_mt,
+                            tested = ploidies,
+                            ploidy.sep = result.ploidy)  # Modes inside areas
+
+  return(structure(est.ploidy.chr_df, class = "qploidy_area_ploidy_estimation"))
+}
+
+#' Merges chromosome-arm level analysis results into chromosome level format
+#'
+#' @param x object of class qploidy_area_ploidy_estimation
+#' @param filter_diff filter by difference on area proportion between first and second place
+#'
+#' @export
+merge_arms_format <- function(x, filter_diff = NULL){
+
+  ploidy <- x$ploidy
+  if(!is.null(filter_diff)){
+    ploidy[which(x$diff_first_second < filter_diff)] <- NA
+  }
+
+  chr <- sapply(strsplit(colnames(ploidy), "[.]"), "[[", 1)
+  result.ploidy.up <- vector()
+  for(i in 1:length(unique(chr))){
+    if(!is.null(dim(ploidy[,which(chr == unique(chr)[i])])[1])){
+      new.col <- apply(ploidy[,which(chr == unique(chr)[i])],1, function(x) if(length(unique(x)) == 1)unique(x) else paste0(x, collapse = "/"))
+    } else new.col <-  ploidy[,which(chr == unique(chr)[i])]
+    result.ploidy.up <- cbind(result.ploidy.up, new.col)
+  }
+  colnames(result.ploidy.up) <- unique(chr)
+
+  x_up <- x
+  x_up$ploidy <- result.ploidy.up
+
+  return(x_up)
+}
+
+
+
+#' print qploidy_area_ploidy_estimation object
+#'
+#' @param x qploidy_area_ploidy_estimation object
+#'
+#' @method print qploidy_area_ploidy_estimation
+#'
+#' @export
+print.qploidy_area_ploidy_estimation <- function(x, ...){
+
+  count_aneu <- get_aneuploids(x$ploidy)
+
+  df <- data.frame(c1 = c("Number of samples:",
+                          "Chromosomes:",
+                          "Tested ploidies:",
+                          "Number of euploid samples:",
+                          "Number of potential aneuploid samples:"),
+                   c2 = c(dim(x$ploidy)[1],
+                          paste0(colnames(x$ploidy), collapse = ","),
+                          paste0(x$tested, collapse = ","),
+                          sum(!count_aneu),
+                          sum(count_aneu)
+                   ))
+
+  colnames(df) <- rownames(df) <- NULL
+
+  cat("Object of class qploidy_area_ploidy_estimation")
+  print(format(df, justify = "left", digits = 2))
+}
+
+
+#' indexes for aneuploids
+#'
+#' @param ploidy_df ploidy table (chromosome in columns and individuals in rows)
+#'
+#' @export
+get_aneuploids  <- function(ploidy_df){
+
+  count_aneu <- !apply(ploidy_df, 1, function(y) if(any(is.na(y))) length(unique(y[-which(is.na(y))])) == 1 else length(unique(y)) == 1)
+  return(count_aneu)
 }
 
 #' Generate plots for overall analysis
@@ -343,266 +472,3 @@ plots_overall <- function(est.ploidy.chr_df, filter_diff=0, filter_corr=0){
   list(p, p_aneuploids, p_aneuploids2, text_ploidy, aneuploid_text,
        aneuploidy_df, ploidy_all_weird, aneuploidy_all_weird)
 }
-
-#' Plot BAF
-#'
-#' @param data_sample data.frame with BAF and genomic position information
-#' @param area_single area around the expected peak to be considered
-#' @param ploidy expected ploidy overall (single integer value) or for each chromosome
-#' @param dot.size graphic dot size
-#' @param add_estimated_peaks add expected peaks lines
-#' @param add_expected_peaks add estimated peaks
-#' @param colors add area colors
-#' @param centromeres vector defining centromeres positions
-#' @param add_centromeres logical defining if centromeres positions will be displayed
-#'
-#' @import ggplot2
-#' @import tidyr
-#'
-#' @export
-plot_baf <- function(data_sample,
-                     area_single,
-                     ploidy,
-                     dot.size = 1,
-                     add_estimated_peaks = FALSE,
-                     add_expected_peaks = FALSE,
-                     centromeres = NULL,
-                     add_centromeres = FALSE,
-                     colors = FALSE){
-
-  if(add_centromeres){
-    #centromeres <- c("1 = 49130338, 5 = 49834357")
-    centromeres <- gsub("\ ", "", centromeres)
-    centromeres <- unlist(strsplit(centromeres, ","))
-    centromeres <- sapply(centromeres, function(x) strsplit(x, "="))
-    centromeres_df <- data.frame(Chr = sapply(centromeres, "[[", 1), value = sapply(centromeres, "[[", 2))
-  }
-
-  if(add_estimated_peaks | add_expected_peaks | colors){
-
-    if(length(ploidy) == 1) {
-      ploidy <- rep(ploidy, length(unique(data_sample$Chr)))
-    } else if(length(ploidy) > 1 & length(ploidy) < length(unique(data_sample$Chr)))
-      stop("Provide a ploidy for each chromosome.")
-
-    data_sample2 <- rets2 <- data.frame()
-    for(z in 1:length(unique(data_sample$Chr))){
-      ymin <- seq(0, 1, 1/ploidy[z]) - (area_single/(ploidy[z]*2))
-      ymax <- seq(0, 1, 1/ploidy[z]) + (area_single/(ploidy[z]*2))
-
-      ymin[which(ymin < 0)] <- 0
-      ymax[which(ymax > 1)] <- 1
-      rets <- data.frame(ymin, ymax, xmax = Inf, xmin = -Inf, Chr = sort(unique(data_sample$Chr))[z])
-
-      data_chr <- data_sample[which(data_sample$Chr == sort(unique(data_sample$Chr))[z]),]
-      idx_tot <- FALSE
-      idx <- list()
-      for(i in 1:nrow(rets)){
-        idx <- data_chr$sample >= rets$ymin[i] & data_chr$sample <= rets$ymax[i]
-        idx_tot <- idx_tot | idx
-      }
-
-      data_chr$color <- NA
-      data_chr$color[which(!idx_tot)] <- "red"
-      data_chr$color[which(idx_tot)] <- "black"
-
-      rets2 <- rbind(rets2, rets)
-      data_sample2 <- rbind(data_sample2, data_chr)
-    }
-  } else data_sample2 <- data_sample
-
-  p_baf <- data_sample2 %>% ggplot(aes(x=Position, y=sample)) +
-    {if(colors) geom_point(aes(color = color), alpha=0.7, size=dot.size) else geom_point(alpha=0.7, size=dot.size)} +
-    scale_color_manual(values = c("red", "black")) +
-    facet_grid(~ Chr, scales = "free_x") + theme_bw() +
-    {if(add_expected_peaks) geom_rect(data = rets2, inherit.aes=FALSE,
-                                      aes(ymin=ymin,ymax=ymax,
-                                          xmax = xmax, xmin = xmin,
-                                          alpha=0.001),
-                                      color = "red")} +
-    ylab("BAF") +
-    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
-          legend.position="none") +
-    {if(add_centromeres) geom_vline(data = centromeres_df,
-                                    aes(xintercept= as.numeric(value)),
-                                    color = "blue",
-                                    linewidth = 0.8)}
-  return(p_baf)
-}
-
-#' Plot BAF histogram
-#'
-#' @param data_sample data.frame with BAF and genomic position information
-#' @param area_single area around the expected peak to be considered
-#' @param ploidy expected ploidy
-#' @param add_estimated_peaks add expected peaks lines
-#' @param add_expected_peaks add estimated peaks
-#' @param colors add area colors
-#'
-#' @export
-plot_baf_hist <- function(data_sample,
-                          area_single,
-                          ploidy,
-                          colors = FALSE,
-                          add_estimated_peaks = TRUE,
-                          add_expected_peaks = FALSE){
-
-
-  if(add_estimated_peaks | add_expected_peaks | colors){
-    if(length(ploidy) == 1) {
-      ploidy <- rep(ploidy, length(unique(data_sample$Chr)))
-    } else if(length(ploidy) != 1 & length(ploidy) != length(unique(data_sample$Chr)))
-      stop("Provide a ploidy for each chromosome.")
-
-    data_sample2 <- modes.df3 <- data.frame()
-    for(z in 1:length(unique(data_sample$Chr))){
-      ymin <- seq(0, 1, 1/ploidy[z]) - (area_single/(ploidy[z]*2))
-      ymax <- seq(0, 1, 1/ploidy[z]) + (area_single/(ploidy[z]*2))
-
-      ymin[which(ymin < 0)] <- 0
-      ymax[which(ymax > 1)] <- 1
-      rets <- data.frame(ymin, ymax, xmax = Inf, xmin = -Inf, Chr = sort(unique(data_sample$Chr))[z])
-
-      split_data <- data_sample[which(data_sample$Chr == sort(unique(data_sample$Chr))[z]),]
-      idx_tot <- FALSE
-      modes.df2 <- data.frame()
-      for(i in 1:nrow(rets)) {
-        idx <- split_data$sample >= rets$ymin[i] & split_data$sample <= rets$ymax[i]
-        idx_tot <- idx_tot | idx
-
-        estimated <- mode(split_data$sample[which(split_data$sample > rets$ymin[i] & split_data$sample < rets$ymax[i])])
-        expected <- seq(0, 1, 1/ploidy[z])[i]
-        modes.df <- cbind(Chr = unique(split_data$Chr), pivot_longer(data.frame(estimated, expected), cols = 1:2))
-        modes.df2 <- rbind(modes.df2, modes.df)
-      }
-
-      modes.df2$alpha <- modes.df2$name
-      modes.df2$alpha <- gsub("expected", 1, modes.df2$alpha)
-      modes.df2$alpha <- as.numeric(gsub("estimated", 0.5, modes.df2$alpha))
-
-      split_data$color <- NA
-      split_data$color[which(!idx_tot)] <- "outside area"
-      split_data$color[which(idx_tot)] <- "inside area"
-
-      modes.df3 <- rbind(modes.df2, modes.df3)
-      data_sample2 <- rbind(data_sample2, split_data)
-    }
-  } else {
-    data_sample2 <- data_sample
-  }
-
-  p_hist <- data_sample2 %>% ggplot(aes(x=sample)) +
-    {if(colors) geom_histogram(aes(fill = color)) else  geom_histogram()} +
-    #scale_x_continuous(breaks = round(seq(0, 1, 1/ploidy),2)) +
-    {if(add_estimated_peaks) geom_vline(data = modes.df3[which(modes.df3$name == "estimated"),],
-                                        aes(xintercept= value,
-                                            color = name,
-                                            linetype = name,
-                                            alpha = alpha),
-                                        linewidth = 0.8)} +
-    {if(add_expected_peaks) geom_vline(data = modes.df3[which(modes.df3$name == "expected"),],
-                                       aes(xintercept= value,
-                                           color = name,
-                                           linetype = name,
-                                           alpha = alpha),
-                                       linewidth = 0.8)} +
-    {if(colors) scale_fill_manual(values = c("red", "black"))} +
-    {if(add_expected_peaks | add_estimated_peaks) scale_color_manual(values = c("blue", "purple"))}+
-    scale_linetype_manual(values = c("dashed", "solid"), guide="none") +
-    scale_alpha(range = c(0.7, 1), guide="none") +
-    facet_grid(~ Chr, scales = "free_x") + theme_bw() +  xlab("BAF") +
-    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
-          legend.position="bottom") +
-    {if(add_expected_peaks | add_estimated_peaks) labs(color= "Peaks")} +
-    {if(colors) labs(fill= "Area")}
-
-  p_hist_all <- data_sample %>% ggplot(aes(x=sample)) + geom_histogram() +
-    scale_color_manual(values = c("blue", "purple")) +
-    scale_linetype_manual(values = c("dashed", "solid"), guide="none") +
-    scale_alpha(range = c(0.7, 1), guide="none") +
-    theme_bw() +  xlab("BAF") +
-    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
-          legend.position="bottom")
-
-  p_hist <- ggarrange(p_hist_all, p_hist, widths = c(1,length(unique(data_sample$Chr))))
-  return(p_hist)
-}
-
-#' Estimate ploidy using area method
-#'
-#' @param data_sample data.frame with BAF values and genomic position information
-#' @param ploidys range of ploidies to by tested
-#' @param area area around the expected peak to be considered
-#'
-#' @export
-area_est_ploidy_single_sample <- function(data_sample, ploidys, area){
-
-  by_chr <- split(data_sample, data_sample$Chr)
-
-  freq <- pascalTriangle(ploidys[2])
-  freq <- freq[-1]
-  ploidys <- ploidys[1]:ploidys[2]
-  dots.int_tot <-  as.list(rep(NA, length(by_chr)))
-  for(j in 1:length(ploidys)){
-    # Area method
-    ymin <- seq(0, 1, 1/ploidys[j]) - (area/(ploidys[j]*2))
-    ymax <- seq(0, 1, 1/ploidys[j]) + (area/(ploidys[j]*2))
-
-    ymin[which(ymin < 0)] <- 0
-    ymax[which(ymax > 1)] <- 1
-    rets <- data.frame(ymin, ymax)
-
-    prop_tot <- as.list(rep(NA, length(by_chr)))
-    for(z in 1:length(by_chr)){
-      for(i in 1:nrow(rets)){
-        prop <- apply(by_chr[[z]][,-c(1,2)], 2, function(x) sum(x >= rets$ymin[i] & x <= rets$ymax[i], na.rm = TRUE))
-        prop_tot[[z]] <- rbind(prop_tot[[z]], prop)
-      }
-    }
-
-    # remove NAs
-    prop_tot <- lapply(prop_tot, function(x) x[-1,])
-    for(z in 1:length(prop_tot)){
-      if(is.null(ncol(prop_tot[[z]]))) dots.int <- sum(prop_tot[[z]], na.rm = TRUE)/dim(by_chr[[z]])[1] else
-        dots.int <- apply(prop_tot[[z]], 2, function(x) sum(x, na.rm = TRUE)/dim(by_chr[[z]])[1])
-      dots.int_tot[[z]] <- rbind(dots.int_tot[[z]], dots.int)
-    }
-  }
-
-  dots.int_tot <- lapply(dots.int_tot, function(x) x[-1,])
-
-  # Area method
-  result.ploidy  <- diff.count <- second <- diff.second <- diff.first.second <- list()
-  for(z in 1:length(dots.int_tot)){
-    if(is.null(rownames(dots.int_tot[[z]]))) {
-      names(dots.int_tot[[z]]) <- ploidys
-      result.ploidy[[z]] <- ploidys[order(dots.int_tot[[z]], decreasing =T)][1]
-
-      diff.count[[z]] <- dots.int_tot[[z]][order(dots.int_tot[[z]], decreasing =T)][1]
-      second[[z]] <- ploidys[order(dots.int_tot[[z]], decreasing =T)][2]
-      diff.second[[z]] <- dots.int_tot[[z]][order(dots.int_tot[[z]], decreasing =T)][2]
-    } else {
-      rownames(dots.int_tot[[z]]) <- ploidys
-      result.ploidy[[z]] <- apply(dots.int_tot[[z]], 2, function(x) ploidys[order(x, decreasing =T)][1])
-      diff.count[[z]] <- apply(dots.int_tot[[z]], 2, function(x) x[order(x, decreasing =T)][1])
-      second[[z]] <- apply(dots.int_tot[[z]], 2, function(x) ploidys[order(x, decreasing =T)][2])
-      diff.second[[z]] <- apply(dots.int_tot[[z]], 2, function(x) x[order(x, decreasing =T)][2])
-    }
-    diff.first.second[[z]] <- diff.count[[z]] - diff.second[[z]]
-  }
-
-  result.ploidy <- do.call(rbind, result.ploidy)
-  diff.first.second <- do.call(rbind, diff.first.second)
-
-  result.ploidy <- as.vector(result.ploidy)
-  diff.first.second <- as.vector(diff.first.second)
-
-  names(result.ploidy) <- names(diff.first.second) <- names(by_chr)
-
-
-  est.ploidy.chr_single <- list(result.ploidy,
-                                diff.first.second)
-
-  return(est.ploidy.chr_single)
-}
-

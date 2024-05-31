@@ -4,12 +4,10 @@
 \alias{get_R_theta}
 \title{Get R and theta values from summary file with option to do standard normalization by plate and markers}
 \usage{
-get_R_theta(cleaned_summary, ind.names, sd.normalization = FALSE, atan = FALSE)
+get_R_theta(cleaned_summary, sd.normalization = FALSE, atan = FALSE)
 }
 \arguments{
 \item{cleaned_summary}{summary object from clean_summary function. List with A and B intensities.}
-
-\item{ind.names}{data.frame with individual names correspondence}
 
 \item{sd.normalization}{logical. If TRUE performs standard normalization}
 

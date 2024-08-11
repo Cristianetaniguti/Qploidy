@@ -58,8 +58,8 @@ area_estimate_ploidy <- function(qploidy_standardization = NULL,
           by_chr[[i]] <- list(by_chr[[i]])
           names(by_chr[[i]]) <- unique(by_chr[[i]][[1]]$Chr)
         }
-      } else if(level == "chromosome-arm") stop("Provide centromeres genomic position information to analyse chromosome-arm level copy number variation.")
-
+      } 
+      
       by_chr <- unlist(by_chr, recursive = F)
     }
   } else if(level == "sample"){

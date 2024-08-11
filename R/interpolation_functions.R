@@ -586,9 +586,11 @@ plot.qploidy_standardization <- function(x,
 
   if(is.null(sample)) stop("Define sample ID")
 
-  if(is.numeric(chr)) chr <- sort(unique(x$data$Chr))[chr] else if(is.null(chr)) chr <- sort(unique(x$data$Chr))
+  data_sample <- x$data[which(x$data$SampleName == sample),]
 
-  data_sample <- x$data %>% select(MarkerName, SampleName, Chr, Position, baf, z, ratio) %>% filter(SampleName == sample & Chr %in% chr)
+  if(is.numeric(chr)) chr <- sort(unique(data_sample$Chr))[chr] else if(is.null(chr)) chr <- sort(unique(data_sample$Chr))
+
+  data_sample <- data_sample %>% filter(Chr %in% chr) %>% select(MarkerName, SampleName, Chr, Position, baf, z, ratio)
 
   if(nrow(data_sample) == 0) stop("Sample or chromosome not found.")
 
@@ -597,7 +599,7 @@ plot.qploidy_standardization <- function(x,
 
   colnames(baf_sample)[ncol(baf_sample)] <-  "sample"
 
-  baf_point <- baf_hist <- p_z <- raw_ratio <- het_rate <- baf_hist_overall <- NULL
+  baf_point <- baf_hist <- p_z <- raw_ratio <- het_rate <- baf_hist_overall <- ratio_hist_overall <- NULL
 
   if(any(type == "all" | type == "BAF")){
     baf_point <- plot_baf(baf_sample,
@@ -659,7 +661,7 @@ plot.qploidy_standardization <- function(x,
   }
 
   if(any(type == "all" | type == "Ratio_hist_overall")){
-    baf_hist_overall <- plot_baf_hist(data_sample = baf_sample,
+    ratio_hist_overall <- plot_baf_hist(data_sample = baf_sample,
                                       area_single,
                                       ploidy,
                                       colors,
@@ -714,7 +716,7 @@ plot.qploidy_standardization <- function(x,
       theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1), legend.position = "none")
   }
 
-  p_all <- list(het_rate, raw_ratio, baf_point, baf_hist,baf_hist_overall, p_z)
+  p_all <- list(het_rate, raw_ratio, baf_point, baf_hist,baf_hist_overall, ratio_hist_overall, p_z)
 
   rm <- which(sapply(p_all, is.null))
   if(length(rm) != 0) p_all <- p_all[-rm]

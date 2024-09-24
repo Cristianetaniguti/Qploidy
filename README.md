@@ -17,17 +17,158 @@
 devtools::install_github("cristianetaniguti/Qploidy")
 ```
 
-## How to use
+## Prepare input files
 
-You can use Qploidy using its graphical interface by:
+### VCF file as input
+
+Read file
 
 ``` r
-library(Qploidy)
-run_app()
+vcf_file <- "data/rose_texas/GBS/MBxGV_NgoMIV_tassel_vcf_norm.vcf.gz"
+data <- qploidy_read_vcf(vcf_file)
+head(data)
 ```
 
-Or you can also use its functions individually.
+``` r
+ref <- pivot_wider(data[,1:3], names_from = SampleName, values_from = X)
+ref <- as.matrix(ref)
+rownames_ref <- ref[,1]
+ref<- ref[,-1]
+ref <- apply(ref, 2, as.numeric)
+rownames(ref) <- rownames_ref
 
-* [Interpolation and ploidy estimation - code version]()
+size <- pivot_wider(data[,c(1,2,5)], names_from = SampleName, values_from = R)
+size <- as.matrix(size)
+rownames_size <- size[,1]
+size<- size[,-1]
+size <- apply(size, 2, as.numeric)
+rownames(size) <- rownames_size
+
+library(updog)
+
+multidog_obj <- multidog(refmat = ref, sizemat = size, 
+                         model = "norm", ploidy = 6, nc = 6)
+                         
+genos <- data.frame(MarkerName = multidog_obj$inddf$snp, 
+                    SampleName = multidog_obj$inddf$ind, 
+                    geno = multidog_obj$inddf$geno,
+                    prob = multidog_obj$inddf$maxpostprob)
+
+head(genos)
+```
+
+``` r
+pos <- strsplit(multidog_obj$snpdf$snp, "_")
+
+genos.pos <- data.frame(MarkerName = multidog_obj$snpdf$snp,
+                        Chromosome = sapply(pos, "[[", 1),
+                        Position = as.numeric(sapply(pos, "[[", 2)))
+head(geno.pos)
+```
 
 
+### Axiom array summary file as input
+
+``` r
+roses_input <- read_axiom(summary_file = "data/rose_texas/AxiomGT1.summary.txt", 
+                          ind_names = "data/rose_texas/ind.names_roses_texas.txt") # optional, if you want to change the sample names. See ?read_axiom
+
+
+library(fitPoly)
+saveMarkerModels(ploidy=4,
+                 data=roses_input,
+                 p.threshold=0.5,
+                 filePrefix="data/rose_texas/fitpoly_out_texas_roses",
+                 ncores=20)
+                 
+fitpoly_scores <- vroom("data/rose_texas/fitpoly_out_texas_rose_tetra_551_scores.dat")
+
+genos <- data.frame(MarkerName = fitpoly_scores$MarkerName, 
+                    SampleName = fitpoly_scores$SampleName, 
+                    geno = fitpoly_scores$geno,
+                    prob = fitpoly_scores$maxP)
+                    
+genos.pos <- read.table("data/rose_texas/geno.pos_roses_texas.txt", header = T)
+genos.pos <- data.frame(MarkerName = genos.pos$probes,
+                        Chromosome = genos.pos$chr,
+                        Position = genos.pos$pos)
+head(genos.pos)
+```
+
+
+### Check depth/intensities distribution
+
+3D plot to check depth distribution 
+
+``` r
+p <- plot_check(data, n = 500, R_lim = 200)
+p
+```
+
+### Run standardization
+
+``` r
+roses_texas_GBS_result <- standardize(data = data,
+                                      genos = genos,
+                                      geno.pos = genos.pos, 
+                                      ploidy.standardization = 4, 
+                                      threshold.n.clusters = 5,
+                                      n.cores =19, 
+                                      out_filename = "data/rose_texas/roses_texas_GBS__counts_5clust.tsv.gz",
+                                      type = "counts", 
+                                      parallel.type = "FORK",
+                                      verbose = TRUE)
+```
+
+### Check standardization
+
+``` r
+p <- plot(x = roses_texas_int_result, sample = "16401_N025", type = c("BAF_hist_overall"), add_expected_peaks = TRUE, colors = FALSE, ploidy = 4)
+
+p <- plot(x = roses_texas_int_result, 
+          sample = "3_HVxLF", 
+          type = c("BAF_hist_overall", "Ratio_hist_overall"), 
+          add_expected_peaks = FALSE, 
+          colors = FALSE, 
+          ploidy = 4, 
+          dot.size = 0.5, 
+          centromeres = c("1" = 22000000, "2" = 36000000, "3" = 4000000, 
+                          "4" = 20000000, "5" = 52000000, "6" = 32000000, "7" = 20000000), 
+          add_centromeres = TRUE, 
+          chr = 2:8)
+p
+
+p <- plot(x = roses_texas_int_result, 
+          sample = "16405_N097", 
+          type = c("BAF", "zscore", "het", "BAF_hist"), 
+          add_expected_peaks = FALSE, 
+          colors = FALSE, 
+          ploidy = 4, 
+          dot.size = 0.5, 
+          centromeres = c("1" = 22000000, "2" = 36000000, "3" = 4000000, 
+                          "4" = 20000000, "5" = 52000000, "6" = 32000000, "7" = 20000000), 
+          add_centromeres = TRUE, 
+          chr = 2:8)
+
+```
+
+### Estimate ploidy
+
+
+``` r
+estimated_ploidies <- area_estimate_ploidy(qploidy_standardization = roses_texas_int_result, 
+                                                  samples = c("16009_N043", "12_MBxBE", "1_MBxBE", "80_HVxLF"), 
+                                                  ploidies = c(2,5))
+                                                  
+                                                  
+estimated_ploidies_cent <- area_estimate_ploidy(qploidy_standardization = roses_texas_int_result, 
+                                                       samples = "all", 
+                                                       ploidies = c(2,5), 
+                                                       centromeres = c("1" = 22000000, "2" = 36000000, "3" = 4000000, 
+                                                                       "4" = 20000000, "5" = 52000000, "6" = 32000000,
+                                                                       "7" = 20000000))
+estimated_ploidies_format <- merge_arms_format(estimated_ploidies_cent, filter_diff = 0.01)
+
+aneu <- get_aneuploids(estimated_ploidies_format$ploidy)
+
+```

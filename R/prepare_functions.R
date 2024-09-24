@@ -5,35 +5,52 @@ globalVariables(c("ind", "zscore", "chr"))
 #' convert vcf file to Qploidy data
 #'
 #' @param vcf path to vcf file
+#' @param geno if TRUE, output columns will be MarkerName, SampleName, geno, prob. If FALSE they will be MarkerName, SampleName, X, Y, R, and ratio.
 #'
 #' @import tidyr
 #' @import vcfR
 #'
 #' @export
-qploidy_read_vcf <- function(vcf_file) {
+qploidy_read_vcf <- function(vcf_file, geno = FALSE) {
 
   vcf <- read.vcfR(vcf_file)
 
-  DP <- extract.gt(vcf, "AD")
+  if(!geno){
+    DP <- extract.gt(vcf, "AD")
 
-  mknames <- pivot_longer(data.frame(mks = rownames(DP), DP), cols = 2:(ncol(DP)+1))
+    mknames <- pivot_longer(data.frame(mks = rownames(DP), DP), cols = 2:(ncol(DP)+1))
 
-  dp_split <- strsplit(mknames$value, ",")
+    dp_split <- strsplit(mknames$value, ",")
 
-  # remove markers without two alleles
-  dp_split_filt <- lapply(dp_split, function(x){
-    if(length(x) != 2) return(c(NA,NA)) else return(x)
-  })
+    # remove markers without two alleles
+    dp_split_filt <- lapply(dp_split, function(x){
+      if(length(x) != 2) return(c(NA,NA)) else return(x)
+    })
 
-  ref <- as.numeric(sapply(dp_split_filt, "[[", 1))
-  alt <- as.numeric(sapply(dp_split_filt, "[[", 2))
+    ref <- as.numeric(sapply(dp_split_filt, "[[", 1))
+    alt <- as.numeric(sapply(dp_split_filt, "[[", 2))
 
-  data_qploidy <- data.frame(MarkerName = mknames$mks,
-                             SampleName = mknames$name,
-                             X= ref,
-                             Y= alt,
-                             R = alt+ref,
-                             ratio = alt/(ref+alt))
+    data_qploidy <- data.frame(MarkerName = mknames$mks,
+                               SampleName = mknames$name,
+                               X= ref,
+                               Y= alt,
+                               R = alt+ref,
+                               ratio = alt/(ref+alt))
+  } else {
+    GT <- extract.gt(vcf, "GT")
+    GT <- pivot_longer(data.frame(mks = rownames(GT), GT), cols = 2:(ncol(GT)+1))
+    GT$value <- stringr::str_count(GT$value, "1")
+    colnames(GT) <- c("MarkerName","SampleName","geno")
+
+    prob <- extract.gt(vcf, "MPP")
+    prob <- pivot_longer(data.frame(mks = rownames(prob), prob), cols = 2:(ncol(prob)+1))
+    colnames(prob) <- c("MarkerName","SampleName","prob")
+
+    data_qploidy <- merge.data.frame(GT, prob, by = c("MarkerName", "SampleName"))
+    data_qploidy$prob <- as.numeric(data_qploidy$prob)
+
+
+  }
 
   return(data_qploidy)
 }

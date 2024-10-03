@@ -20,7 +20,7 @@ updog_centers <- function(multidog_obj, threshold.n.clusters=2, rm.mks){
 
   result <- list()
   for(i in 1:length(bias)){
-    centers_theta <- updog:::xi_fun(p = (0:ploidy[i])/ploidy[i], eps = seq[i], h = bias[i])
+    #centers_theta <- updog:::xi_fun(p = (0:ploidy[i])/ploidy[i], eps = seq[i], h = bias[i])
 
     result[[i]] <- list(rm = if(n.clusters.df[i,]$n.clusters >= threshold.n.clusters) 0 else 1,
                         centers_theta = sort(1 - centers_theta),
@@ -82,6 +82,7 @@ get_baf_par <- function(par_all_item, ploidy=2){
 #' @param n.clusters.thr minimum number of clusters required. If clusters < ploidy + 1, the missing clusters will be imputed
 #' @param type if array alleles intensities data "intensities", if read counts data "counts"
 #' @param rm_outlier if TRUE, it remove the outlier markers before defining the cluster centers
+#' @param cluster_median if TRUE use median to define the cluster centroids
 #'
 #' @import tidyr
 #' @import dplyr
@@ -177,8 +178,6 @@ get_centers <- function(ratio_geno,
 #'
 #' @param geno.pos data.frame with columns: 1) MarkerName: markers IDs; 2) Chromosome: chromosome where the marker is located; 3) Position: position on the chromosome the marker is located (bp).
 #'
-#' @param zscore_file_name zscore output filename
-#'
 #' @import tidyr
 #' @import dplyr
 #'
@@ -204,7 +203,9 @@ get_zscore <- function(data = NULL,
 
 
 ##' Identify outliers using Bonferroni-Holm tests for the adjusted p-values and remove them from the input vector
-##' @param resid residuals (e.g. lm.object$residuals)
+##'
+##' @param plot_data_split_one todo
+##' @param alpha todo
 ##'
 ##' @import multtest
 ##'
@@ -267,7 +268,9 @@ rm_outlier <- function(plot_data_split_one, alpha=0.05){
 #' @param type method to determine the clusters centers for each marker. It can be "intensities" if array data, "counts" if sequencing data or "updog" if multidog object is provided in multidog_obj argument
 #' @param multidog_obj object of class multidog from updog package analysis
 #' @param out_filename output file name
-#'
+#' @param parallel.type FORK or PSOCK
+#' @param rm_outlier if TRUE remove outliers while standardizing
+#' @param cluster_median if TRUE use median to define the cluster centroids
 #' @param verbose If TRUE display informative messages
 #'
 #' @import dplyr
@@ -489,7 +492,7 @@ standardize <- function(data = NULL,
 #' Print method for object of class 'qploidy_standardization'
 #'
 #' @param x object of class 'qploidy_standardization'
-#' @param ...
+#' @param ... print parameters
 #'
 #' @return printed information about Qploidy standardization process
 #'
@@ -555,6 +558,13 @@ print.qploidy_standardization <- function(x, ...){
 #'             "BAF_hist" is the histogram of standardized ratios. "BAF_hist_overall" add the histogram including all markers.
 #' @param window_size genomic position window to calculate the number of heterozygous locus
 #' @param het_interval interval to be considered as heterozygous (heterozygous ratio > 1 - het_interval and heterozygous ratio < 0 + het_interval)
+#' @param chr chromosome index to be plotted
+#' @param dot.size dot size
+#' @param centromeres centromeres position for each chromosome
+#' @param add_centromeres if TRUE add a vertical line at the centromere position
+#' @param rm_homozygous if TRUE remove the homozygous for the BAF histogram plots
+#'
+#' @param ... plot parameters
 #'
 #' @importFrom ggpubr ggarrange annotate_figure text_grob
 #' @import dplyr
@@ -580,7 +590,7 @@ plot.qploidy_standardization <- function(x,
                                          colors = FALSE,
                                          window_size = 2000000,
                                          het_interval = 0.1,
-                                         rm_homozygous = FALSE){
+                                         rm_homozygous = FALSE, ...){
 
   if(!inherits(x, "qploidy_standardization")) stop("Object is not of class qploidy_standardization")
 

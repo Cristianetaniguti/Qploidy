@@ -381,8 +381,7 @@ make_action_button <- function(tag, inputId = NULL) {
 #' #' @rdname includeRMarkdown
 #' #' @export
 #' #'
-#' #' @importFrom rmarkdown render
-#' #' @importFrom markdown markdownToHTML
+#' #' @importFrom rmarkdown render markdownToHTML
 #' #' @importFrom shiny HTML
 #' includeRMarkdown <- function(path){
 #'
@@ -390,14 +389,14 @@ make_action_button <- function(tag, inputId = NULL) {
 #'
 #'   on.exit(unlink(md),add = TRUE)
 #'
-#'   rmarkdown::render(
+#'   render(
 #'     path,
 #'     output_format = 'md_document',
 #'     output_dir = tempdir(),
 #'     output_file = md,quiet = TRUE
 #'     )
 #'
-#'   html <- markdown::markdownToHTML(md, fragment.only = TRUE)
+#'   html <- markdownToHTML(md, fragment.only = TRUE)
 #'
 #'   Encoding(html) <- "UTF-8"
 #'

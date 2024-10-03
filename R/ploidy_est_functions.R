@@ -58,8 +58,8 @@ area_estimate_ploidy <- function(qploidy_standardization = NULL,
           by_chr[[i]] <- list(by_chr[[i]])
           names(by_chr[[i]]) <- unique(by_chr[[i]][[1]]$Chr)
         }
-      } 
-      
+      }
+
       by_chr <- unlist(by_chr, recursive = F)
     }
   } else if(level == "sample"){
@@ -224,6 +224,7 @@ merge_arms_format <- function(x, filter_diff = NULL){
 #' print qploidy_area_ploidy_estimation object
 #'
 #' @param x qploidy_area_ploidy_estimation object
+#' @param ... print parameters
 #'
 #' @method print qploidy_area_ploidy_estimation
 #'

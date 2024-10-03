@@ -8,6 +8,8 @@
 }
 \arguments{
 \item{x}{qploidy_area_ploidy_estimation object}
+
+\item{...}{print parameters}
 }
 \description{
 print qploidy_area_ploidy_estimation object

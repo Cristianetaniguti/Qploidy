@@ -12,6 +12,8 @@ plot_check(data_qploidy, R_lim = NULL, n = 3000)
 \item{data_qploidy}{data.frame input for Qploidy}
 
 \item{R_lim}{limit the sum of intensities/depth axis to adjust the dimentions in case there are outliers}
+
+\item{n}{subset size}
 }
 \description{
 3D plot to check raw data allele intensities (if array) or depth (if sequencing) data properties

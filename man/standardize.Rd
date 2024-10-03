@@ -45,7 +45,13 @@ standardize(
 
 \item{multidog_obj}{object of class multidog from updog package analysis}
 
+\item{parallel.type}{FORK or PSOCK}
+
 \item{verbose}{If TRUE display informative messages}
+
+\item{rm_outlier}{if TRUE remove outliers while standardizing}
+
+\item{cluster_median}{if TRUE use median to define the cluster centroids}
 }
 \description{
 Performs standardization and returns BAF and z score

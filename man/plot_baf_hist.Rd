@@ -11,7 +11,8 @@ plot_baf_hist(
   colors = FALSE,
   add_estimated_peaks = TRUE,
   add_expected_peaks = FALSE,
-  BAF_hist_overall = TRUE,
+  BAF_hist_overall = FALSE,
+  ratio = FALSE,
   rm_homozygous = FALSE
 )
 }
@@ -29,6 +30,10 @@ plot_baf_hist(
 \item{add_expected_peaks}{add estimated peaks}
 
 \item{BAF_hist_overall}{if TRUE it plots the BAF histogram for entire genome}
+
+\item{ratio}{if TRUE plot the raw ratio}
+
+\item{rm_homozygous}{if TRUE removes the homozygous calls}
 }
 \description{
 Plot BAF histogram

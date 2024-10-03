@@ -4,7 +4,7 @@ globalVariables(c("ind", "zscore", "chr"))
 
 #' convert vcf file to Qploidy data
 #'
-#' @param vcf path to vcf file
+#' @param vcf_file path to vcf file
 #' @param geno if TRUE, output columns will be MarkerName, SampleName, geno, prob. If FALSE they will be MarkerName, SampleName, X, Y, R, and ratio.
 #'
 #' @import tidyr

@@ -7,7 +7,9 @@
 rm_outlier(plot_data_split_one, alpha = 0.05)
 }
 \arguments{
-\item{resid}{residuals (e.g. lm.object$residuals)}
+\item{plot_data_split_one}{todo}
+
+\item{alpha}{todo}
 }
 \description{
 Identify outliers using Bonferroni-Holm tests for the adjusted p-values and remove them from the input vector

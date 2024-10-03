@@ -97,6 +97,8 @@ plot_baf <- function(data_sample,
 #' @param add_expected_peaks add estimated peaks
 #' @param colors add area colors
 #' @param BAF_hist_overall if TRUE it plots the BAF histogram for entire genome
+#' @param ratio if TRUE plot the raw ratio
+#' @param rm_homozygous if TRUE removes the homozygous calls
 #'
 #' @export
 plot_baf_hist <- function(data_sample,
@@ -231,6 +233,7 @@ plot_baf_hist <- function(data_sample,
 #'
 #' @param data_qploidy data.frame input for Qploidy
 #' @param R_lim limit the sum of intensities/depth axis to adjust the dimentions in case there are outliers
+#' @param n subset size
 #'
 #' @importFrom plotly plot_ly layout
 #' @import tidyr

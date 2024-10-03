@@ -23,6 +23,8 @@ get_centers(
 \item{type}{if array alleles intensities data "intensities", if read counts data "counts"}
 
 \item{rm_outlier}{if TRUE, it remove the outlier markers before defining the cluster centers}
+
+\item{cluster_median}{if TRUE use median to define the cluster centroids}
 }
 \description{
 Define cluster centers

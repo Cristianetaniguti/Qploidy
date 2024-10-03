@@ -8,7 +8,8 @@
   x,
   sample = NULL,
   chr = NULL,
-  type = c("all", "het", "BAF", "zscore", "BAF_hist", "BAF_hist_overall"),
+  type = c("all", "het", "BAF", "zscore", "BAF_hist", "BAF_hist_overall",
+    "Ratio_hist_overall"),
   area_single = 0.75,
   ploidy = 4,
   dot.size = 1,
@@ -19,13 +20,16 @@
   colors = FALSE,
   window_size = 2e+06,
   het_interval = 0.1,
-  rm_homozygous = FALSE
+  rm_homozygous = FALSE,
+  ...
 )
 }
 \arguments{
 \item{x}{object of class 'qploidy_standardization'}
 
 \item{sample}{character indicating sample ID}
+
+\item{chr}{chromosome index to be plotted}
 
 \item{type}{character defining the graphic type. "all" plots all graphics,
 it is equivalent to "het","ratio","BAF","zscore","BAF_hist", "BAF_hist_overall".
@@ -38,15 +42,25 @@ it is equivalent to "het","ratio","BAF","zscore","BAF_hist", "BAF_hist_overall".
 
 \item{ploidy}{expected ploidy}
 
+\item{dot.size}{dot size}
+
 \item{add_estimated_peaks}{add expected peaks lines}
 
 \item{add_expected_peaks}{add estimated peaks}
+
+\item{centromeres}{centromeres position for each chromosome}
+
+\item{add_centromeres}{if TRUE add a vertical line at the centromere position}
 
 \item{colors}{add area colors}
 
 \item{window_size}{genomic position window to calculate the number of heterozygous locus}
 
 \item{het_interval}{interval to be considered as heterozygous (heterozygous ratio > 1 - het_interval and heterozygous ratio < 0 + het_interval)}
+
+\item{rm_homozygous}{if TRUE remove the homozygous for the BAF histogram plots}
+
+\item{...}{plot parameters}
 }
 \value{
 printed information about Qploidy standardization process

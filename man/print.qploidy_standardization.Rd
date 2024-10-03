@@ -9,7 +9,7 @@
 \arguments{
 \item{x}{object of class 'qploidy_standardization'}
 
-\item{...}{}
+\item{...}{print parameters}
 }
 \value{
 printed information about Qploidy standardization process

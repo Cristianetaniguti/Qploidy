@@ -39,7 +39,8 @@ Imports:
     plotly,
     vcfR,
     emmeans,
-    lme4
+    lme4,
+    stringr
 Encoding: UTF-8
 LazyData: true
 RoxygenNote: 7.3.2

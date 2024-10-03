@@ -4,7 +4,7 @@
 #'     DO NOT REMOVE.
 #'
 #' @import shiny
-#' @import shinythemes
+#' @importFrom shinythemes shinytheme
 #' @import shinyWidgets
 #' @import shinydashboard
 #' @import ggplot2
@@ -94,7 +94,7 @@ app_ui <- function(request) {
                                   '.navbar-default .navbar-nav>.active>a {background-color: #22284c;}'))),
         # Your application UI logic
         navbarPage("Qploidy",
-                   theme = shinythemes::shinytheme("flatly"),
+                   theme = shinytheme("flatly"),
                    tabPanel("About", value = "about",
                             includeMarkdown(system.file("about.Rmd", package = "Qploidy")),
                    ),
@@ -130,7 +130,6 @@ golem_add_external_resources <- function() {
       path = app_sys("app/www"),
       app_title = "Qploidy"
     )
-    # Add here other external resources
-    # for example, you can add shinyalert::useShinyalert()
+
   )
 }

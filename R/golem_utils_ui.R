@@ -368,37 +368,3 @@ make_action_button <- function(tag, inputId = NULL) {
 }
 
 
-# UNCOMMENT AND USE
-#
-# attachment::att_amend_desc()
-#
-# To use this part of the UI
-#
-#' #' Include Content From a File
-#' #'
-#' #' Load rendered RMarkdown from a file and turn into HTML.
-#' #'
-#' #' @rdname includeRMarkdown
-#' #' @export
-#' #'
-#' #' @importFrom rmarkdown render markdownToHTML
-#' #' @importFrom shiny HTML
-#' includeRMarkdown <- function(path){
-#'
-#'   md <- tempfile(fileext = '.md')
-#'
-#'   on.exit(unlink(md),add = TRUE)
-#'
-#'   render(
-#'     path,
-#'     output_format = 'md_document',
-#'     output_dir = tempdir(),
-#'     output_file = md,quiet = TRUE
-#'     )
-#'
-#'   html <- markdownToHTML(md, fragment.only = TRUE)
-#'
-#'   Encoding(html) <- "UTF-8"
-#'
-#'   return(HTML(html))
-#' }

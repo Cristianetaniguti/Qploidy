@@ -13,7 +13,8 @@ plot_baf_hist(
   add_expected_peaks = FALSE,
   BAF_hist_overall = FALSE,
   ratio = FALSE,
-  rm_homozygous = FALSE
+  rm_homozygous = FALSE,
+  font_size = 12
 )
 }
 \arguments{
@@ -34,6 +35,8 @@ plot_baf_hist(
 \item{ratio}{if TRUE plot the raw ratio}
 
 \item{rm_homozygous}{if TRUE removes the homozygous calls}
+
+\item{font_size}{graphic labels font size}
 }
 \description{
 Plot BAF histogram

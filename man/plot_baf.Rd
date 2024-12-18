@@ -13,7 +13,8 @@ plot_baf(
   add_expected_peaks = FALSE,
   centromeres = NULL,
   add_centromeres = FALSE,
-  colors = FALSE
+  colors = FALSE,
+  font_size = 12
 )
 }
 \arguments{
@@ -34,6 +35,8 @@ plot_baf(
 \item{add_centromeres}{logical defining if centromeres positions will be displayed}
 
 \item{colors}{add area colors}
+
+\item{font_size}{graphic labels font size}
 }
 \description{
 Plot BAF

@@ -4,12 +4,14 @@
 \alias{qploidy_read_vcf}
 \title{convert vcf file to Qploidy data}
 \usage{
-qploidy_read_vcf(vcf_file, geno = FALSE)
+qploidy_read_vcf(vcf_file, geno = FALSE, geno.pos = FALSE)
 }
 \arguments{
 \item{vcf_file}{path to vcf file}
 
 \item{geno}{if TRUE, output columns will be MarkerName, SampleName, geno, prob. If FALSE they will be MarkerName, SampleName, X, Y, R, and ratio.}
+
+\item{geno.pos}{if TRUE output MarkerName Chromosome and Position columns}
 }
 \description{
 convert vcf file to Qploidy data

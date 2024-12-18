@@ -9,6 +9,7 @@
 #' @param colors add area colors
 #' @param centromeres vector defining centromeres positions
 #' @param add_centromeres logical defining if centromeres positions will be displayed
+#' @param font_size graphic labels font size
 #'
 #' @import ggplot2
 #' @import tidyr
@@ -22,7 +23,8 @@ plot_baf <- function(data_sample,
                      add_expected_peaks = FALSE,
                      centromeres = NULL,
                      add_centromeres = FALSE,
-                     colors = FALSE){
+                     colors = FALSE,
+                     font_size = 12){
 
   if(add_centromeres){
     #centromeres <- c("1 = 49130338, 5 = 49834357")
@@ -80,7 +82,7 @@ plot_baf <- function(data_sample,
                                       color = "red")} +
     ylab("BAF") +
     theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
-          legend.position="none") +
+          legend.position="none", text = element_text(size = font_size)) +
     {if(add_centromeres) geom_vline(data = centromeres_df,
                                     aes(xintercept= as.numeric(value)),
                                     color = "blue",
@@ -99,6 +101,7 @@ plot_baf <- function(data_sample,
 #' @param BAF_hist_overall if TRUE it plots the BAF histogram for entire genome
 #' @param ratio if TRUE plot the raw ratio
 #' @param rm_homozygous if TRUE removes the homozygous calls
+#' @param font_size graphic labels font size
 #'
 #' @export
 plot_baf_hist <- function(data_sample,
@@ -109,7 +112,8 @@ plot_baf_hist <- function(data_sample,
                           add_expected_peaks = FALSE,
                           BAF_hist_overall = FALSE,
                           ratio = FALSE,
-                          rm_homozygous = FALSE){
+                          rm_homozygous = FALSE,
+                          font_size = 12){
 
   if(add_estimated_peaks | add_expected_peaks | colors){
     if(length(ploidy) == 1) {
@@ -187,7 +191,7 @@ plot_baf_hist <- function(data_sample,
       scale_alpha(range = c(0.7, 1), guide="none") +
       facet_grid(~ Chr, scales = "free_x") + theme_bw() +  xlab("BAF") +
       theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
-            legend.position="bottom") +
+            legend.position="bottom", text = element_text(size = font_size)) +
       {if(add_expected_peaks | add_estimated_peaks) labs(color= "Peaks")} +
       {if(colors) labs(fill= "Area")}
 
@@ -216,7 +220,7 @@ plot_baf_hist <- function(data_sample,
       scale_alpha(range = c(0.7, 1), guide="none") +
       theme_bw() +  {if(ratio) xlab("ratio") else xlab("BAF")} +
       theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
-            legend.position="bottom") +
+            legend.position="bottom", text = element_text(size = font_size)) +
       {if(add_expected_peaks | add_estimated_peaks) labs(color= "Peaks")} +
       {if(colors) labs(fill= "Area")}
 
@@ -234,6 +238,7 @@ plot_baf_hist <- function(data_sample,
 #' @param data_qploidy data.frame input for Qploidy
 #' @param R_lim limit the sum of intensities/depth axis to adjust the dimentions in case there are outliers
 #' @param n subset size
+#'
 #'
 #' @importFrom plotly plot_ly layout
 #' @import tidyr
@@ -266,4 +271,211 @@ plot_check <- function(data_qploidy, R_lim = NULL, n = 3000){
   p <- plot_ly(z=plot_df, type="surface") %>%
     layout(scene = list(xaxis=axx,yaxis=axy,zaxis=axz))
   return(p)
+}
+
+#' Plot method for object of class 'qploidy_standardization'
+#'
+#' @param x object of class 'qploidy_standardization'
+#' @param sample character indicating sample ID
+#' @param area_single area around the expected peak to be considered
+#' @param ploidy expected ploidy
+#' @param add_estimated_peaks add expected peaks lines
+#' @param add_expected_peaks add estimated peaks
+#' @param colors add area colors
+#' @param type character defining the graphic type. "all" plots all graphics,
+#'             it is equivalent to "het","ratio","BAF","zscore","BAF_hist", "BAF_hist_overall".
+#'             "het" plots the heterozygous locus counts inside genomic positions window defined in 'window_size'.
+#'             "ratio" plots raw Y/(X+Y) or alternative count/(alternative counts + reference counts).
+#'             "BAF" plots standardized ratios. "zscore" is the smoothed conditional means curve of standardized sum of intensities/counts.
+#'             "BAF_hist" is the histogram of standardized ratios. "BAF_hist_overall" add the histogram including all markers.
+#' @param window_size genomic position window to calculate the number of heterozygous locus
+#' @param het_interval interval to be considered as heterozygous (heterozygous ratio > 1 - het_interval and heterozygous ratio < 0 + het_interval)
+#' @param chr chromosome index to be plotted
+#' @param dot.size dot size
+#' @param centromeres centromeres position for each chromosome
+#' @param add_centromeres if TRUE add a vertical line at the centromere position
+#' @param rm_homozygous if TRUE remove the homozygous for the BAF histogram plots
+#' @param font_size graphic labels font size
+#'
+#' @param ... plot parameters
+#'
+#' @importFrom ggpubr ggarrange annotate_figure text_grob
+#' @import dplyr
+#' @import tidyr
+#' @import ggplot2
+#'
+#' @return printed information about Qploidy standardization process
+#'
+#'
+#' @export
+plot_qploidy_standardization <- function(x,
+                                         sample = NULL,
+                                         chr = NULL,
+                                         type = c("all", "het", "BAF","zscore","BAF_hist", "BAF_hist_overall", "Ratio_hist_overall"),
+                                         area_single = 0.75,
+                                         ploidy = 4,
+                                         dot.size = 1,
+                                         font_size = 12,
+                                         add_estimated_peaks = FALSE,
+                                         add_expected_peaks = FALSE,
+                                         centromeres = NULL,
+                                         add_centromeres = FALSE,
+                                         colors = FALSE,
+                                         window_size = 2000000,
+                                         het_interval = 0.1,
+                                         rm_homozygous = FALSE, ...){
+
+  if(!inherits(x, "qploidy_standardization")) stop("Object is not of class qploidy_standardization")
+
+  if(is.null(sample)) stop("Define sample ID")
+
+  data_sample <- x$data[which(x$data$SampleName == sample),]
+
+  if(is.numeric(chr)) chr <- sort(unique(data_sample$Chr))[chr] else if(is.null(chr)) chr <- sort(unique(data_sample$Chr))
+
+  data_sample <- data_sample %>% filter(Chr %in% chr) %>% select(MarkerName, SampleName, Chr, Position, baf, z, ratio)
+
+  if(nrow(data_sample) == 0) stop("Sample or chromosome not found.")
+
+  baf_sample <- data_sample %>% pivot_wider(names_from = SampleName, values_from = baf)
+  zscore_sample <- data_sample %>% pivot_wider(names_from = SampleName, values_from = z)
+
+  colnames(baf_sample)[ncol(baf_sample)] <-  "sample"
+
+  baf_point <- baf_hist <- p_z <- raw_ratio <- het_rate <- baf_hist_overall <- ratio_hist_overall <- NULL
+
+  if(any(type == "all" | type == "BAF")){
+    baf_point <- plot_baf(baf_sample,
+                          area_single,
+                          ploidy,
+                          dot.size = dot.size,
+                          add_estimated_peaks,
+                          add_expected_peaks,
+                          centromeres,
+                          add_centromeres,
+                          colors,
+                          font_size = font_size)
+  }
+
+  if(add_centromeres){
+    #centromeres <- c("1 = 49130338, 5 = 49834357")
+    if(length(centromeres) == 1 & any(grepl(",", centromeres))){
+      centromeres <- gsub("\ ", "", centromeres)
+      centromeres <- unlist(strsplit(centromeres, ","))
+      centromeres <- sapply(centromeres, function(x) strsplit(x, "="))
+      centromeres_df <- data.frame(Chr = sapply(centromeres, "[[", 1), value = sapply(centromeres, "[[", 2))
+    } else {
+      centromeres_df <- data.frame(Chr = names(centromeres), value = centromeres)
+    }
+
+    for(i in 1:length(centromeres)){
+      idx <- which(baf_sample$Chr == centromeres_df$Chr[i] & baf_sample$Position < centromeres_df$value[i])
+      baf_sample$Chr[idx] <- paste0(baf_sample$Chr[idx], ".1")
+      idx <- which(baf_sample$Chr == centromeres_df$Chr[i] & baf_sample$Position >= centromeres_df$value[i])
+      baf_sample$Chr[idx] <- paste0(baf_sample$Chr[idx], ".2")
+      if(any(type == "zscore")){
+        idx <- which(zscore_sample$Chr == centromeres_df$Chr[i] & zscore_sample$Position < centromeres_df$value[i])
+        zscore_sample$Chr[idx] <- paste0(zscore_sample$Chr[idx], ".1")
+        idx <- which(zscore_sample$Chr == centromeres_df$Chr[i] & zscore_sample$Position >= centromeres_df$value[i])
+        zscore_sample$Chr[idx] <- paste0(zscore_sample$Chr[idx], ".2")
+      }
+    }
+  }
+
+  if(any(type == "all" | type == "BAF_hist")){
+    baf_hist <- plot_baf_hist(data_sample = baf_sample,
+                              area_single,
+                              ploidy,
+                              colors,
+                              add_estimated_peaks,
+                              add_expected_peaks,
+                              BAF_hist_overall = FALSE,
+                              rm_homozygous = rm_homozygous,
+                              font_size = font_size)
+  }
+
+  if(any(type == "all" | type == "BAF_hist_overall")){
+    baf_hist_overall <- plot_baf_hist(data_sample = baf_sample,
+                                      area_single,
+                                      ploidy,
+                                      colors,
+                                      add_estimated_peaks,
+                                      add_expected_peaks,
+                                      BAF_hist_overall = TRUE,
+                                      rm_homozygous = rm_homozygous,
+                                      font_size = font_size)
+  }
+
+  if(any(type == "all" | type == "Ratio_hist_overall")){
+    ratio_hist_overall <- plot_baf_hist(data_sample = baf_sample,
+                                        area_single,
+                                        ploidy,
+                                        colors,
+                                        add_estimated_peaks,
+                                        add_expected_peaks,
+                                        BAF_hist_overall = TRUE,
+                                        ratio = TRUE,
+                                        rm_homozygous = rm_homozygous,
+                                        font_size = font_size)
+  }
+
+  if(any(type == "zscore")){
+    colnames(zscore_sample)[ncol(zscore_sample)] <- "z"
+    p_z <- zscore_sample  %>%
+      ggplot(aes(x = Position , y = z)) +
+      facet_grid(.~Chr, scales = "free") +
+      geom_smooth(method = "gam") +
+      theme_bw() + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+                         text = element_text(size = font_size)) +
+      geom_hline(yintercept=median(zscore_sample$z), linetype="dashed")
+
+  }
+
+  if(any(type == "ratio")){
+    raw_ratio <- data_sample %>%  ggplot(aes(x = Position, y = ratio)) + geom_point(alpha =0.7, size=dot.size) +
+      facet_grid(.~Chr, scales = "free") + theme_bw() +
+      theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+            text = element_text(size = font_size))
+  }
+
+  if(any(type == "het")){
+    data_sample$het_rate <- NA
+    data_sample$het_rate[which(data_sample$ratio <= 0+het_interval | data_sample$ratio >= 1 - het_interval)] <- 0
+    data_sample$het_rate[which(data_sample$ratio > 0+het_interval & data_sample$ratio < 1 - het_interval)] <- 1
+
+    data_sample_lst <- split.data.frame(data_sample, data_sample$Chr)
+
+    for(j in 1:length(data_sample_lst)){
+      data_sample_lst[[j]]$window <- 1
+      if(length(unique(data_sample_lst[[j]]$Position)) == 1) next()
+      intervals_start <- c(seq(1,max(data_sample_lst[[j]]$Position), window_size))
+      intervals_end <- c(seq(1,max(data_sample_lst[[j]]$Position), window_size) - 1, max(data_sample_lst[[j]]$Position))
+      intervals_end <- intervals_end[-1]
+      for(i in 1:length(intervals_start)){
+        data_sample_lst[[j]]$window[which(data_sample_lst[[j]]$Position >= intervals_start[i] & data_sample_lst[[j]]$Position <= intervals_end[i])] <- intervals_start[i]
+      }
+    }
+
+    data_sample <- do.call(rbind, data_sample_lst)
+
+    het_rate <- data_sample %>%
+      group_by(Chr, window) %>%
+      summarise(prop_het = sum(het_rate, na.rm = TRUE)/length(which(het_rate == 1 | het_rate == 0))) %>%
+      ggplot(aes(x = window, y = prop_het, color = prop_het)) + geom_line() +
+      scale_color_gradient(low = "black", high = "red") +
+      facet_grid(.~Chr, scales = "free") + theme_bw() + ylab("proportion of heterozygous loci") + xlab("Position")+
+      theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+            legend.position = "none", text = element_text(size = font_size))
+  }
+
+  p_all <- list(het_rate, raw_ratio, baf_point, baf_hist,baf_hist_overall, ratio_hist_overall, p_z)
+
+  rm <- which(sapply(p_all, is.null))
+  if(length(rm) != 0) p_all <- p_all[-rm]
+
+  p_result <- ggarrange(plotlist = p_all, ncol = 1)
+
+  p_result <- annotate_figure(p_result, top = text_grob(sample, face = "bold", size = 14))
+
+  return(p_result)
 }

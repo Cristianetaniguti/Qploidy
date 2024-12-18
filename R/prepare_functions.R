@@ -6,16 +6,17 @@ globalVariables(c("ind", "zscore", "chr"))
 #'
 #' @param vcf_file path to vcf file
 #' @param geno if TRUE, output columns will be MarkerName, SampleName, geno, prob. If FALSE they will be MarkerName, SampleName, X, Y, R, and ratio.
+#' @param geno.pos if TRUE output MarkerName Chromosome and Position columns
 #'
 #' @import tidyr
 #' @import vcfR
 #'
 #' @export
-qploidy_read_vcf <- function(vcf_file, geno = FALSE) {
+qploidy_read_vcf <- function(vcf_file, geno = FALSE, geno.pos = FALSE) {
 
   vcf <- read.vcfR(vcf_file)
 
-  if(!geno){
+  if(!(geno | geno.pos)){
     DP <- extract.gt(vcf, "AD")
 
     mknames <- pivot_longer(data.frame(mks = rownames(DP), DP), cols = 2:(ncol(DP)+1))
@@ -36,7 +37,7 @@ qploidy_read_vcf <- function(vcf_file, geno = FALSE) {
                                Y= alt,
                                R = alt+ref,
                                ratio = alt/(ref+alt))
-  } else {
+  } else if(geno){
     GT <- extract.gt(vcf, "GT")
     GT <- pivot_longer(data.frame(mks = rownames(GT), GT), cols = 2:(ncol(GT)+1))
     GT$value <- stringr::str_count(GT$value, "1")
@@ -48,6 +49,12 @@ qploidy_read_vcf <- function(vcf_file, geno = FALSE) {
 
     data_qploidy <- merge.data.frame(GT, prob, by = c("MarkerName", "SampleName"))
     data_qploidy$prob <- as.numeric(data_qploidy$prob)
+
+
+  } else if(geno.pos){
+    data_qploidy <- data.frame("MarkerName" = vcf@fix[,3],
+                               "Chromosome" = vcf@fix[,1],
+                               "Position" = vcf@fix[,2])
 
 
   }

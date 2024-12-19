@@ -3,5 +3,4 @@
 .Rdata
 .httr-oauth
 .DS_Store
-inst/*texas.txt
 Qploidy.Rproj

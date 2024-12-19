@@ -10,28 +10,150 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+This vignette describes how to use `Qploidy` to estimate ploidy using SNP marker data. For more details in `Qploidy` methodology, please check its [publication]().
 
-## Installation
+`Qploidy` methodology will work if:
+
+* Your marker data is from Axiom or Illumina array data
+* Your marker data is from target sequencing data (e.g. DArTag, GTseq, AgriSeq)
+* All DNA samples library were prepared following the same protocol
+* You know the ploidy of a subset of at least 60 samples or if you know which is the most common ploidy overall
+* You have heterozygous samples
+
+`Qploidy` methodology won't work if:
+
+* You marker data is from RADseq/GBS
+* You want to combine datasets from different batches of sequencing. 
+For example, you extracted DNA and sequenced two plates (total of 192 samples) as one batch and after, you prepared the library and sequenced more three plates with more 288 samples. You have a total of 480 samples but you must process the two batches (with 192 and 288 samples) separately in `Qploidy`. 
+* You don't have a subset with known ploidy or a predominant ploidy in your population
+* You have inbred line samples  
+
+# Installation
 
 ```{r}
 #install.packages("devtools")
 devtools::install_github("cristianetaniguti/Qploidy")
+
+library(Qploidy)
 ```
 
-## Prepare input files
+# Prepare input files
 
-### VCF file as input
+## From Axiom array summary file
 
-Read file
+* How to get the summary file
 
 ```{r}
-vcf_file <- "data/rose_texas/GBS/MBxGV_NgoMIV_tassel_vcf_norm.vcf.gz"
-data <- qploidy_read_vcf(vcf_file)
+data <- read_axiom("Qploidy_AxiomGT1_summary.txt")
 head(data)
 ```
 
+About this dataset: This is Axiom array sequenced collection of 524 garden roses cultivars. We have a total of 137.786 markers. See more details in [this publication]().
+
+## From Illumina array 
+
+```{r, eval=FALSE}
+data <- read_illumina_array("data/illumina/Set1.txt", # This is a example code, data not available
+                            "data/illumina/Set2.txt",
+                            "data/illumina/Set3.txt")
+head(input_data)
+```
+
+```
+MarkerName     SampleName     X     Y     R     ratio
+1        CT1         S1-2_1 0.023 0.009 0.032 0.2812500
+2       CT10         S1-2_1 0.006 0.000 0.006 0.0000000
+3      CT100         S1-2_1 0.030 0.020 0.050 0.4000000
+4      CT101         S1-2_1 0.026 0.010 0.036 0.2777778
+5      CT103         S1-2_1 0.019 0.000 0.019 0.0000000
+6      CT104         S1-2_1 0.041 0.012 0.053 0.2264151
+```
+
+## From target sequencing VCF file
+
+```{r, eval=FALSE}
+data <- qploidy_read_vcf("my_file.vcf") # This is a example code, data not available
+head(data)
+
+```
+
+# Define reference samples
+
+`Qploidy` apply a standardization method to allele intensities/read counts to allow comparison of copy number across the genome of a sample. For that, it needs to use some samples as reference. There are two ways of selecting the reference samples:
+
+* 1) If you have a subset of samples with known ploidy, `Qploidy` will use it as reference. 
+* 2) If you know which is the most common ploidy among your samples, you can run `Qploidy` using all samples as reference at first, identify the samples with that reference ploidy and select the subset for a second round of `Qploidy` run. 
+
+Bellow you can find how to proceed for both cases  with path tagged as (1) and (2):
+
+## (1) Using a subset with known ploidy
+
+In this case, you will need to separate your subset with known ploidy samples:
+
 ```{r}
-ref <- pivot_wider(data[,1:3], names_from = SampleName, values_from = X)
+tetraploids_subset <- c()
+data_reference <- data[which(data$SampleName %in% tetraploids_subset),]
+```
+
+## (2) Using the most common ploidy 
+
+In this case, you will use the entire dataset as reference in a first round of the `Qploidy` run:
+
+```{r}
+data_reference <- data
+```
+
+## (1) and (2) Run dosage caller
+
+We will have to know the dosage for all reference samples. If you still don't have it, you can run any dosage caller for that. If it is an array data, we suggest using [`fitpoly`]() package. If it is sequencing data, we suggest using [`updog`]() or [`polyRAD`]() packages. Notice that these packages identify the dosages by evaluating all samples allele intensities/read counts distribution by marker considering a informed ploidy model. You will use the most common ploidy in your population or the known ploidy in your selected subset as the informed ploidy. If you are provinding the most common ploidy (path (2)), the samples with different ploidy will receive wrong dosages, but we will be able to filter them out in the next step.
+
+**Warning**: Depending on the number of samples and markers, this step can take some time to run. It is better to be performed in a high-performance computing system where you can use multiple cores and you will not have issues with excess usage of RAM memory.
+
+### Array data
+
+```{r, eval=FALSE}
+library(fitPoly)
+saveMarkerModels(ploidy=4,                                # Most common ploidy among Texas Garden Roses collection
+                 data=data_reference,                               # output of the previous function
+                 filePrefix="fitpoly_output/texas_roses", # Define the path and prefix for the result files
+                 ncores=8)                                # Change it accordingly to your system!!!!
+
+fitpoly_scores <- vroom("fitpoly_output/texas_roses_scores.dat")
+
+genos <- data.frame(MarkerName = fitpoly_scores$MarkerName, 
+                    SampleName = fitpoly_scores$SampleName, 
+                    geno = fitpoly_scores$geno,
+                    prob = fitpoly_scores$maxP)
+
+genos.pos <- read.table("geno.pos_roses_texas.txt", header = T)
+genos.pos <- data.frame(MarkerName = genos.pos$probes,
+                        Chromosome = genos.pos$chr,
+                        Position = genos.pos$pos)
+```
+
+### Target sequencing VCF data
+
+* If the VCF file already contain dosage/genotype information called considering the subset/most common ploidy:
+
+```{r, eval=FALSE}
+genos <- qploidy_read_vcf("my_file.vcf", geno = TRUE) # This is a example code, data not available
+dim(genos)
+
+genos.pos <- qploidy_read_vcf("my_file.vcf", geno.pos = TRUE) # This is a example code, data not available
+head(genos.pos)
+```
+
+#### (1) Filter the genos object to keep only the known ploidy samples subset
+
+```{r, eval=FALSE}
+genos <- genos[which(genos$SampleName %in% tetraploids_subset),]
+```
+
+* If the VCF file doesn't contain dosage/genotype information called considering the subset/most common ploidy:
+
+```{r, eval=FALSE}
+# Prepare inputs for updog
+ref <- pivot_wider(data[,1:3], names_from = SampleName, values_from = X) # This is a example code, data not available
 ref <- as.matrix(ref)
 rownames_ref <- ref[,1]
 ref<- ref[,-1]
@@ -46,10 +168,12 @@ size <- apply(size, 2, as.numeric)
 rownames(size) <- rownames_size
 
 library(updog)
+multidog_obj <- multidog(refmat = ref, 
+                         sizemat = size, 
+                         model = "norm", # It depends of your population structure
+                         ploidy = 6,     # Most common ploidy in your population 
+                         nc = 6)         # Change the parameters accordingly!!
 
-multidog_obj <- multidog(refmat = ref, sizemat = size, 
-                         model = "norm", ploidy = 6, nc = 6)
-                         
 genos <- data.frame(MarkerName = multidog_obj$inddf$snp, 
                     SampleName = multidog_obj$inddf$ind, 
                     geno = multidog_obj$inddf$geno,
@@ -58,8 +182,8 @@ genos <- data.frame(MarkerName = multidog_obj$inddf$snp,
 head(genos)
 ```
 
-```{r}
-pos <- strsplit(multidog_obj$snpdf$snp, "_")
+```{r, eval=FALSE}
+pos <- strsplit(multidog_obj$snpdf$snp, "_") # This is a example code, data not available
 
 genos.pos <- data.frame(MarkerName = multidog_obj$snpdf$snp,
                         Chromosome = sapply(pos, "[[", 1),
@@ -67,109 +191,188 @@ genos.pos <- data.frame(MarkerName = multidog_obj$snpdf$snp,
 head(geno.pos)
 ```
 
-
-### Axiom array summary file as input
+# (1) and (2) Standardization
 
 ```{r}
-roses_input <- read_axiom(summary_file = "data/rose_texas/AxiomGT1.summary.txt", 
-                          ind_names = "data/rose_texas/ind.names_roses_texas.txt") # optional, if you want to change the sample names. See ?read_axiom
-
-
-library(fitPoly)
-saveMarkerModels(ploidy=4,
-                 data=roses_input,
-                 p.threshold=0.5,
-                 filePrefix="data/rose_texas/fitpoly_out_texas_roses",
-                 ncores=20)
-                 
-fitpoly_scores <- vroom("data/rose_texas/fitpoly_out_texas_rose_tetra_551_scores.dat")
-
-genos <- data.frame(MarkerName = fitpoly_scores$MarkerName, 
-                    SampleName = fitpoly_scores$SampleName, 
-                    geno = fitpoly_scores$geno,
-                    prob = fitpoly_scores$maxP)
-                    
-genos.pos <- read.table("data/rose_texas/geno.pos_roses_texas.txt", header = T)
-genos.pos <- data.frame(MarkerName = genos.pos$probes,
-                        Chromosome = genos.pos$chr,
-                        Position = genos.pos$pos)
-head(genos.pos)
+roses_data_standardized <- standardize(data = data,
+                                       genos = genos,
+                                       geno.pos = genos.pos, 
+                                       ploidy.standardization = 4, 
+                                       threshold.n.clusters = 5,
+                                       n.cores =8, 
+                                       out_filename = "standardization_results/roses_texas_5clust.tsv.gz",
+                                       type = "intensities", 
+                                       verbose = TRUE)
 ```
 
+See details of the parameters with `?standardize`.
 
-### Check depth/intensities distribution
+The `print` function of the resulted object display information about markers filtering during the process. One important filtering is by the number of dosage clusters represented for each marker. If your samples are highly inbred in certain loci, you may not have samples for all possible dosages in these markers locations. For example, if using tetraploids as reference, certain markers may have individuals with only dosages 0,1,3,4 (with 2 missing). Without representants for the dosage, Qploidy standardization cannot be performed. If `threshold.n.clusters` is `ploidy + 1` the marker with missing dosages are discarded. If `threshold.n.clusters` is smaller than `ploidy + 1` the missing dosages cluster center will be impute for the standardization purpose.
 
-3D plot to check depth distribution 
+
+# (1) and (2) Plot results
+
+`Qploidy` provides several options for visualization of the results. Check the complete description with `?plot_qploidy_standaridization`. Bellow you can see examples:
 
 ```{r}
-p <- plot_check(data, n = 500, R_lim = 200)
-p
+# Select a sample to be evaluated
+samples <- ""
+head(samples)
 ```
 
-### Run standardization
-
 ```{r}
-roses_texas_GBS_result <- standardize(data = data,
-                                      genos = genos,
-                                      geno.pos = genos.pos, 
-                                      ploidy.standardization = 4, 
-                                      threshold.n.clusters = 5,
-                                      n.cores =19, 
-                                      out_filename = "data/rose_texas/roses_texas_GBS__counts_5clust.tsv.gz",
-                                      type = "counts", 
-                                      parallel.type = "FORK",
-                                      verbose = TRUE)
+sample <- ""
+
+# Heterozygous frequency, raw allele intensity or read count ratio and BAF (standardized ratio), and zscore by genomic positions  
+p <- plot_qploidy_standardization(x = roses_data_standardized, 
+                                  sample = sample, 
+                                  type = c("Ratio", "BAF", "zscore"), 
+                                  dot.size = 0.05,
+                                  chr = 2:8)
+
+# Heterozygous frequency, raw allele intensity or read count ratio and BAF (standardized ratio), and zscore by genomic positions  - expected peak position added
+p <- plot_qploidy_standardization(x = roses_data_standardized, 
+                                  sample = sample, 
+                                  type = c("Ratio", "BAF", "zscore"),
+                                  dot.size = 0.05,
+                                  chr = 2:8, 
+                                  ploidy = 4, 
+                                  add_expected_peaks = TRUE)
+
+# Heterozygous frequency, raw allele intensity or read count ratio and BAF (standardized ratio), and zscore by genomic positions  - expected peak position and centromere positions added
+p <- plot_qploidy_standardization(x = roses_data_standardized, 
+                                  sample = sample, 
+                                  type = c("Ratio", "BAF", "zscore"),
+                                  dot.size = 0.05,
+                                  chr = 2:8, 
+                                  ploidy = 4, 
+                                  add_expected_peaks = TRUE,
+                                  add_centromeres = TRUE,
+                                  centromeres = c("1" = 22000000, "2" = 36000000, "3" = 4000000, 
+                                                  "4" = 20000000, "5" = 52000000, "6" = 32000000, "7" = 20000000))
+
+# Raw ratio and BAF histograms combining all markers in the sample (sample level resolution) 
+p <- plot_qploidy_standardization(x = roses_data_standardized, 
+                                  sample = sample, 
+                                  type = c("Ratio_hist_overall", "BAF_hist_overall"), 
+                                  chr = 2:8, 
+                                  ploidy = 4,
+                                  add_expected_peaks = TRUE)
+
+# Raw ratio and BAF histograms (chromosome level resolution)
+p <- plot_qploidy_standardization(x = roses_data_standardized, 
+                                  sample = sample, 
+                                  type = c("Ratio_hist", "BAF_hist", "zscore"), 
+                                  chr = 2:8,
+                                  add_expected_peaks = TRUE, 
+                                  ploidy = 4)
+
+# Raw ratio and BAF histograms combining all markers in the sample (chromosome-arm level resolution) 
+p <- plot_qploidy_standardization(x = roses_data_standardized, 
+                                  sample = sample, 
+                                  type = c("Ratio_hist", "BAF_hist", "zscore"), 
+                                  chr = 2:8, 
+                                  ploidy = 4,
+                                  add_expected_peaks = TRUE,
+                                  add_centromeres = TRUE,
+                                  centromeres = c("1" = 22000000, "2" = 36000000, "3" = 4000000, 
+                                                  "4" = 20000000, "5" = 52000000, "6" = 32000000, "7" = 20000000))
+
 ```
 
-### Check standardization
+One important aspect to notice observing different samples plots is that it will vary in quality: how sharp the peaks are in the histogram plots, or how well the dots are clustered in the BAF x genomic position plots, and if it match decay or increase of the zscore (Z). In our publication, we distinguish the quality of the sample results by categorizing different **resolutions**, from the highest to the lowest: **chromosome-arm** resolution if we can distinguish the chromosome-arm copy number for all chromosomes; **chromosome** if at least one chromosome-arm copy number cannot be estimated; **sample** level if at least one entire chromosome copy number cannot be estimated; **none** if the peaks of histograms consider all markers don't fit any expected ploidy tested. See the paper for more details and examples. 
+
+# (1) and (2) Ploidy estimation for all samples
+
+**Warning**: This method is not accurate in some situations. 
 
 ```{r}
-p <- plot(x = roses_texas_int_result, sample = "16401_N025", type = c("BAF_hist_overall"), add_expected_peaks = TRUE, colors = FALSE, ploidy = 4)
 
-p <- plot(x = roses_texas_int_result, 
-          sample = "3_HVxLF", 
-          type = c("BAF_hist_overall", "Ratio_hist_overall"), 
-          add_expected_peaks = FALSE, 
-          colors = FALSE, 
-          ploidy = 4, 
-          dot.size = 0.5, 
-          centromeres = c("1" = 22000000, "2" = 36000000, "3" = 4000000, 
-                          "4" = 20000000, "5" = 52000000, "6" = 32000000, "7" = 20000000), 
-          add_centromeres = TRUE, 
-          chr = 2:8)
-p
+# If sample level resolution
+estimated_ploidies_sample <- area_estimate_ploidy(qploidy_standardization = roses_data_standardized, # standardization result object
+                                                  samples = "all",                                  # Samples or "all" to estimate all samples
+                                                  level = "sample",                                 # Resolution level
+                                                  ploidies = c(2,5))                                # Ploidy range to investigate
 
-p <- plot(x = roses_texas_int_result, 
-          sample = "16405_N097", 
-          type = c("BAF", "zscore", "het", "BAF_hist"), 
-          add_expected_peaks = FALSE, 
-          colors = FALSE, 
-          ploidy = 4, 
-          dot.size = 0.5, 
-          centromeres = c("1" = 22000000, "2" = 36000000, "3" = 4000000, 
-                          "4" = 20000000, "5" = 52000000, "6" = 32000000, "7" = 20000000), 
-          add_centromeres = TRUE, 
-          chr = 2:8)
+# If chromosome resolution
+estimated_ploidies_chromosome <- area_estimate_ploidy(qploidy_standardization = roses_data_standardized, 
+                                                      samples = "all", 
+                                                      level = "chromosome",
+                                                      ploidies = c(2,5))
 
-```
+# If chromosome-arm resolution
+estimated_ploidies_chromosome_arm <- area_estimate_ploidy(qploidy_standardization = roses_data_standardized, 
+                                                          samples = "all", 
+                                                          level = "chromosome-arm",
+                                                          ploidies = c(2,5), 
+                                                          centromeres = c("1" = 22000000, "2" = 36000000, "3" = 4000000, 
+                                                                          "4" = 20000000, "5" = 52000000, "6" = 32000000,
+                                                                          "7" = 20000000))
 
-### Estimate ploidy
-
-
-```{r}
-estimated_ploidies <- area_estimate_ploidy(qploidy_standardization = roses_texas_int_result, 
-                                                  samples = c("16009_N043", "12_MBxBE", "1_MBxBE", "80_HVxLF"), 
-                                                  ploidies = c(2,5))
-                                                  
-                                                  
-estimated_ploidies_cent <- area_estimate_ploidy(qploidy_standardization = roses_texas_int_result, 
-                                                       samples = "all", 
-                                                       ploidies = c(2,5), 
-                                                       centromeres = c("1" = 22000000, "2" = 36000000, "3" = 4000000, 
-                                                                       "4" = 20000000, "5" = 52000000, "6" = 32000000,
-                                                                       "7" = 20000000))
-estimated_ploidies_format <- merge_arms_format(estimated_ploidies_cent, filter_diff = 0.01)
+estimated_ploidies_format <- merge_arms_format(estimated_ploidies_chromosome_arm)
 
 aneu <- get_aneuploids(estimated_ploidies_format$ploidy)
+```
+
+This provides a good initial guide, but **visual inspection** of the plots described in the previous section is required to determine the resolution and ploidy.
+
+## (1) and (2) Save plots for all samples
+
+Facilitate the individual visual inspection by generating figures for all samples at once:
+
+```{r}
+library(parallel)
+
+samples_ploidy_list <- list()
+for(i in 1:length(samples)) samples_ploidy_list[[i]] <- c(samples[i], estimated_ploidies_chromosome$ploidy[i])
+
+dir.create("figures")
+
+n.cores <- 6 # Adapt to your computer capacities
+clust <- makeCluster(n.cores)
+clusterExport(clust, "all_resolutions_plots")
+parLapply(clust, samples_ploidy_list, function(x) all_resolutions_plots(x[1], 
+                                                                        ploidy = x[2], 
+                                                                        chr = 2:8,
+                                                                        centromeres = c("1" = 22000000, "2" = 36000000, "3" = 4000000, 
+                                                                                        "4" = 20000000, "5" = 52000000, "6" = 32000000, "7" = 20000000),
+                                                                        file_name = paste0("figures/",x[1])))
+
+stopCluster(clust)
 
 ```
+
+By visualizing the plots it is possible to correct the results from `area_estimate_ploidy` and add the resolution information by sample. Check the example:
+
+```{r}
+ploidy_corrected <- read.csv("final_results.csv")
+```
+
+# (2) Improve standardization selecting a known ploidy subset after first round
+
+If you didn't use a subset of known ploidy but the most common ploidy as reference, the standardization is not as good as it could be. You can improve the resolution by: i) selecting the higher resolution plots from the first standardization round; ii) filter these samples from the `data` object; iii) run standardization again using this subset as the reference; iv) evaluate plots and estimate ploidy again.
+
+```{r}
+
+#i)
+data_reference2 <- ploidy_corrected$samples[which(ploidy_corrected$ploidy == 4 & ploidy_corrected$Resolution == "chromosome-arm")]
+
+#ii)
+
+genos_round2 <- genos[which(genos$SampleNames %in% data_reference2),]
+
+#iii)
+roses_data_standardized_round2 <- standardize(data = data,
+                                              genos = genos_round2,
+                                              geno.pos = genos.pos, 
+                                              ploidy.standardization = 4, 
+                                              threshold.n.clusters = 5,
+                                              n.cores = 8, 
+                                              out_filename = "standardization_results/roses_texas_5clust.tsv.gz",
+                                              type = "intensities", 
+                                              verbose = TRUE)
+
+#iv)
+```
+
+

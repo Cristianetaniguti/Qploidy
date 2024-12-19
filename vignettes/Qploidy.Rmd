@@ -10,23 +10,26 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-This vignette describes how to use `Qploidy` to estimate ploidy using SNP marker data. For more details in `Qploidy` methodology, please check its [publication]().
+This vignette describes how to use `Qploidy`, an R package designed for ploidy and aneuploidy estimation using genotyping platform data. For a detailed explanation of the `Qploidy` methodology, please refer to its [publication]().
 
-`Qploidy` methodology will work if:
+### When does the `Qploidy` methodology work?
 
-* Your marker data is from Axiom or Illumina array data
-* Your marker data is from target sequencing data (e.g. DArTag, GTseq, AgriSeq)
-* All DNA samples library were prepared following the same protocol
-* You know the ploidy of a subset of at least 60 samples or if you know which is the most common ploidy overall
-* You have heterozygous samples
+The `Qploidy` approach is effective under the following conditions:  
+- Your marker data originates from **Axiom** or **Illumina genotyping arrays**.  
+- Your marker data is derived from **targeted sequencing platforms** (e.g., DArTag, GTseq, AgriSeq).  
+- All DNA samples were prepared following the **same library preparation protocol**.  
+- You know the **ploidy** of at least a subset of 60 samples *or* you know the **most common ploidy** in the dataset.  
+- Your dataset includes **heterozygous samples**.  
 
-`Qploidy` methodology won't work if:
+### When does the `Qploidy` methodology NOT work?
 
-* You marker data is from RADseq/GBS
-* You want to combine datasets from different batches of sequencing. 
-For example, you extracted DNA and sequenced two plates (total of 192 samples) as one batch and after, you prepared the library and sequenced more three plates with more 288 samples. You have a total of 480 samples but you must process the two batches (with 192 and 288 samples) separately in `Qploidy`. 
-* You don't have a subset with known ploidy or a predominant ploidy in your population
-* You have inbred line samples  
+The methodology will not be effective under the following circumstances:  
+- Your marker data comes from **RADseq** or **GBS** (Genotyping-by-Sequencing) platforms.  
+- You intend to **combine datasets from different sequencing batches**.  
+   - For example: If you extracted DNA and sequenced two plates (192 samples) as one batch, and later sequenced an additional three plates (288 samples) as a second batch, you would need to analyze the two batches **separately** in `Qploidy`. Combining all 480 samples into a single analysis will lead to incorrect results.  
+- You **do not have a subset of samples with known ploidy** or **lack a predominant ploidy** in your dataset.  
+- Your samples consist of **inbred lines** (homozygous individuals).  
+
 
 # Installation
 

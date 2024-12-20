@@ -115,7 +115,7 @@ plot_baf_hist <- function(data_sample,
                           rm_homozygous = FALSE,
                           font_size = 12){
 
-  if(add_estimated_peaks | add_expected_peaks | colors){
+  if((add_estimated_peaks | add_expected_peaks | colors) & !all(is.na(ploidy))){
     if(length(ploidy) == 1) {
       ploidy <- rep(ploidy, length(unique(data_sample$Chr)))
     } else if(length(ploidy) != 1 & length(ploidy) != length(unique(data_sample$Chr)))
@@ -164,6 +164,7 @@ plot_baf_hist <- function(data_sample,
     }
   } else {
     data_sample2 <- data_sample
+    add_estimated_peaks <- add_expected_peaks <- colors <- FALSE
   }
 
   if(rm_homozygous) data_sample2 <- data_sample2 %>% filter(sample != 0 & sample != 1)
@@ -483,6 +484,7 @@ plot_qploidy_standardization <- function(x,
 #' Plot graphics for ploidy visual inspection for each resolution
 #' It was made for parallelization purpose
 #'
+#' @param data_standardized result from standardization function
 #' @param sample sample name
 #' @param ploidy sample ploidy if known
 #' @param centromeres vector with centromeres positions
@@ -492,9 +494,9 @@ plot_qploidy_standardization <- function(x,
 #' @importFrom ggplot2 ggsave
 #'
 #' @export
-all_resolutions_plots <- function(sample, ploidy, centromeres, file_name, chr){
+all_resolutions_plots <- function(data_standardized, sample, ploidy, centromeres, file_name, chr){
   # Raw ratio and BAF histograms (chromosome level resolution)
-  p <- plot_qploidy_standardization(x = roses_data_standardized,
+  p <- plot_qploidy_standardization(x = data_standardized,
                                     sample = sample,
                                     type = c("Ratio_hist", "BAF_hist", "zscore"),
                                     chr = chr,
@@ -504,7 +506,7 @@ all_resolutions_plots <- function(sample, ploidy, centromeres, file_name, chr){
   ggsave(p, filename = paste0(file_name, "_res:chromosome.png"))
 
   # Raw ratio and BAF histograms combining all markers in the sample (chromosome-arm level resolution)
-  p <- plot_qploidy_standardization(x = roses_data_standardized,
+  p <- plot_qploidy_standardization(x = data_standardized,
                                     sample = sample,
                                     type = c("Ratio_hist", "BAF_hist", "zscore"),
                                     chr = chr,
@@ -516,7 +518,7 @@ all_resolutions_plots <- function(sample, ploidy, centromeres, file_name, chr){
   ggsave(p, filename = paste0(file_name, "_res:chromosome_arm.png"))
 
   # Raw ratio and BAF histograms combining all markers in the sample (sample level resolution)
-  p <- plot_qploidy_standardization(x = roses_data_standardized,
+  p <- plot_qploidy_standardization(x = data_standardized,
                                     sample = sample,
                                     type = c("Ratio_hist_overall", "BAF_hist_overall"),
                                     chr = chr,

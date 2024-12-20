@@ -6,7 +6,9 @@
 
 <!-- badges: end -->
 
-# Qploidy <img src="https://github.com/Cristianetaniguti/Qploidy/assets/7572527/88ef9fad-7f86-4a84-9e1a-5dd4625dd1c8" align="right" width="230"/>
+# Qploidy 
+
+<img src="https://github.com/Cristianetaniguti/Qploidy/assets/7572527/88ef9fad-7f86-4a84-9e1a-5dd4625dd1c8" align="right" width="230"/>
 
 
 **`Qploidy`** is an R package designed for ploidy and aneuploidy estimation using genotyping platform data. For a detailed explanation of the `Qploidy` methodology, please refer to its [publication]().

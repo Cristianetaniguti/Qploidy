@@ -1,4 +1,6 @@
-globalVariables(c("theta", "R", "geno", "Var1"))
+globalVariables(c("theta", "R", "geno", "Var1", "array.id",
+                  "ids", "sd", "median", "z", "lm", "sd",
+                  "snp", "centers_theta", "pnorm"))
 
 #' Get centers for standardization using updog estimated bias
 #'
@@ -206,6 +208,9 @@ get_zscore <- function(data = NULL,
 ##'
 ##' @param plot_data_split_one todo
 ##' @param alpha todo
+##'
+##' @importFrom stats cor lm median pnorm sd window
+##'
 ##'
 ##' @import multtest
 ##'

@@ -1,7 +1,7 @@
 globalVariables(c("color", "xmax", "xmin", "value", "name",
                   "Var1", "ploidy", "chromosome", "aneuploidy_ploidy",
                   "#individuals*#chrom", "Freq", "Freq_all", "#individuals",
-                  "LG", "MarkerName", "R", "SampleName"))
+                  "LG", "MarkerName", "R", "SampleName", "baf", "sd"))
 
 #' Estimate ploidy using area method
 #'
@@ -29,7 +29,8 @@ area_estimate_ploidy <- function(qploidy_standardization = NULL,
     data_sample <- qploidy_standardization$data[,c(9,10,2,8)] %>% filter(SampleName %in% samples & !is.na(baf))
   }
 
-  if(length(unique(data_sample$Position)) != length(data_sample$Position)) {
+  one_sample <- data_sample$Position[which(data_sample$SampleName %in% data_sample$SampleName[1])]
+  if(any(duplicated(one_sample))) {
     warning("There are duplicated marker positions. Only the first one will be kept.")
     data_sample <- data_sample %>% group_by(SampleName) %>% filter(!duplicated(Position))
   }
@@ -178,6 +179,10 @@ area_estimate_ploidy <- function(qploidy_standardization = NULL,
   idx <- which(result.ploidy == 1)
   if(length(idx) > 0) result.ploidy[idx] <- NA
 
+  if(level == "sample") n.inbred <- length(idx) else {
+    n.inbred <- sum(apply(result.ploidy, 1, function(x) all(is.na(x))))
+  }
+
   est.ploidy.chr_df <- list(ploidy = result.ploidy,                  # Estimated ploidy by area method
                             prop_inside_area = dots.int_tot_mt,      # Proportion of dots inside selected area
                             diff_first_second = diff.first.second,   # Difference between first and second place in area method
@@ -185,7 +190,9 @@ area_estimate_ploidy <- function(qploidy_standardization = NULL,
                             highest_correlation_modes = corr_tot_mt, # Highest correlation
                             modes_inside_area = modes_paste_tot_mt,
                             tested = ploidies,
-                            ploidy.sep = result.ploidy)  # Modes inside areas
+                            ploidy.sep = result.ploidy,
+                            chr = unique(data_sample$Chr),
+                            n.inbred = n.inbred)  # Modes inside areas
 
   return(structure(est.ploidy.chr_df, class = "qploidy_area_ploidy_estimation"))
 }
@@ -237,12 +244,14 @@ print.qploidy_area_ploidy_estimation <- function(x, ...){
                           "Chromosomes:",
                           "Tested ploidies:",
                           "Number of euploid samples:",
-                          "Number of potential aneuploid samples:"),
+                          "Number of potential aneuploid samples:",
+                          "Number of highly inbred samples:"),
                    c2 = c(dim(x$ploidy)[1],
-                          paste0(colnames(x$ploidy), collapse = ","),
+                          {if(!is.null(colnames(x$ploidy))) paste0(colnames(x$ploidy), collapse = ",") else paste0(x$chr, collapse = ",")},
                           paste0(x$tested, collapse = ","),
-                          sum(!count_aneu),
-                          sum(count_aneu)
+                          sum(!count_aneu, na.rm = TRUE),
+                          sum(count_aneu, na.rm = TRUE),
+                          x$n.inbred
                    ))
 
   colnames(df) <- rownames(df) <- NULL
@@ -259,7 +268,17 @@ print.qploidy_area_ploidy_estimation <- function(x, ...){
 #' @export
 get_aneuploids  <- function(ploidy_df){
 
-  count_aneu <- !apply(ploidy_df, 1, function(y) if(any(is.na(y))) length(unique(y[-which(is.na(y))])) == 1 else length(unique(y)) == 1)
+  if(any(grepl("/NA", ploidy_df) | grepl("NA/",ploidy_df))){
+    ploidy_df <- gsub("/NA", "", ploidy_df)
+    ploidy_df <- gsub("NA/", "", ploidy_df)
+  }
+
+  count_aneu <- !apply(ploidy_df, 1, function(y) {
+    if(any(is.na(y))) {
+      temp <- length(unique(y[-which(is.na(y))]))
+      if(temp == 1) TRUE else if(temp == 0) NA else FALSE
+    } else length(unique(y)) == 1
+  })
   return(count_aneu)
 }
 

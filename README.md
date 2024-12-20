@@ -6,9 +6,31 @@
 
 <!-- badges: end -->
 
-# Qploidy <img src="https://github.com/Cristianetaniguti/Qploidy/assets/7572527/88ef9fad-7f86-4a84-9e1a-5dd4625dd1c8" align="right" width="230"/>
+# Qploidy 
 
-`Qploidy` is and R package and Shiny app to perform ploidy and aneuploid estimation using genotyping platforms data such as intensities (normalized X and Y) from Axiom and Illumina array genotyping platforms and read counts for each allele from target sequencing platforms. 
+<img src="https://github.com/Cristianetaniguti/Qploidy/assets/7572527/88ef9fad-7f86-4a84-9e1a-5dd4625dd1c8" align="right" width="230"/>
+
+
+**`Qploidy`** is an R package designed for ploidy and aneuploidy estimation using genotyping platform data. For a detailed explanation of the `Qploidy` methodology, please refer to its [publication]().
+
+### When does the `Qploidy` methodology work?
+
+The `Qploidy` approach is effective under the following conditions:  
+- Your marker data originates from **Axiom** or **Illumina genotyping arrays**.  
+- Your marker data is derived from **targeted sequencing platforms** (e.g., DArTag, GTseq, AgriSeq).  
+- All DNA samples were prepared following the **same library preparation protocol**.  
+- You know the **ploidy** of at least a subset of 60 samples *or* you know the **most common ploidy** in the dataset.  
+- Your dataset includes **heterozygous samples**.  
+
+### When does the `Qploidy` methodology NOT work?
+
+The methodology will not be effective under the following circumstances:  
+- Your marker data comes from **RADseq** or **GBS** (Genotyping-by-Sequencing) platforms.  
+- You intend to **combine datasets from different sequencing batches**.  
+   - For example: If you extracted DNA and sequenced two plates (192 samples) as one batch, and later sequenced an additional three plates (288 samples) as a second batch, you would need to analyze the two batches **separately** in `Qploidy`. Combining all 480 samples into a single analysis will lead to incorrect results.  
+- You **do not have a subset of samples with known ploidy** or **lack a predominant ploidy** in your dataset.  
+- Your samples consist of **inbred lines** (homozygous individuals).  
+
 
 ## Installation
 
@@ -17,158 +39,20 @@
 devtools::install_github("cristianetaniguti/Qploidy")
 ```
 
-## Prepare input files
+## Documentation
 
-### VCF file as input
-
-Read file
-
-``` r
-vcf_file <- "data/rose_texas/GBS/MBxGV_NgoMIV_tassel_vcf_norm.vcf.gz"
-data <- qploidy_read_vcf(vcf_file)
-head(data)
-```
-
-``` r
-ref <- pivot_wider(data[,1:3], names_from = SampleName, values_from = X)
-ref <- as.matrix(ref)
-rownames_ref <- ref[,1]
-ref<- ref[,-1]
-ref <- apply(ref, 2, as.numeric)
-rownames(ref) <- rownames_ref
-
-size <- pivot_wider(data[,c(1,2,5)], names_from = SampleName, values_from = R)
-size <- as.matrix(size)
-rownames_size <- size[,1]
-size<- size[,-1]
-size <- apply(size, 2, as.numeric)
-rownames(size) <- rownames_size
-
-library(updog)
-
-multidog_obj <- multidog(refmat = ref, sizemat = size, 
-                         model = "norm", ploidy = 6, nc = 6)
-                         
-genos <- data.frame(MarkerName = multidog_obj$inddf$snp, 
-                    SampleName = multidog_obj$inddf$ind, 
-                    geno = multidog_obj$inddf$geno,
-                    prob = multidog_obj$inddf$maxpostprob)
-
-head(genos)
-```
-
-``` r
-pos <- strsplit(multidog_obj$snpdf$snp, "_")
-
-genos.pos <- data.frame(MarkerName = multidog_obj$snpdf$snp,
-                        Chromosome = sapply(pos, "[[", 1),
-                        Position = as.numeric(sapply(pos, "[[", 2)))
-head(geno.pos)
-```
+* [`Qploidy` tutorial]() for directions on how to run
 
 
-### Axiom array summary file as input
+## Bug Reports
 
-``` r
-roses_input <- read_axiom(summary_file = "data/rose_texas/AxiomGT1.summary.txt", 
-                          ind_names = "data/rose_texas/ind.names_roses_texas.txt") # optional, if you want to change the sample names. See ?read_axiom
+If you find a bug or want an enhancement, please submit an issue [here](https://github.com/Cristianetaniguti/Qploidy/issues).
 
+## How to cite
 
-library(fitPoly)
-saveMarkerModels(ploidy=4,
-                 data=roses_input,
-                 p.threshold=0.5,
-                 filePrefix="data/rose_texas/fitpoly_out_texas_roses",
-                 ncores=20)
-                 
-fitpoly_scores <- vroom("data/rose_texas/fitpoly_out_texas_rose_tetra_551_scores.dat")
+Taniguti, C.H; Lau, J.; Hochhaus, T.; Arias Lopez, D. C.; Hokanson, S.C.; Zlesak, D. C.; Byrne, D. H.; Klein, P.E. and Riera-Lizarazu, O. Exploring Chromosomal Variations in Garden Roses: Insights from High-density SNP Array Data and a New Tool, Qploidy. 2025. Submitted.
 
-genos <- data.frame(MarkerName = fitpoly_scores$MarkerName, 
-                    SampleName = fitpoly_scores$SampleName, 
-                    geno = fitpoly_scores$geno,
-                    prob = fitpoly_scores$maxP)
-                    
-genos.pos <- read.table("data/rose_texas/geno.pos_roses_texas.txt", header = T)
-genos.pos <- data.frame(MarkerName = genos.pos$probes,
-                        Chromosome = genos.pos$chr,
-                        Position = genos.pos$pos)
-head(genos.pos)
-```
+## Acknowledgments
 
+This work is funded in part by the Robert E. Basye Endowment in Rose Genetics, Dept. of Horticultural Sciences, Texas A&M University, and USDA’s National Institute of Food and Agriculture (NIFA), Specialty Crop Research Initiative (SCRI) projects: ‘‘Tools for Genomics-Assisted Breeding in Polyploids: Development of a Community Resource’’ (Award No. 2020-51181-32156); and ‘‘Developing Sustainable Rose Landscapes via Rose Rosette Disease Education, Socioeconomic Assessments, and Breeding RRD-Resistant Roses with Stable Black Spot Resistance’’ (Award No. 2022-51181-38330).
 
-### Check depth/intensities distribution
-
-3D plot to check depth distribution 
-
-``` r
-p <- plot_check(data, n = 500, R_lim = 200)
-p
-```
-
-### Run standardization
-
-``` r
-roses_texas_GBS_result <- standardize(data = data,
-                                      genos = genos,
-                                      geno.pos = genos.pos, 
-                                      ploidy.standardization = 4, 
-                                      threshold.n.clusters = 5,
-                                      n.cores =19, 
-                                      out_filename = "data/rose_texas/roses_texas_GBS__counts_5clust.tsv.gz",
-                                      type = "counts", 
-                                      parallel.type = "FORK",
-                                      verbose = TRUE)
-```
-
-### Check standardization
-
-``` r
-p <- plot(x = roses_texas_int_result, sample = "16401_N025", type = c("BAF_hist_overall"), add_expected_peaks = TRUE, colors = FALSE, ploidy = 4)
-
-p <- plot(x = roses_texas_int_result, 
-          sample = "3_HVxLF", 
-          type = c("BAF_hist_overall", "Ratio_hist_overall"), 
-          add_expected_peaks = FALSE, 
-          colors = FALSE, 
-          ploidy = 4, 
-          dot.size = 0.5, 
-          centromeres = c("1" = 22000000, "2" = 36000000, "3" = 4000000, 
-                          "4" = 20000000, "5" = 52000000, "6" = 32000000, "7" = 20000000), 
-          add_centromeres = TRUE, 
-          chr = 2:8)
-p
-
-p <- plot(x = roses_texas_int_result, 
-          sample = "16405_N097", 
-          type = c("BAF", "zscore", "het", "BAF_hist"), 
-          add_expected_peaks = FALSE, 
-          colors = FALSE, 
-          ploidy = 4, 
-          dot.size = 0.5, 
-          centromeres = c("1" = 22000000, "2" = 36000000, "3" = 4000000, 
-                          "4" = 20000000, "5" = 52000000, "6" = 32000000, "7" = 20000000), 
-          add_centromeres = TRUE, 
-          chr = 2:8)
-
-```
-
-### Estimate ploidy
-
-
-``` r
-estimated_ploidies <- area_estimate_ploidy(qploidy_standardization = roses_texas_int_result, 
-                                                  samples = c("16009_N043", "12_MBxBE", "1_MBxBE", "80_HVxLF"), 
-                                                  ploidies = c(2,5))
-                                                  
-                                                  
-estimated_ploidies_cent <- area_estimate_ploidy(qploidy_standardization = roses_texas_int_result, 
-                                                       samples = "all", 
-                                                       ploidies = c(2,5), 
-                                                       centromeres = c("1" = 22000000, "2" = 36000000, "3" = 4000000, 
-                                                                       "4" = 20000000, "5" = 52000000, "6" = 32000000,
-                                                                       "7" = 20000000))
-estimated_ploidies_format <- merge_arms_format(estimated_ploidies_cent, filter_diff = 0.01)
-
-aneu <- get_aneuploids(estimated_ploidies_format$ploidy)
-
-```

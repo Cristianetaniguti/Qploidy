@@ -1,3 +1,5 @@
+globalVariables(c("Chr", "baf","z","ratio", "median", "window", "prop_het"))
+
 #' Plot BAF
 #'
 #' @param data_sample data.frame with BAF and genomic position information

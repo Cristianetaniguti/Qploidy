@@ -168,8 +168,8 @@ plot.mappoly.homoprob <- function(x, stack = FALSE, lg = NULL,
     df.pr1 <- subset(x$homoprob, individual  ==  ind)
   } else if (is.character(ind)){
     if(!ind%in%all.ind)
-      stop(safeError("Invalid individual name"))
-  } else stop(safeError("Invalid individual name"))
+      stop("Invalid individual name")
+  } else stop("Invalid individual name")
 
   #### LG handling ####
   if(is.null(lg))

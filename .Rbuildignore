@@ -12,3 +12,6 @@ $run_dev.*
 ^\.github$
 ^\.circleci$
 ^\.circleci/config\.yml$
+^example_data_run$
+^doc$
+^Meta$

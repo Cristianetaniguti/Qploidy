@@ -1,6 +1,10 @@
 ---
 title: "Qploidy"
 date: "Last update: 2024-12-18"
+vignette: >
+  %\VignetteIndexEntry{Qploidy}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
 output:
   rmdformats::html_clean:
     highlight: kate

@@ -1,4 +1,4 @@
-globalVariables(c("ind", "zscore", "chr"))
+globalVariables(c("ind", "zscore", "chr", "write.csv"))
 
 
 
@@ -238,6 +238,8 @@ summary_to_fitpoly <- function(R_all, theta_all){
 #'
 #' @param filename character with path to polyancentry CSV file
 #' @param outstem output pedigree filename
+#'
+#' @importFrom utils write.csv
 #'
 #' @export
 read_polyOrigin <- function(filename, outstem=NULL){

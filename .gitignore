@@ -5,3 +5,6 @@
 .DS_Store
 Qploidy.Rproj
 example_data_run
+inst/doc
+/doc/
+/Meta/

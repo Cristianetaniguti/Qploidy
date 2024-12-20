@@ -1,2 +1,0 @@
-n.mk.start	missing.data	wrong_n_clusters	n.mk.selected
-2379	294	1348	725

@@ -16,7 +16,7 @@ Authors@R: c(person(given='Cristiane',
                     family = "Riera-Lizarazu",
                     role = c("ctb"))
              )
-Description: Estimates and presents graphics and statistics about individuals ploidy and aneuploidy based on array genotyping data.
+Description: Ploidy and Aneuploidy Estimation Using Markers from High-Throughput Genotyping Platforms
 License: AGPL (>= 3)
 Depends: R (>= 3.6.0)
 Imports: 

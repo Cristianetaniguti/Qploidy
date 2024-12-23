@@ -11,7 +11,7 @@
 <img src="https://github.com/Cristianetaniguti/Qploidy/assets/7572527/88ef9fad-7f86-4a84-9e1a-5dd4625dd1c8" align="right" width="230"/>
 
 
-**`Qploidy`** is an R package designed for ploidy and aneuploidy estimation using genotyping platform data. For a detailed explanation of the `Qploidy` methodology, please refer to its [publication]().
+**`Qploidy`** is an R package designed for ploidy and aneuploidy estimation using genotyping platform data. 
 
 ### When does the `Qploidy` methodology work?
 
@@ -41,7 +41,7 @@ devtools::install_github("cristianetaniguti/Qploidy")
 
 ## Documentation
 
-* [`Qploidy` tutorial]() for directions on how to run
+* [`Qploidy` tutorial](https://cristianetaniguti.github.io/Qploidy/Qploidy.html) for directions on how to run
 
 
 ## Bug Reports

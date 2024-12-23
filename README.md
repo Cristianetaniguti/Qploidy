@@ -50,7 +50,7 @@ If you find a bug or want an enhancement, please submit an issue [here](https://
 
 ## How to cite
 
-Taniguti, C.H; Lau, J.; Hochhaus, T.; Arias Lopez, D. C.; Hokanson, S.C.; Zlesak, D. C.; Byrne, D. H.; Klein, P.E. and Riera-Lizarazu, O. Exploring Chromosomal Variations in Garden Roses: Insights from High-density SNP Array Data and a New Tool, Qploidy. 2025. Submitted.
+Taniguti, C.H; Lau, J.; Hochhaus, T.; Arias Lopez, D. C.; Hokanson, S.C.; Zlesak, D. C.; Byrne, D. H.; Klein, P.E. and Riera-Lizarazu, O. Exploring Chromosomal Variations in Garden Roses: Insights from High-density SNP Array Data and a New Tool, Qploidy. Submitted.
 
 ## Acknowledgments
 

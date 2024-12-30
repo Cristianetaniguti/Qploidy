@@ -64,6 +64,10 @@ knitr::opts_chunk$set(echo = TRUE)
 # head(genos.pos)
 
 ## ----eval=FALSE---------------------------------------------------------------
+# genos.pos$MarkerName=paste0(genos.pos$Chromosome,"_",genos.pos$Position)
+# head(genos.pos)
+
+## ----eval=FALSE---------------------------------------------------------------
 # genos <- genos[which(genos$SampleName %in% tetraploids_subset),]
 
 ## ----eval=FALSE---------------------------------------------------------------

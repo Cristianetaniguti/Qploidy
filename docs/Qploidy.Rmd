@@ -199,7 +199,12 @@ dim(genos)
 genos.pos <- qploidy_read_vcf("my_file.vcf", geno.pos = TRUE) # This is a example code, data not available
 head(genos.pos)
 ```
+* If the VCF file does not have marker names in the `ID` column of the fixed portion, then you will see `NAs` in the `MarkerName` column. You can use the following code (concatenates the chromosme and position as a marker name) to fix this:
 
+```{r, eval=FALSE}
+genos.pos$MarkerName=paste0(genos.pos$Chromosome,"_",genos.pos$Position)
+head(genos.pos)
+```
 #### (1) Filter the genos object to keep only the known ploidy samples subset
 
 ```{r, eval=FALSE}
@@ -698,7 +703,7 @@ for(i in 1:length(samples)){
 
 # How to cite
 
-Taniguti, C.H; Lau, J.; Hochhaus, T.; Arias Lopez, D. C.; Hokanson, S.C.; Zlesak, D. C.; Byrne, D. H.; Klein, P.E. and Riera-Lizarazy, O. Exploring Chromosomal Variations in Garden Roses: Insights from High-density SNP Array Data and a New Tool, Qploidy. 2025. Submitted.
+Taniguti, C.H; Lau, J.; Hochhaus, T.; Lopez Arias, D. C.; Hokanson, S.C.; Zlesak, D. C.; Byrne, D. H.; Klein, P.E. and Riera-Lizarazu, O. Exploring Chromosomal Variations in Garden Roses: Insights from High-density SNP Array Data and a New Tool, Qploidy. 2025. Submitted.
 
 # Acknowledgments
 

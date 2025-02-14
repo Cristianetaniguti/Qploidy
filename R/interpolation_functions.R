@@ -42,7 +42,7 @@ updog_centers <- function(multidog_obj, threshold.n.clusters=2, rm.mks){
 #'
 #' @export
 get_baf <- function(theta_subject, centers_theta, ploidy){
-  baf <- vector()
+  baf <- rep(NA, length(theta_subject))
   ploidy_freq <- seq(0,1,1/(ploidy))
   ploidy_freq_multi <- 1/ploidy
   centers_theta <- sort(centers_theta, decreasing = F)
@@ -68,6 +68,7 @@ get_baf <- function(theta_subject, centers_theta, ploidy){
 #' @export
 get_baf_par <- function(par_all_item, ploidy=2){
   baf <- list()
+  i <- 1
   for(i in 1:nrow(par_all_item[[1]])){
     baf[[i]] <- get_baf(theta_subject = as.numeric(par_all_item[[1]][i,-1]),
                         centers_theta = as.numeric(par_all_item[[2]][i,-1]),
@@ -418,17 +419,11 @@ standardize <- function(data = NULL,
   gc()
 
   bafs_lt <- unlist(bafs, recursive = F)
-
-  # bugfix
-  legths <- sapply(bafs_lt, length)
-  keep.mks.n <- which(legths == names(which.max(table(legths))))
-
-  bafs_lt <- bafs_lt[keep.mks.n]
   bafs_m <- do.call(rbind, bafs_lt)
-  rownames(bafs_m) <- theta_filt$MarkerName[keep.mks.n]
+  rownames(bafs_m) <- theta_filt$MarkerName
   colnames(bafs_m) <- colnames(theta_filt)[-1]
   bafs_df <- as.data.frame(bafs_m)
-  bafs_df <- cbind(mks = theta_filt$MarkerName[keep.mks.n], bafs_df)
+  bafs_df <- cbind(mks = theta_filt$MarkerName, bafs_df)
 
   # Add chr and pos info
   chr <- geno.pos$Chromosome[match(bafs_df$mks,geno.pos$MarkerName)]

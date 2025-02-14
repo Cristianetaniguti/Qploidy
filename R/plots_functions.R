@@ -337,6 +337,7 @@ plot_qploidy_standardization <- function(x,
   if(is.numeric(chr)) chr <- sort(unique(data_sample$Chr))[chr] else if(is.null(chr)) chr <- sort(unique(data_sample$Chr))
 
   data_sample <- data_sample %>% filter(Chr %in% chr) %>% select(MarkerName, SampleName, Chr, Position, baf, z, ratio)
+  data_sample$Position <- as.numeric(data_sample$Position)
 
   if(nrow(data_sample) == 0) stop("Sample or chromosome not found.")
 

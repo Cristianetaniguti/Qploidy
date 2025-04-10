@@ -1,13 +1,13 @@
 Package: Qploidy
 Title: Qploidy
-Version: 0.0.1
+Version: 1.0.0
 Authors@R: c(person(given='Cristiane', 
                     family='Taniguti', 
-                    email = 'chtaniguti@tamu.edu', 
+                    email = 'cht47@cornell.edu', 
                     role = c('cre', 'aut')),
              person(given='Jeekin', 
                     family='Lau', 
-                    email = 'jzl0026@tamu.edu', 
+                    email = 'Jeekin.Lau@usda.gov', 
                     role = c('ctb')),
              person(given = "David",
                     family = "Byrne",

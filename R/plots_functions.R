@@ -269,6 +269,7 @@ plot_check <- function(data_qploidy, R_lim = NULL, n = 3000){
   axz <- list(title = "Sum of intensities/depth")
 
   cat("Values summary:\n")
+  plot_df
   print(summary(as.numeric(plot_df)))
 
   p <- plot_ly(z=plot_df, type="surface") %>%

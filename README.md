@@ -3,7 +3,7 @@
 [![License: GPL v3](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![R-CMD-check](https://github.com/Cristianetaniguti/Qploidy/workflows/R-CMD-check/badge.svg)](https://github.com/Cristianetaniguti/Qploidy/actions)
 ![](https://img.shields.io/badge/RRID-SCR_026724-yellow.svg)
-[![codecov](https://codecov.io/github/cristianetaniguti/qploidy/branch/main/graphs/badge.svg)](https://codecov.io/github/cristianetaniguti/qploidy)
+[![codecov](https://codecov.io/gh/Cristianetaniguti/Qploidy/graph/badge.svg?token=DQBM227JSY)](https://codecov.io/gh/Cristianetaniguti/Qploidy)
 
 <!-- badges: end -->
 

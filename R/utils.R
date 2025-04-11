@@ -102,10 +102,11 @@ simulate_standardization_input <- function(n_markers = 10,
   geno_data <- final_dataset %>%
     select(MarkerName, SampleName, geno, prob)
 
-  geno_pos <- tibble::tibble(
+  geno_pos <- data.frame(
     MarkerName = marker_ids,
     Chromosome = rep(c("1", "2", "3"), length.out = n_markers),
-    Position = sort(sample(1e5:1e6, n_markers))
+    Position = sort(sample(1e5:1e6, n_markers)),
+    stringsAsFactors = FALSE
   )
 
   standardization_input <- inner_join(

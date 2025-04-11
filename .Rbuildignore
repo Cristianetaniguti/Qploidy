@@ -16,3 +16,4 @@ $run_dev.*
 ^doc$
 ^Meta$
 ^docs$
+^data$

@@ -16,7 +16,7 @@ Authors@R: c(person(given='Cristiane',
                     family = "Riera-Lizarazu",
                     role = c("ctb"))
              )
-Description: Ploidy and Aneuploidy Estimation Using Markers from High-Throughput Genotyping Platforms.
+Description: Provides tools for estimating ploidy and detecting aneuploidy in individuals using allele dosage information from high-throughput genotyping platforms, such as SNP arrays and sequencing-based technologies. The package includes functions for standardizing signal intensities, calculating B-allele frequencies (BAF) and z-scores, and identifying copy number variation patterns.
 License: AGPL (>= 3)
 Depends: R (>= 3.6.0)
 Imports: 
@@ -38,7 +38,8 @@ LazyData: true
 RoxygenNote: 7.3.2
 Suggests: 
     covr,
-    spelling,    
+    spelling,
+    updog,
     rmdformats,
     knitr (>= 1.10),
     rmarkdown,

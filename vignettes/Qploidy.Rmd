@@ -53,10 +53,19 @@ data <- read_axiom("Qploidy_AxiomGT1_summary.txt")
 head(data)
 ```
 
+```
+   MarkerName     SampleName         X         Y        R     ratio
+1 AX-86752740      Lemon_Fiz  977.7548  793.4656 1771.220 0.4479768
+2 AX-86752740   High_Voltage 1292.2205  582.7886 1875.009 0.3108191
+3 AX-86752740    Lemon_Fiz.1  919.8055  870.9619 1790.767 0.4863624
+4 AX-86752740 High_Voltage.1 1368.1266  645.9481 2014.075 0.3207170
+5 AX-86752740     Brite_Eyes  238.5416 1242.7593 1481.301 0.8389648
+6 AX-86752740 Morden_Blush.1  302.1575 1542.4037 1844.561 0.8361900
+```
+
 * About this Dataset
 
 This dataset consists of an Axiom array-sequenced collection of 524 garden rose cultivars, comprising a total of 137,786 genetic markers. For more details, please refer to [this publication]().
-
 
 ## From Illumina array 
 
@@ -100,7 +109,32 @@ For this method, you will need to separate your subset of samples with known plo
 
 ```{r, eval=FALSE}
 tetraploids_subset <- read.csv("tetraploids.csv")
+head(tetraploids_subset)
+```
+
+```
+  X               x
+1 1      10004-N008
+2 2     10049-R7P76
+3 3 15112-HT8R07P12
+4 4 15114-HT8R07P30
+5 5 15118-HT8R07P50
+6 6      16406-N085
+```
+
+```{r, eval=FALSE}
 data_reference <- data[which(data$SampleName %in% tetraploids_subset$x),]
+head(data_reference)
+```
+
+```
+     MarkerName     SampleName         X         Y        R     ratio
+1   AX-86752740      Lemon_Fiz  977.7548  793.4656 1771.220 0.4479768
+2   AX-86752740   High_Voltage 1292.2205  582.7886 1875.009 0.3108191
+3   AX-86752740    Lemon_Fiz.1  919.8055  870.9619 1790.767 0.4863624
+4   AX-86752740 High_Voltage.1 1368.1266  645.9481 2014.075 0.3207170
+6   AX-86752740 Morden_Blush.1  302.1575 1542.4037 1844.561 0.8361900
+104 AX-86752740 Morden_Blush.2  304.3137 1536.8583 1841.172 0.8347174
 ```
 
 ## (2) Using the Most Common Ploidy

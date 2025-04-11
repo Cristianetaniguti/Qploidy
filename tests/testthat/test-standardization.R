@@ -1,197 +1,163 @@
-# testServer(
-#   mod_interpolation_server,
-#   # Add here your module params
-#   args = list()
-#   , {
-#     ns <- session$ns
-#     expect_true(
-#       inherits(ns, "function")
-#     )
-#     expect_true(
-#       grepl(id, ns(""))
-#     )
-#     expect_true(
-#       grepl("test", ns("test"))
-#     )
-#
-#     session$setInputs(load_summary = list(datapath = system.file("summary_example.txt", package = "Qploidy")),
-#                       load_ind_names = list(datapath = system.file("ind.names_example.txt", package = "Qploidy")),
-#                       load_geno_pos = list(datapath = system.file("geno.pos_example.tsv.gz", package = "Qploidy")),
-#                       fitpoly_scores = list(datapath = system.file("tetraploids_refs_scores.tsv.gz", package = "Qploidy")),
-#                       zscores = list(datapath = system.file("zscore_example.tsv.gz", package = "Qploidy")),
-#                       refs = paste0("Tetra_", 1:50),
-#                       ploidy = 4,
-#                       n.cores = 1)
-#
-#     # Prepare Axiom file
-#     # library(vroom)
-#     # library(dplyr)
-#     # library(tidyr)
-#     # library(testthat)
-#     # library(Qploidy)
-#     #
-#     # input <- list()
-#     # input$load_summary$datapath <- system.file("summary_example.txt", package = "Qploidy")
-#     # input$load_ind_names$datapath <- system.file("ind.names_example.txt", package = "Qploidy")
-#     # input$load_geno_pos$datapath <- system.file("geno.pos_example.tsv.gz", package = "Qploidy")
-#     # input$fitpoly_scores$datapath <- system.file("tetraploids_refs_scores.tsv.gz", package = "Qploidy")
-#     # input$zscore$datapath <- system.file("zscore_example.tsv.gz", package = "Qploidy")
-#     # input$refs <- paste0("Tetra_", 1:50)
-#     # input$ploidy <- 4
-#     # input$n.cores <- 1
-#
-#     summary <- vroom(input$load_summary$datapath, show_col_types = FALSE)
-#     cleaned_summary <- clean_summary(summary_df = summary)
-#
-#     expect_true(length(cleaned_summary) == 2)
-#     expect_true(round(sum(cleaned_summary$A_probes[,4]),0) == 3925567)
-#
-#     ind.names <- vroom(input$load_ind_names$datapath, show_col_types = FALSE)
-#
-#     R_theta <- get_R_theta(cleaned_summary, ind.names)
-#
-#     R_all <- R_theta[[1]]
-#     theta_all <- R_theta[[2]]
-#
-#     fitpoly_input <- summary_to_fitpoly(R_all, theta_all)
-#
-#     expect_equal(round(sum(fitpoly_input$X),0), 239122013)
-#     expect_equal(round(sum(fitpoly_input$ratio),0), 82226)
-#
-#     # Export file for fitpoly
-#     fitpoly_input_sele <- fitpoly_input %>% filter(SampleName %in% input$refs)
-#
-#     # library(fitPoly)
-#     # saveMarkerModels(ploidy=4,
-#     #                  data=fitpoly_input_sele,
-#     #                  p.threshold=0.9,
-#     #                  filePrefix="tetraploids_refs",
-#     #                  ncores=20)
-#
-#     # After fitpoly
-#     scores <- vroom(input$fitpoly_scores$datapath, show_col_types = FALSE)
-#     expect_equal(sum(scores$geno, na.rm = TRUE), 203403)
-#
-#     # Filters
-#     n.na <- scores %>% group_by(MarkerName) %>% summarize(n.na = (sum(is.na(geno))/length(geno))*100)
-#     rm.mks <- n.na$MarkerName[which(n.na$n.na > 25)]
-#     missing.data <- length(rm.mks)
-#     scores_filt <- scores[-which(scores$MarkerName %in% rm.mks),]
-#
-#     keep.mks <- match(paste0(scores_filt$SampleName, "_", scores_filt$MarkerName),
-#                       paste0(fitpoly_input$SampleName, "_", fitpoly_input$MarkerName))
-#
-#     fitpoly_input_filt <- fitpoly_input[keep.mks,]
-#     theta <- fitpoly_input_filt$ratio
-#     R <- fitpoly_input_filt$R
-#
-#     rm.na <- which(is.na(scores_filt$geno))
-#     if(length(rm.na) > 0){
-#       R[rm.na] <- NA
-#       theta[rm.na] <- NA
-#     }
-#
-#     data_interpolation <- data.frame(mks = fitpoly_input_filt$MarkerName,
-#                                      ind = fitpoly_input_filt$SampleName,
-#                                      R = R,
-#                                      theta = theta,
-#                                      geno = scores_filt$geno)
-#
-#     lst_interpolation <- split(data_interpolation, data_interpolation$mks)
-#
-#     # Generate clusters
-#     library(parallel)
-#     clust <- makeCluster(input$n.cores)
-#     ploidy <- input$ploidy
-#     clusterExport(clust, c("par_fitpoly_interpolation"))
-#     #clusterExport(clust, c("par_fitpoly_interpolation", "ploidy"))
-#     clusters <- parLapply(clust, lst_interpolation, function(x) {
-#       library(ggplot2)
-#       par_fitpoly_interpolation(x, ploidy= ploidy)
-#     })
-#     stopCluster(clust)
-#
-#     # Filter by number of clusters
-#     rm.mks <- sapply(clusters, function(x) x$rm != 0)
-#     wrong_n_clusters <- sum(rm.mks)
-#     clusters_filt <- clusters[-which(rm.mks)]
-#
-#     # Filtered markers table
-#     filtered.markers <- data.frame(n.mk.start = nrow(cleaned_summary[[1]]),
-#                                    missing.data,
-#                                    wrong_n_clusters,
-#                                    n.mk.selected = length(clusters_filt))
-#
-#     expect_equal(c(nrow(cleaned_summary[[1]]),
-#                    missing.data,
-#                    wrong_n_clusters,
-#                    length(clusters_filt)), c(2379, 294, 741, 1332))
-#
-#     mks <- names(clusters)
-#     mks[which(rm.mks)] <- paste(mks[which(rm.mks)], "(discarded)")
-#
-#     # Add discarted
-#     data_interpolation_disc.mks <- do.call(rbind, lst_interpolation)
-#     data_interpolation_disc.mks$mks.disc <- mks[match(data_interpolation_disc.mks$mks, names(clusters))]
-#
-#     # Plot markers interpolation
-#     p <- plot_one_marker(lst_interpolation[[1]], ploidy = 4)
-#     # Discarded marker:
-#     p <- plot_one_marker(lst_interpolation[[2]], ploidy = 4)
-#
-#
-#     keep.mks <- names(clusters_filt)
-#     # Getting logR and BAF for entire dataset
-#     theta_filt <- theta_all[match(keep.mks, theta_all$MarkerName),]
-#
-#     par <- rep(1:input$n.cores, each=round((nrow(theta_filt)/input$n.cores)+1,0))[1:nrow(theta_filt)]
-#
-#     par_theta <- split.data.frame(theta_filt[,-1], par)
-#     par_clusters_filt <- split(clusters_filt, par)
-#
-#     par_all <- list()
-#     for(i in 1:input$n.cores){
-#       par_all[[i]] <- list()
-#       par_all[[i]][[1]] <- par_theta[[i]]
-#       par_all[[i]][[2]] <- par_clusters_filt[[i]]
-#     }
-#
-#     # Get BAF
-#     clust <- makeCluster(input$n.cores)
-#     clusterExport(clust, c("get_baf", "get_baf_par"))
-#     #clusterExport(clust, c("get_baf", "get_baf_par", "ploidy"))
-#     bafs_diplo <- parLapply(clust, par_all, function(x) {
-#       get_baf_par(x, ploidy = ploidy)
-#     })
-#     stopCluster(clust)
-#
-#     bafs_diplo_lt <- unlist(bafs_diplo, recursive = F)
-#     bafs_diplo_m <- do.call(rbind, bafs_diplo_lt)
-#     rownames(bafs_diplo_m) <- keep.mks
-#     colnames(bafs_diplo_m) <- colnames(theta_filt)[-1]
-#     bafs_diplo_df <- as.data.frame(bafs_diplo_m)
-#     bafs_diplo_df <- cbind(mks=rownames(bafs_diplo_df), bafs_diplo_df)
-#
-#     expect_equal(sum(bafs_diplo_df[,-1]), 25343, tolerance = 1)
-#
-#     geno.pos <- vroom(input$load_geno_pos$datapath, show_col_types = FALSE)
-#
-#     chr <- geno.pos$Chr[match(bafs_diplo_df$mks,geno.pos$Name)]
-#     pos <- geno.pos$Position[match(bafs_diplo_df$mks,geno.pos$Name)]
-#
-#     baf <- cbind(Name=bafs_diplo_df$mks, Chr = chr, Position = pos, bafs_diplo_df[,-1])
-#
-#     colnames(geno.pos)[2] <- "Chromosome"
-#     zscore <- get_zscore(data = fitpoly_input, geno.pos = geno.pos)
-#   })
-#
-# test_that("module ui works", {
-#   ui <- mod_interpolation_ui(id = "test")
-#   golem::expect_shinytaglist(ui)
-#   # Check that formals have not been removed
-#   fmls <- formals(mod_interpolation_ui)
-#   for (i in c("id")){
-#     expect_true(i %in% names(fmls))
-#   }
-# })
-#
+library(dplyr)
+
+test_that("get_centers returns expected result", {
+  fake_input <- simulate_standardization_input(n_markers = 10, n_samples = 5, ploidy = 2, seed = 2025)
+
+  # Example that marker has all 3 possible dosages
+  m <- fake_input$standardization_input %>% filter(MarkerName == "m2")
+  result <- get_centers(m, ploidy = 2)
+
+  expect_type(result, "list")
+  expect_named(result, c("rm", "centers_theta", "MarkerName", "n.clusters"))
+  expect_true(length(result$centers_theta) == 3)
+  expect_equal(result$centers_theta, c(0.03685, 0.47120, 0.97875), tolerance = 1e-4)
+
+  # Example that marker has only 2 of the 3 possible dosages - 1 imputed
+  m1 <- fake_input$standardization_input %>% filter(MarkerName == "m1")
+  result <- get_centers(m1, ploidy = 2) # marker get flag 2 - will be removed
+  expect_true(result$rm == 2)
+  result <- get_centers(m1, ploidy = 2, n.clusters.thr = 2)
+
+
+  expect_type(result, "list")
+  expect_named(result, c("rm", "centers_theta", "MarkerName", "n.clusters"))
+  expect_true(length(result$centers_theta) == 3)
+  expect_equal(result$centers_theta, c(0.086750, 0.520875, 0.955000), tolerance = 1e-4)
+})
+
+test_that("get_baf works as expected", {
+  centers_theta <- c(0.1, 0.5, 0.9)
+  theta <- c(0.05, 0.3, 0.6, 0.95)
+
+  bafs <- get_baf(theta, centers_theta, ploidy = 2)
+
+  expect_equal(length(bafs), length(theta))
+  expect_true(all(bafs >= 0 & bafs <= 1))
+  expect_equal(sum(bafs), 1.875, tolerance = 1e-4)
+})
+
+test_that("get_baf_par returns correct BAFs for 5 markers and 4 samples", {
+  set.seed(123)
+
+  n_markers <- 5
+  n_samples <- 4
+  marker_ids <- paste0("m", 1:n_markers)
+  sample_ids <- paste0("S", 1:n_samples)
+
+  # Simulate theta values between 0 and 1 (e.g., sample allelic ratios)
+  theta_matrix <- matrix(runif(n_markers * n_samples, min = 0.05, max = 0.95), nrow = n_markers)
+  theta_df <- data.frame(ID = marker_ids, theta_matrix)
+  colnames(theta_df)[-1] <- sample_ids
+
+  # Simulate cluster centers (3 centers for diploid: 0, 0.5, 1)
+  # We'll make them a bit variable to simulate real centroids
+  centers_matrix <- t(replicate(n_markers, sort(c(
+    runif(1, 0.05, 0.15),
+    runif(1, 0.45, 0.55),
+    runif(1, 0.85, 0.95)
+  ))))
+  centers_df <- data.frame(ID = marker_ids, centers_matrix)
+  colnames(centers_df)[-1] <- 1:3
+
+  # Prepare input list
+  par_input <- list(theta_df, centers_df)
+
+  # Call the function
+  result <- get_baf_par(par_input, ploidy = 2)
+
+  # Assertions
+  expect_type(result, "list")
+  expect_length(result, n_markers)
+  expect_equal(sum(result[[1]]), 2.1509, tolerance = 0.001)
+})
+
+test_that("get_zscore returns z-score table", {
+  fake_input <- simulate_standardization_input(n_markers = 10, n_samples = 5, ploidy = 2, seed = 2025)
+
+  result <- get_zscore(data = fake_input$sample_data, geno.pos = fake_input$geno_pos)
+
+  expect_s3_class(result, "data.frame")
+  expect_true("z" %in% colnames(result))
+  expect_equal(nrow(result), nrow(fake_input$sample_data))
+  expect_equal(var(result$z), 0.8163, tolerance = 0.001)
+})
+
+test_that("standardize runs and returns expected object", {
+  fake_input <- simulate_standardization_input(n_markers = 10, n_samples = 5, ploidy = 2, seed = 2025)
+
+  result <- standardize(
+    data = fake_input$sample_data,
+    genos = fake_input$geno_data,
+    geno.pos = fake_input$geno_pos,
+    threshold.missing.geno = 1,
+    threshold.geno.prob = 0.5,
+    ploidy.standardization = 2,
+    threshold.n.clusters = 2,
+    n.cores = 1,
+    type = "intensities",
+    verbose = FALSE
+  )
+
+  expect_s3_class(result, "qploidy_standardization")
+  expect_true("data" %in% names(result))
+  expect_equal(sum(result$data$baf, na.rm = TRUE), 27.3644 ,tolerance = 0.001)
+})
+
+test_that("rm_outlier removes extreme values", {
+  # Create a dataset with 19 'normal' values and 1 extreme outlier
+  normal_theta <- rnorm(19, mean = 0.2, sd = 0.01)
+  outlier_theta <- 3.0
+  test_theta <- c(normal_theta, outlier_theta)
+
+  test_df <- data.frame(theta = test_theta)
+  cleaned <- rm_outlier(test_df)
+
+  expect_true(length(cleaned) < nrow(test_df))
+})
+
+
+test_that("updog_centers returns correct output structure", {
+  skip_if_not_installed("updog")
+
+  library(dplyr)
+  library(updog)
+
+  set.seed(123)
+  n_markers <- 5
+  n_individuals <- 10
+  ploidy <- 2
+
+  # Simulate varying total read depth (size) for each marker × individual
+  sizemat <- matrix(rpois(n_markers * n_individuals, lambda = 100), nrow = n_markers, ncol = n_individuals)
+  sizemat[sizemat == 0] <- 1  # avoid 0 depth
+
+  # Simulate reference reads with moderate allele bias
+  refmat <- matrix(rbinom(n_markers * n_individuals, size = c(sizemat), prob = 0.7),
+                   nrow = n_markers, ncol = n_individuals)
+  altmat <- sizemat - refmat
+
+  # Name dimensions
+  marker_ids <- paste0("m", 1:n_markers)
+  sample_ids <- paste0("ind", 1:n_individuals)
+
+  rownames(refmat) <- rownames(altmat) <- rownames(sizemat) <- marker_ids
+  colnames(refmat) <- colnames(altmat) <- colnames(sizemat) <- sample_ids
+
+  # Create multidog object
+  md <- multidog(
+    refmat = refmat,
+    sizemat = sizemat,
+    ploidy = ploidy,
+    model = "norm"
+  )
+
+  # No markers removed
+  rm.mks <- character(0)
+
+  result <- updog_centers(md, threshold.n.clusters = 2, rm.mks = rm.mks)
+
+  # Basic checks
+  expect_type(result, "list")
+  expect_length(result, 5)
+  expect_equal(sum(result$m1$centers_theta), 1.502, tolerance = 0.001)
+})

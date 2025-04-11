@@ -1,3 +1,5 @@
+globalVariables(c("rnom", "X", "Y", "runif", "prob"))
+
 #' Pascal triangle to define the expected peaks for each ploidy
 #'
 #' @param h ploidy value
@@ -7,6 +9,21 @@ pascalTriangle <- function(h) {
   lapply(0:h, function(i) choose(i, 0:i))
 }
 
+
+#' Calculate the Statistical Mode
+#'
+#' This function returns the most frequent (modal) value in a vector.
+#' If there are multiple values with the same highest frequency,
+#' it returns the first one encountered.
+#'
+#' @param x A vector of numeric, character, or factor values.
+#'
+#' @return A single value representing the mode of the input vector.
+#'
+#' @examples
+#' mode(c(1, 2, 2, 3, 4))   # Returns 2
+#' mode(c("apple", "banana", "apple"))  # Returns "apple"
+#'
 mode <- function(x) {
   ux <- unique(x)
   ux[which.max(tabulate(match(x, ux)))]
@@ -70,6 +87,8 @@ xi_fun <- function(p, eps, h) {
 #'   \item{geno_pos}{Genomic coordinates for each marker.}
 #'   \item{standardization_input}{Merged input data with theta and genotype.}
 #' }
+#'
+#' @importFrom stats cor rnorm runif
 #'
 #' @export
 simulate_standardization_input <- function(n_markers = 10,

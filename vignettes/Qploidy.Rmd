@@ -360,10 +360,10 @@ p <- plot_qploidy_standardization(x = roses_data_standardized,
                                   type = c("het", "BAF", "zscore"), 
                                   dot.size = 0.05,
                                   chr = 2:8)
-ggsave(p, filename = "fig1.png")
+ggsave(p, filename = "fig1.jpg")
 ```
 
-![](fig1.png)
+![](fig1.jpg)
 
 ```{r, eval=FALSE}
 # Heterozygous frequency, BAF (Qploidy standardized ratio), and zscore by genomic positions  - centromere positions added
@@ -376,11 +376,11 @@ p <- plot_qploidy_standardization(x = roses_data_standardized,
                                   centromeres = c("1" = 22000000, "2" = 36000000, "3" = 4000000, 
                                                   "4" = 20000000, "5" = 52000000, "6" = 32000000, "7" = 20000000))
 
-ggsave(p, filename = "fig2.png")
+ggsave(p, filename = "fig2.jpg")
 
 ```
 
-![](fig2.png)
+![](fig2.jpg)
 
 ```{r, eval=FALSE}
 # Raw allele intensity or read count ratio and BAF (Qploidy standardized ratio) histograms combining all markers in the sample (sample level resolution) 
@@ -391,10 +391,10 @@ p <- plot_qploidy_standardization(x = roses_data_standardized,
                                   ploidy = c(4,4,5,4,4,4,4),
                                   add_expected_peaks = TRUE)
 
-ggsave(p, filename = "fig3.png")
+ggsave(p, filename = "fig3.jpg")
 ```
 
-![](fig3.png)
+![](fig3.jpg)
 
 ```{r, eval=FALSE}
 # BAF histograms (chromosome level resolution) and Z score
@@ -404,11 +404,11 @@ p <- plot_qploidy_standardization(x = roses_data_standardized,
                                   chr = 2:8,
                                   add_expected_peaks = TRUE, 
                                   ploidy = c(4,4,5,4,4,4,4))
-ggsave(p, filename = "fig4.png")
+ggsave(p, filename = "fig4.jpg")
 
 ```
 
-![](fig4.png)
+![](fig4.jpg)
 
 ```{r, eval=FALSE}
 # BAF histograms combining all markers in the sample (chromosome-arm level resolution) and Z score
@@ -422,10 +422,10 @@ p <- plot_qploidy_standardization(x = roses_data_standardized,
                                   centromeres = c("1" = 22000000, "2" = 36000000, "3" = 4000000, 
                                                   "4" = 20000000, "5" = 52000000, "6" = 32000000, "7" = 20000000))
 
-ggsave(p, filename = "fig5.png")
+ggsave(p, filename = "fig5.jpg")
 ```
 
-![](fig5.png)
+![](fig5.jpg)
 
 It is important to note that the quality of results can vary across samples, as observed in different plots. Key aspects to assess include:  
 - How sharp the peaks are in the histogram plots.  
@@ -679,13 +679,13 @@ p <- plot_qploidy_standardization(x = roses_data_standardized_round2,
                                   chr = 2:8, 
                                   ploidy = c(4,4,5,4,4,4,4))
 
-ggsave(p, filename = "fig7.png")
+ggsave(p, filename = "fig7.jpg")
 
 ```
 
-![Round 1](fig1.png)
+![Round 1](fig1.jpg)
 
-![Round 2](fig7.png)
+![Round 2](fig7.jpg)
 
 ```{r, eval=FALSE}
 # BAF histograms combining all markers in the sample (chromosome-arm level resolution) and Z score
@@ -696,12 +696,12 @@ p <- plot_qploidy_standardization(x = roses_data_standardized_round2,
                                   ploidy = c(4,4,5,4,4,4,4), 
                                   add_expected_peaks = TRUE)
 
-ggsave(p, filename = "fig6.png")
+ggsave(p, filename = "fig6.jpg")
 ```
 
-![Round 1](fig4.png)
+![Round 1](fig4.jpg)
 
-![Round 2](fig6.png)
+![Round 2](fig6.jpg)
 
 
 ```{r, eval=FALSE}

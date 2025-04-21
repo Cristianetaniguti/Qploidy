@@ -2,7 +2,7 @@
 % Please edit documentation in R/prepare.R
 \name{read_axiom}
 \alias{read_axiom}
-\title{Converts axiom array summary file to Qploidy and fitpoly input data}
+\title{Convert Axiom Array Summary File to Qploidy Input}
 \usage{
 read_axiom(
   summary_file,
@@ -12,14 +12,17 @@ read_axiom(
 )
 }
 \arguments{
-\item{summary_file}{Axiom summary file}
+\item{summary_file}{Path to the Axiom summary file.}
 
-\item{ind_names}{if the summary file columns does not have the desirable sample names, provide a file with two columns: Plate_name: with sample IDs contained in the summary file; Sample_Name: with desirable sample names to be replaced}
+\item{ind_names}{Optional. A file with two columns: Plate_name (sample IDs in the summary file) and Sample_Name (desired sample names).}
 
-\item{sd.normalization}{logical. If TRUE performs standard normalization}
+\item{sd.normalization}{Logical. If TRUE, performs standard normalization.}
 
-\item{atan}{logical. If TRUE calculates the theta using atan2}
+\item{atan}{Logical. If TRUE, calculates theta using atan2.}
+}
+\value{
+A data frame formatted for Qploidy analysis.
 }
 \description{
-Converts axiom array summary file to Qploidy and fitpoly input data
+This function processes an Axiom array summary file and converts it into a format compatible with Qploidy and fitpoly analysis.
 }

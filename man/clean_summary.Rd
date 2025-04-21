@@ -2,16 +2,19 @@
 % Please edit documentation in R/prepare.R
 \name{clean_summary}
 \alias{clean_summary}
-\title{Edit Axiom Summary file}
+\title{Clean Axiom Summary File}
 \usage{
 clean_summary(summary_df)
 }
 \arguments{
-\item{summary_df}{data.frame with A and B probes intensities}
+\item{summary_df}{A data frame containing A and B probe intensities.}
 }
 \value{
-list with A and B probes
+A list with cleaned A and B probes.
 }
 \description{
-Remove consecutive A allele probe from the summary file
+This function removes consecutive A allele probes from an Axiom summary file.
+}
+\examples{
+NULL
 }

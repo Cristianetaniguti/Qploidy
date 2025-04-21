@@ -14,15 +14,17 @@ simulate_illumina_file(
 )
 }
 \arguments{
+\item{filepath}{The path where the simulated Illumina file will be saved. Default is "simulated_summary.txt".}
+
 \item{num_snps}{The number of SNPs to simulate. Default is 10.}
 
 \item{num_samples}{The number of samples to simulate. Default is 1.}
 
 \item{sample_id_prefix}{The prefix for sample IDs. Default is "SAMP".}
 
-\item{seed}{The seed for random number generation to ensure reproducibility. Default is 123.}
+\item{mk_id}{The prefix for marker IDs. Default is "MK-".}
 
-\item{file}{The path where the simulated Illumina file will be saved. Default is "simulated_summary.txt".}
+\item{seed}{The seed for random number generation to ensure reproducibility. Default is 123.}
 }
 \value{
 None. The function writes the simulated Illumina file to the specified path.

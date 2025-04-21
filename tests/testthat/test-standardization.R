@@ -1,4 +1,5 @@
 library(dplyr)
+library(testthat)
 
 test_that("get_centers returns expected result", {
   fake_input <- simulate_standardization_input(n_markers = 10, n_samples = 5, ploidy = 2, seed = 2025)
@@ -101,6 +102,43 @@ test_that("standardize runs and returns expected object", {
   expect_s3_class(result, "qploidy_standardization")
   expect_true("data" %in% names(result))
   expect_equal(sum(result$data$baf, na.rm = TRUE), 27.3644 ,tolerance = 0.001)
+
+
+  temp <- tempfile()
+  result <- standardize(
+    data = fake_input$sample_data,
+    genos = fake_input$geno_data,
+    geno.pos = fake_input$geno_pos,
+    threshold.missing.geno = 1,
+    threshold.geno.prob = 0.5,
+    ploidy.standardization = 2,
+    threshold.n.clusters = 2,
+    n.cores = 1,
+    type = "counts",
+    verbose = TRUE,
+    out_filename = temp
+  )
+
+  expect_s3_class(result, "qploidy_standardization")
+  expect_true("data" %in% names(result))
+  expect_equal(sum(result$data$baf, na.rm = TRUE), 27.3644 ,tolerance = 0.001)
+
+  # Check print.qploidy_standardization
+  txt <- print(result)
+  expect_equal(dim(txt), c(6,3))
+  expect_equal(as.character(txt[4,3]), "(0 %)  ")
+
+  # Check read.qploidy_standardization
+  result <- read_qploidy_standardization(temp)
+
+  expect_s3_class(result, "qploidy_standardization")
+  expect_true("data" %in% names(result))
+  expect_equal(sum(result$data$baf, na.rm = TRUE), 27.3644 ,tolerance = 0.001)
+
+  # Check print.qploidy_standardization
+  txt <- print(result)
+  expect_equal(dim(txt), c(6,3))
+  expect_equal(as.character(txt[4,3]), "(0 %)  ")
 })
 
 test_that("rm_outlier removes extreme values", {
@@ -161,3 +199,4 @@ test_that("updog_centers returns correct output structure", {
   expect_length(result, 5)
   expect_equal(sum(result$m1$centers_theta), 1.502, tolerance = 0.001)
 })
+

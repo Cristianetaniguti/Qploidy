@@ -74,7 +74,8 @@ read_illumina_array <- function(...){
 
   raw_all <- vector()
   for(i in 1:length(files)){
-    raw <- vroom(files[[i]], delim = "\t", skip = 9)
+    skipn <- find_header_line(files[[i]], word = "SNP Name")
+    raw <- vroom(files[[i]], delim = "\t", skip = skipn-1)
     raw1 <- raw[,c("SNP Name","Sample ID","X","Y")]
     if(length(files) > 1) raw1$`Sample ID` <- paste0(raw1$`Sample ID`, "_",i)
     raw_all <- rbind(raw_all, raw1)
@@ -83,6 +84,31 @@ read_illumina_array <- function(...){
   fitpoly_potato_input <- cbind(raw_all, R = raw_all$X + raw_all$Y, ratio = raw_all$Y/(raw_all$X + raw_all$Y))
   colnames(fitpoly_potato_input)[1:2] <- c("MarkerName", "SampleName")
   return(fitpoly_potato_input)
+}
+
+
+#' Find the Header Line in a File
+#'
+#' This function scans a file to locate the first line containing a specific keyword, such as 'probeset_id'.
+#' It is useful for identifying the starting point of data in files with headers or metadata.
+#'
+#' @param summary_file The path to the file to be scanned.
+#' @param max_lines The maximum number of lines to scan. Default is 6000.
+#' @param word The keyword to search for in the first column. Default is "probeset_id".
+#' @return The line number where the keyword is found.
+#' 
+#' @export
+find_header_line <- function(summary_file, word = "probeset_id", max_lines = 6000) {
+  con <- file(summary_file, open = "r")
+  on.exit(close(con))
+  
+  for (i in 1:max_lines) {
+    line <- readLines(con, n = 1)
+    if (length(line) == 0) break  # EOF
+    if (startsWith(line, word)) return(i)
+  }
+  
+  stop(substitute(word)," not found in the first column within the first ", max_lines, " lines.")
 }
 
 #' Converts axiom array summary file to Qploidy and fitpoly input data
@@ -97,10 +123,8 @@ read_illumina_array <- function(...){
 #' @export
 read_axiom <- function(summary_file, ind_names = NULL, sd.normalization = FALSE, atan = FALSE){
 
-  header_line <- system(paste("grep -Fn 'probeset_id'", summary_file), intern = TRUE)
-  header_line <- sapply(strsplit(header_line, ":"), "[[", 1)
-
-  raw <- vroom(summary_file, skip = as.numeric(header_line) -1)
+  skip_line <- find_header_line(summary_file)
+  raw <- vroom(summary_file, skip = as.numeric(skip_line) -1)
 
   # Guarantee that every A has a B
   summary_filt <- clean_summary(raw)
@@ -184,7 +208,8 @@ get_R_theta <- function(cleaned_summary, sd.normalization = FALSE, atan = FALSE)
   return(list(R_all=R_all, theta_all = theta_all))
 }
 
-#' Get R and theta values from Illumina intensities file with option to do standard normalization by plate and markers
+#' Get R and theta values from Illumina intensities file with option to do standard normalization by 
+#' plate and markers
 #'
 #' @param cleaned_illumina List with X and Y intensities.
 #' @param atan logical. If TRUE calculates the theta using atan2
@@ -389,3 +414,4 @@ get_probs_sing <- function(melt_df, f1.codes, ploidy){
   print(paste0("Individual ", unique(homoprob$ind), " done!"))
   return(homoprob)
 }
+

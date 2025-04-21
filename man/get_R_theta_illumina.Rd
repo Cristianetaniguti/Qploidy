@@ -2,7 +2,8 @@
 % Please edit documentation in R/prepare.R
 \name{get_R_theta_illumina}
 \alias{get_R_theta_illumina}
-\title{Get R and theta values from Illumina intensities file with option to do standard normalization by plate and markers}
+\title{Get R and theta values from Illumina intensities file with option to do standard normalization by 
+plate and markers}
 \usage{
 get_R_theta_illumina(cleaned_illumina, atan = FALSE)
 }
@@ -12,5 +13,6 @@ get_R_theta_illumina(cleaned_illumina, atan = FALSE)
 \item{atan}{logical. If TRUE calculates the theta using atan2}
 }
 \description{
-Get R and theta values from Illumina intensities file with option to do standard normalization by plate and markers
+Get R and theta values from Illumina intensities file with option to do standard normalization by 
+plate and markers
 }

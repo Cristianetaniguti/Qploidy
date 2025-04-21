@@ -2,16 +2,17 @@ globalVariables(c("ind", "zscore", "chr", "write.csv"))
 
 
 
-#' convert vcf file to Qploidy data
+#' Convert VCF File to Qploidy Data
 #'
-#' @param vcf_file path to vcf file
-#' @param geno if TRUE, output columns will be MarkerName, SampleName, geno, prob. If FALSE they will be MarkerName, SampleName, X, Y, R, and ratio.
-#' @param geno.pos if TRUE output MarkerName Chromosome and Position columns
+#' This function converts a VCF file into a format compatible with Qploidy analysis. It extracts genotype and allele depth information and formats it into a data frame.
 #'
-#' @import tidyr
-#' @import vcfR
-#'
+#' @param vcf_file Path to the VCF file.
+#' @param geno Logical. If TRUE, the output columns will include MarkerName, SampleName, geno, and prob. If FALSE, the output will include MarkerName, SampleName, X, Y, R, and ratio.
+#' @param geno.pos Logical. If TRUE, the output will include MarkerName, Chromosome, and Position columns.
+#' @return A data frame containing the processed VCF data.
 #' @export
+#' @import vcfR
+#' @importFrom tidyr pivot_longer
 qploidy_read_vcf <- function(vcf_file, geno = FALSE, geno.pos = FALSE) {
 
   vcf <- read.vcfR(vcf_file)
@@ -62,13 +63,14 @@ qploidy_read_vcf <- function(vcf_file, geno = FALSE, geno.pos = FALSE) {
   return(data_qploidy)
 }
 
-#' read illumina array files. Add suffix _[file number] if more than one file.
+#' Read Illumina Array Files
 #'
-#' @param ... illumina array filename/s
+#' This function reads Illumina array files and processes them into a format suitable for Qploidy analysis. It adds a suffix to sample IDs if multiple files are provided.
 #'
-#' @import vroom
-#'
+#' @param ... One or more Illumina array filenames.
+#' @return A data frame containing the processed Illumina array data.
 #' @export
+#' @importFrom tidyr pivot_longer
 read_illumina_array <- function(...){
   files <- list(...)
 
@@ -111,16 +113,18 @@ find_header_line <- function(summary_file, word = "probeset_id", max_lines = 600
   stop(substitute(word)," not found in the first column within the first ", max_lines, " lines.")
 }
 
-#' Converts axiom array summary file to Qploidy and fitpoly input data
+#' Convert Axiom Array Summary File to Qploidy Input
 #'
-#' @param summary_file Axiom summary file
-#' @param ind_names if the summary file columns does not have the desirable sample names, provide a file with two columns: Plate_name: with sample IDs contained in the summary file; Sample_Name: with desirable sample names to be replaced
-#' @param sd.normalization logical. If TRUE performs standard normalization
-#' @param atan logical. If TRUE calculates the theta using atan2
+#' This function processes an Axiom array summary file and converts it into a format compatible with Qploidy and fitpoly analysis.
 #'
-#' @import vroom
-#'
+#' @param summary_file Path to the Axiom summary file.
+#' @param ind_names Optional. A file with two columns: Plate_name (sample IDs in the summary file) and Sample_Name (desired sample names).
+#' @param sd.normalization Logical. If TRUE, performs standard normalization.
+#' @param atan Logical. If TRUE, calculates theta using atan2.
+#' @return A data frame formatted for Qploidy analysis.
 #' @export
+#' @importFrom tidyr pivot_longer
+#' @importFrom tidyr pivot_wider
 read_axiom <- function(summary_file, ind_names = NULL, sd.normalization = FALSE, atan = FALSE){
 
   skip_line <- find_header_line(summary_file)
@@ -145,14 +149,13 @@ read_axiom <- function(summary_file, ind_names = NULL, sd.normalization = FALSE,
 }
 
 
-#' Edit Axiom Summary file
+#' Clean Axiom Summary File
 #'
-#' Remove consecutive A allele probe from the summary file
+#' This function removes consecutive A allele probes from an Axiom summary file.
 #'
-#' @param summary_df data.frame with A and B probes intensities
-#'
-#' @return list with A and B probes
-#'
+#' @param summary_df A data frame containing A and B probe intensities.
+#' @return A list with cleaned A and B probes.
+#' @examples NULL
 #' @export
 clean_summary <- function(summary_df){
   summaries_filt <- summary_df
@@ -165,16 +168,16 @@ clean_summary <- function(summary_df){
   return(list(A_probes=A_probes, B_probes = B_probes))
 }
 
-#' Get R and theta values from summary file with option to do standard normalization by plate and markers
+#' Get R and Theta Values from Summary File
 #'
-#' @param cleaned_summary summary object from clean_summary function. List with A and B intensities.
-#' @param sd.normalization logical. If TRUE performs standard normalization
-#' @param atan logical. If TRUE calculates the theta using atan2
+#' This function calculates R and theta values from a cleaned summary file. It optionally performs standard normalization by plate and markers.
 #'
-#' @import tidyr
-#' @importFrom dplyr mutate
-#'
+#' @param cleaned_summary A summary object from the clean_summary function.
+#' @param sd.normalization Logical. If TRUE, performs standard normalization.
+#' @param atan Logical. If TRUE, calculates theta using atan2.
+#' @return A list containing R and theta values.
 #' @export
+#' @importFrom dplyr mutate
 get_R_theta <- function(cleaned_summary, sd.normalization = FALSE, atan = FALSE){
   R_all <- as.data.frame(cleaned_summary$A_probes[,-1] + cleaned_summary$B_probes[,-1])
   if(atan){
@@ -214,6 +217,7 @@ get_R_theta <- function(cleaned_summary, sd.normalization = FALSE, atan = FALSE)
 #' @param cleaned_illumina List with X and Y intensities.
 #' @param atan logical. If TRUE calculates the theta using atan2
 #'
+#' @examples NULL
 #' @import tidyr
 #' @importFrom dplyr mutate
 #'

@@ -21,6 +21,3 @@ None. The function writes the simulated summary content to the specified file.
 \description{
 This function generates a simulated Axiom array summary file with probe IDs ending in `-A` or `-B` and sample intensities. The intensities are simulated based on the genotype of the sample: homozygous for A, homozygous for B, or heterozygous.
 }
-\examples{
-simulate_axiom_summary("simulated_summary.txt", n_probes = 50, n_samples = 5, seed = 1234)
-}

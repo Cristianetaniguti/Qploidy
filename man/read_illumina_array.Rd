@@ -2,13 +2,16 @@
 % Please edit documentation in R/prepare.R
 \name{read_illumina_array}
 \alias{read_illumina_array}
-\title{read illumina array files. Add suffix _[file number] if more than one file.}
+\title{Read Illumina Array Files}
 \usage{
 read_illumina_array(...)
 }
 \arguments{
-\item{...}{illumina array filename/s}
+\item{...}{One or more Illumina array filenames.}
+}
+\value{
+A data frame containing the processed Illumina array data.
 }
 \description{
-read illumina array files. Add suffix _[file number] if more than one file.
+This function reads Illumina array files and processes them into a format suitable for Qploidy analysis. It adds a suffix to sample IDs if multiple files are provided.
 }

@@ -2,17 +2,20 @@
 % Please edit documentation in R/prepare.R
 \name{get_R_theta}
 \alias{get_R_theta}
-\title{Get R and theta values from summary file with option to do standard normalization by plate and markers}
+\title{Get R and Theta Values from Summary File}
 \usage{
 get_R_theta(cleaned_summary, sd.normalization = FALSE, atan = FALSE)
 }
 \arguments{
-\item{cleaned_summary}{summary object from clean_summary function. List with A and B intensities.}
+\item{cleaned_summary}{A summary object from the clean_summary function.}
 
-\item{sd.normalization}{logical. If TRUE performs standard normalization}
+\item{sd.normalization}{Logical. If TRUE, performs standard normalization.}
 
-\item{atan}{logical. If TRUE calculates the theta using atan2}
+\item{atan}{Logical. If TRUE, calculates theta using atan2.}
+}
+\value{
+A list containing R and theta values.
 }
 \description{
-Get R and theta values from summary file with option to do standard normalization by plate and markers
+This function calculates R and theta values from a cleaned summary file. It optionally performs standard normalization by plate and markers.
 }

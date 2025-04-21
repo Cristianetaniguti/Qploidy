@@ -16,3 +16,6 @@ get_R_theta_illumina(cleaned_illumina, atan = FALSE)
 Get R and theta values from Illumina intensities file with option to do standard normalization by 
 plate and markers
 }
+\examples{
+NULL
+}

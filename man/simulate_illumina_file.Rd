@@ -5,7 +5,7 @@
 \title{Simulate an Illumina File}
 \usage{
 simulate_illumina_file(
-  file = "simulated_summary.txt",
+  filepath,
   num_snps = 10,
   num_samples = 1,
   sample_id_prefix = "SAMP",
@@ -14,8 +14,6 @@ simulate_illumina_file(
 )
 }
 \arguments{
-\item{file}{The path where the simulated Illumina file will be saved. Default is "simulated_summary.txt".}
-
 \item{num_snps}{The number of SNPs to simulate. Default is 10.}
 
 \item{num_samples}{The number of samples to simulate. Default is 1.}
@@ -23,6 +21,8 @@ simulate_illumina_file(
 \item{sample_id_prefix}{The prefix for sample IDs. Default is "SAMP".}
 
 \item{seed}{The seed for random number generation to ensure reproducibility. Default is 123.}
+
+\item{file}{The path where the simulated Illumina file will be saved. Default is "simulated_summary.txt".}
 }
 \value{
 None. The function writes the simulated Illumina file to the specified path.
@@ -33,7 +33,4 @@ The file includes a header section and a data section with fields such as SNP Na
 }
 \details{
 The simulated data includes random values for GC Score, Theta, X, Y, X Raw, Y Raw, and Log R Ratio. The header section provides metadata about the file, including the number of SNPs and samples.
-}
-\examples{
-simulate_illumina_file(file = "simulated_illumina.txt", num_snps = 50, num_samples = 5, sample_id_prefix = "SAMPLE", seed = 42)
 }

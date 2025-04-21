@@ -119,10 +119,11 @@ simulate_axiom_summary <- function(file_path, n_probes = 100, n_samples = 10, se
 #' This function generates a simulated Illumina file with SNP data for a specified number of SNPs and samples.
 #' The file includes a header section and a data section with fields such as SNP Name, Sample ID, GC Score, Theta, X, Y, X Raw, Y Raw, and Log R Ratio.
 #'
-#' @param file The path where the simulated Illumina file will be saved. Default is "simulated_summary.txt".
+#' @param filepath The path where the simulated Illumina file will be saved. Default is "simulated_summary.txt".
 #' @param num_snps The number of SNPs to simulate. Default is 10.
 #' @param num_samples The number of samples to simulate. Default is 1.
 #' @param sample_id_prefix The prefix for sample IDs. Default is "SAMP".
+#' @param mk_id The prefix for marker IDs. Default is "MK-".
 #' @param seed The seed for random number generation to ensure reproducibility. Default is 123.
 #' @return None. The function writes the simulated Illumina file to the specified path.
 #' @details The simulated data includes random values for GC Score, Theta, X, Y, X Raw, Y Raw, and Log R Ratio. The header section provides metadata about the file, including the number of SNPs and samples.

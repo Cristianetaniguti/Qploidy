@@ -5,6 +5,7 @@
 #' @return None. The function writes the simulated VCF content to the specified file.
 #' 
 #' @export 
+#' @importFrom stats rbinom
 simulate_vcf <- function(file_path, seed) {
   set.seed(seed) # For reproducibility
 
@@ -62,9 +63,9 @@ simulate_vcf <- function(file_path, seed) {
 #' @param n_samples Number of samples to simulate. Default is 10.
 #' @param seed The seed for random number generation to ensure reproducibility.
 #' @return None. The function writes the simulated summary content to the specified file.
-#' @examples
-#' simulate_axiom_summary("simulated_summary.txt", n_probes = 50, n_samples = 5, seed = 1234)
+#' 
 #' @export
+#' @importFrom utils write.table
 simulate_axiom_summary <- function(file_path, n_probes = 100, n_samples = 10, seed) {
   set.seed(seed) # For reproducibility
 
@@ -125,11 +126,10 @@ simulate_axiom_summary <- function(file_path, n_probes = 100, n_samples = 10, se
 #' @param seed The seed for random number generation to ensure reproducibility. Default is 123.
 #' @return None. The function writes the simulated Illumina file to the specified path.
 #' @details The simulated data includes random values for GC Score, Theta, X, Y, X Raw, Y Raw, and Log R Ratio. The header section provides metadata about the file, including the number of SNPs and samples.
-#' @examples
-#' simulate_illumina_file(file = "simulated_illumina.txt", num_snps = 50, num_samples = 5, sample_id_prefix = "SAMPLE", seed = 42)
+#' 
 #' @export
 simulate_illumina_file <- function(
-  file = "simulated_summary.txt",
+  filepath,
   num_snps = 10,
   num_samples = 1,
   sample_id_prefix = "SAMP",
@@ -177,15 +177,15 @@ simulate_illumina_file <- function(
   )
 
   # --- Write to file ---
-  writeLines(header, file)
+  writeLines(header, filepath)
   write.table(
     data_df,
-    file,
+    filepath,
     sep = "\t",
     row.names = FALSE,
     col.names = TRUE,
     quote = FALSE
   )
 
-  message("File written to: ", normalizePath(file))
+  message("File written to: ", normalizePath(filepath))
 }

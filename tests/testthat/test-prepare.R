@@ -5,10 +5,9 @@ library(testthat)
 # Replace 'sample.vcf' with the actual path to a test VCF file
 
 test_that("qploidy_read_vcf handles VCF input correctly", {
-
   temp <- tempfile(fileext = ".vcf")
   simulate_vcf(temp, seed = 1213)
-  
+
   result <- qploidy_read_vcf(temp, geno = FALSE, geno.pos = FALSE)
   expect_s3_class(result, "data.frame")
   expect_true(all(c("MarkerName", "SampleName", "X", "Y", "R", "ratio") %in% colnames(result)))
@@ -29,7 +28,7 @@ test_that("qploidy_read_vcf handles VCF input correctly", {
 test_that("read_illumina_array processes Illumina array files correctly", {
   temp1 <- tempfile(fileext = ".txt")
   temp2 <- tempfile(fileext = ".txt")
-  simulate_illumina_file(file =temp1, seed = 1213, num_snps = 100, num_samples = 50, mk_id = "MK1-")
+  simulate_illumina_file(file = temp1, seed = 1213, num_snps = 100, num_samples = 50, mk_id = "MK1-")
   simulate_illumina_file(temp2, seed = 2312, num_snps = 100, num_samples = 30, mk_id = "MK2-")
 
   result <- read_illumina_array(temp1, temp2)
@@ -44,7 +43,25 @@ test_that("read_illumina_array processes Illumina array files correctly", {
 test_that("read_axiom processes Axiom summary files correctly", {
   temp <- tempfile(fileext = ".txt")
   simulate_axiom_summary(temp, seed = 1213, n_probes = 100, n_samples = 50)
-  result <- read_axiom(summary_file=temp, sd.normalization = FALSE, atan = FALSE)
+
+  # Create the data frame
+  ind_names_example <- data.frame(
+    Plate_Name = paste0("Sample", 1:50),
+    Sample_Name = paste0("NewName", 1:50)
+  )
+
+  temp_name <- tempfile(fileext = ".txt")
+  # Save the data frame to a file for testing
+  write.table(
+    ind_names_example,
+    file = temp_name,
+    sep = "\t",
+    row.names = FALSE,
+    col.names = TRUE,
+    quote = FALSE
+  )
+
+  result <- read_axiom(summary_file = temp, atan = FALSE, ind_names = temp_name)
   expect_s3_class(result, "data.frame")
   expect_true(all(c("MarkerName", "SampleName", "X", "Y", "R", "ratio") %in% colnames(result)))
 })

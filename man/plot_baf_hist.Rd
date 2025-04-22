@@ -2,7 +2,7 @@
 % Please edit documentation in R/plots.R
 \name{plot_baf_hist}
 \alias{plot_baf_hist}
-\title{Plot BAF histogram}
+\title{Plot BAF Histogram}
 \usage{
 plot_baf_hist(
   data_sample,
@@ -18,26 +18,29 @@ plot_baf_hist(
 )
 }
 \arguments{
-\item{data_sample}{data.frame with BAF and genomic position information}
+\item{data_sample}{A data.frame containing BAF and genomic position information. Must include columns `Chr`, `Position`, and `sample`.}
 
-\item{area_single}{area around the expected peak to be considered}
+\item{area_single}{Numeric value defining the area around the expected peak to be considered.}
 
-\item{ploidy}{expected ploidy}
+\item{ploidy}{Integer or vector specifying the expected ploidy. If a vector, it must match the number of chromosomes in `data_sample`.}
 
-\item{colors}{add area colors}
+\item{colors}{Logical. If TRUE, adds area colors to the histogram. Default is FALSE.}
 
-\item{add_estimated_peaks}{add expected peaks lines}
+\item{add_estimated_peaks}{Logical. If TRUE, adds lines for estimated peaks. Default is TRUE.}
 
-\item{add_expected_peaks}{add estimated peaks}
+\item{add_expected_peaks}{Logical. If TRUE, adds lines for expected peaks. Default is FALSE.}
 
-\item{BAF_hist_overall}{if TRUE it plots the BAF histogram for entire genome}
+\item{BAF_hist_overall}{Logical. If TRUE, plots the BAF histogram for the entire genome. Default is FALSE.}
 
-\item{ratio}{if TRUE plot the raw ratio}
+\item{ratio}{Logical. If TRUE, plots the raw ratio instead of BAF. Default is FALSE.}
 
-\item{rm_homozygous}{if TRUE removes the homozygous calls}
+\item{rm_homozygous}{Logical. If TRUE, removes homozygous calls from the histogram. Default is FALSE.}
 
-\item{font_size}{graphic labels font size}
+\item{font_size}{Numeric value for the font size of plot labels. Default is 12.}
+}
+\value{
+A ggplot object representing the BAF histogram.
 }
 \description{
-Plot BAF histogram
+This function generates a histogram of BAF (B-allele frequency) values. It supports options for adding estimated and expected peaks, area colors, and filtering homozygous calls.
 }

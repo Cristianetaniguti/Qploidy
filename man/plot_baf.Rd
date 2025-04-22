@@ -18,26 +18,29 @@ plot_baf(
 )
 }
 \arguments{
-\item{data_sample}{data.frame with BAF and genomic position information}
+\item{data_sample}{A data.frame containing BAF and genomic position information. Must include columns `Chr`, `Position`, and `sample`.}
 
-\item{area_single}{area around the expected peak to be considered}
+\item{area_single}{Numeric value defining the area around the expected peak to be considered.}
 
-\item{ploidy}{expected ploidy overall (single integer value) or for each chromosome}
+\item{ploidy}{Integer or vector specifying the expected ploidy. If a vector, it must match the number of chromosomes in `data_sample`.}
 
-\item{dot.size}{graphic dot size}
+\item{dot.size}{Numeric value for the size of the dots in the plot. Default is 1.}
 
-\item{add_estimated_peaks}{add expected peaks lines}
+\item{add_estimated_peaks}{Logical. If TRUE, adds lines for estimated peaks. Default is FALSE.}
 
-\item{add_expected_peaks}{add estimated peaks}
+\item{add_expected_peaks}{Logical. If TRUE, adds lines for expected peaks. Default is FALSE.}
 
-\item{centromeres}{vector defining centromeres positions}
+\item{centromeres}{Named vector defining centromere positions for each chromosome. Names must match chromosome IDs in `data_sample`.}
 
-\item{add_centromeres}{logical defining if centromeres positions will be displayed}
+\item{add_centromeres}{Logical. If TRUE, adds vertical lines at centromere positions. Default is FALSE.}
 
-\item{colors}{add area colors}
+\item{colors}{Logical. If TRUE, adds area colors to the plot. Default is FALSE.}
 
-\item{font_size}{graphic labels font size}
+\item{font_size}{Numeric value for the font size of plot labels. Default is 12.}
+}
+\value{
+A ggplot object representing the BAF plot.
 }
 \description{
-Plot BAF
+This function generates a BAF (B-allele frequency) plot for visualizing genomic data. It allows customization of dot size, expected and estimated peaks, centromere positions, and area colors.
 }

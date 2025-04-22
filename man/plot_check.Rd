@@ -2,21 +2,20 @@
 % Please edit documentation in R/plots.R
 \name{plot_check}
 \alias{plot_check}
-\title{3D plot to check raw data allele intensities (if array) or depth (if sequencing) data properties
-Qploidy can be used if that is not much variation among the individuals for the same marker.
-So we expect that the overall structure of the resulting graphic is a ramp.}
+\title{3D Plot for Raw Data Inspection}
 \usage{
 plot_check(data_qploidy, R_lim = NULL, n = 3000)
 }
 \arguments{
-\item{data_qploidy}{data.frame input for Qploidy}
+\item{data_qploidy}{A data.frame input for Qploidy. Must include columns `MarkerName`, `SampleName`, and `R`.}
 
-\item{R_lim}{limit the sum of intensities/depth axis to adjust the dimentions in case there are outliers}
+\item{R_lim}{Numeric value to limit the sum of intensities/depth axis. Useful for adjusting dimensions in case of outliers. Default is NULL.}
 
-\item{n}{subset size}
+\item{n}{Integer specifying the subset size for plotting. Default is 3000.}
+}
+\value{
+A plotly object representing the 3D surface plot.
 }
 \description{
-3D plot to check raw data allele intensities (if array) or depth (if sequencing) data properties
-Qploidy can be used if that is not much variation among the individuals for the same marker.
-So we expect that the overall structure of the resulting graphic is a ramp.
+This function generates a 3D surface plot to inspect raw data properties, such as allele intensities or sequencing depth. It helps identify variation among individuals for the same marker.
 }

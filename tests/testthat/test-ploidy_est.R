@@ -61,4 +61,20 @@ test_that("area_estimate_ploidy handles missing data correctly", {
   expect_true(any(grepl("Number of euploid samples:", output)))
   expect_true(any(grepl("Number of potential aneuploid samples:", output)))
   expect_true(any(grepl("Number of highly inbred samples:", output)))
+
+
+  temp2 <- tempfile()
+  p_list <- all_resolutions_plots(
+    data_standardized = qploidy_standardization,
+    sample = "S1",
+    ploidy = 4,
+    centromeres = c("1" = 500000, "2" = 500000, "3" = 500000),
+    file_name = temp2
+  )
+
+  expect_true(all(c("chromosome", "chromosome_arm") %in% names(p_list)))
+  expect_true(file.exists(paste0(temp2, "_res:chromosome_arm.png")))
+  expect_true(file.exists(paste0(temp2, "_res:chromosome.png")))
+  expect_true(file.exists(paste0(temp2, "_res:sample.png")))
+  
 })

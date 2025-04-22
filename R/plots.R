@@ -1,21 +1,23 @@
-globalVariables(c("Chr", "baf","z","ratio", "median", "window", "prop_het"))
+globalVariables(c("Chr", "baf", "z", "ratio", "median", "window", "prop_het"))
 
 #' Plot BAF
 #'
-#' @param data_sample data.frame with BAF and genomic position information
-#' @param area_single area around the expected peak to be considered
-#' @param ploidy expected ploidy overall (single integer value) or for each chromosome
-#' @param dot.size graphic dot size
-#' @param add_estimated_peaks add expected peaks lines
-#' @param add_expected_peaks add estimated peaks
-#' @param colors add area colors
-#' @param centromeres vector defining centromeres positions
-#' @param add_centromeres logical defining if centromeres positions will be displayed
-#' @param font_size graphic labels font size
+#' This function generates a BAF (B-allele frequency) plot for visualizing genomic data. It allows customization of dot size, expected and estimated peaks, centromere positions, and area colors.
 #'
-#' @import ggplot2
-#' @import tidyr
+#' @param data_sample A data.frame containing BAF and genomic position information. Must include columns `Chr`, `Position`, and `sample`.
+#' @param area_single Numeric value defining the area around the expected peak to be considered.
+#' @param ploidy Integer or vector specifying the expected ploidy. If a vector, it must match the number of chromosomes in `data_sample`.
+#' @param dot.size Numeric value for the size of the dots in the plot. Default is 1.
+#' @param add_estimated_peaks Logical. If TRUE, adds lines for estimated peaks. Default is FALSE.
+#' @param add_expected_peaks Logical. If TRUE, adds lines for expected peaks. Default is FALSE.
+#' @param colors Logical. If TRUE, adds area colors to the plot. Default is FALSE.
+#' @param centromeres Named vector defining centromere positions for each chromosome. Names must match chromosome IDs in `data_sample`.
+#' @param add_centromeres Logical. If TRUE, adds vertical lines at centromere positions. Default is FALSE.
+#' @param font_size Numeric value for the font size of plot labels. Default is 12.
+#' @return A ggplot object representing the BAF plot.
 #'
+#' @importFrom ggplot2 ggplot aes geom_point geom_rect geom_vline scale_color_manual facet_grid theme_bw theme element_text ylab
+#' @importFrom dplyr filter
 #' @export
 plot_baf <- function(data_sample,
                      area_single,
@@ -26,11 +28,10 @@ plot_baf <- function(data_sample,
                      centromeres = NULL,
                      add_centromeres = FALSE,
                      colors = FALSE,
-                     font_size = 12){
-
-  if(add_centromeres){
-    #centromeres <- c("1 = 49130338, 5 = 49834357")
-    if(length(centromeres) == 1 & any(grepl(",", centromeres))){
+                     font_size = 12) {
+  if (add_centromeres) {
+    # centromeres <- c("1 = 49130338, 5 = 49834357")
+    if (length(centromeres) == 1 & any(grepl(",", centromeres))) {
       centromeres <- gsub("\ ", "", centromeres)
       centromeres <- unlist(strsplit(centromeres, ","))
       centromeres <- sapply(centromeres, function(x) strsplit(x, "="))
@@ -40,26 +41,26 @@ plot_baf <- function(data_sample,
     }
   }
 
-  if(add_estimated_peaks | add_expected_peaks | colors){
-
-    if(length(ploidy) == 1) {
+  if (add_estimated_peaks | add_expected_peaks | colors) {
+    if (length(ploidy) == 1) {
       ploidy <- rep(ploidy, length(unique(data_sample$Chr)))
-    } else if(length(ploidy) > 1 & length(ploidy) < length(unique(data_sample$Chr)))
+    } else if (length(ploidy) > 1 & length(ploidy) < length(unique(data_sample$Chr))) {
       stop("Provide a ploidy for each chromosome.")
+    }
 
     data_sample2 <- rets2 <- data.frame()
-    for(z in 1:length(unique(data_sample$Chr))){
-      ymin <- seq(0, 1, 1/ploidy[z]) - (area_single/(ploidy[z]*2))
-      ymax <- seq(0, 1, 1/ploidy[z]) + (area_single/(ploidy[z]*2))
+    for (z in 1:length(unique(data_sample$Chr))) {
+      ymin <- seq(0, 1, 1 / ploidy[z]) - (area_single / (ploidy[z] * 2))
+      ymax <- seq(0, 1, 1 / ploidy[z]) + (area_single / (ploidy[z] * 2))
 
       ymin[which(ymin < 0)] <- 0
       ymax[which(ymax > 1)] <- 1
       rets <- data.frame(ymin, ymax, xmax = Inf, xmin = -Inf, Chr = sort(unique(data_sample$Chr))[z])
 
-      data_chr <- data_sample[which(data_sample$Chr == sort(unique(data_sample$Chr))[z]),]
+      data_chr <- data_sample[which(data_sample$Chr == sort(unique(data_sample$Chr))[z]), ]
       idx_tot <- FALSE
       idx <- list()
-      for(i in 1:nrow(rets)){
+      for (i in 1:nrow(rets)) {
         idx <- data_chr$sample >= rets$ymin[i] & data_chr$sample <= rets$ymax[i]
         idx_tot <- idx_tot | idx
       }
@@ -71,40 +72,66 @@ plot_baf <- function(data_sample,
       rets2 <- rbind(rets2, rets)
       data_sample2 <- rbind(data_sample2, data_chr)
     }
-  } else data_sample2 <- data_sample
+  } else {
+    data_sample2 <- data_sample
+  }
 
-  p_baf <- data_sample2 %>% ggplot(aes(x=Position, y=sample)) +
-    {if(colors) geom_point(aes(color = color), alpha=0.7, size=dot.size) else geom_point(alpha=0.7, size=dot.size)} +
+  p_baf <- data_sample2 %>% ggplot(aes(x = Position, y = sample)) +
+    {
+      if (colors) geom_point(aes(color = color), alpha = 0.7, size = dot.size) else geom_point(alpha = 0.7, size = dot.size)
+    } +
     scale_color_manual(values = c("red", "black")) +
-    facet_grid(~ Chr, scales = "free_x") + theme_bw() +
-    {if(add_expected_peaks) geom_rect(data = rets2, inherit.aes=FALSE,
-                                      aes(ymin=ymin,ymax=ymax,
-                                          xmax = xmax, xmin = xmin,
-                                          alpha=0.001),
-                                      color = "red")} +
+    facet_grid(~Chr, scales = "free_x") +
+    theme_bw() +
+    {
+      if (add_expected_peaks) {
+        geom_rect(
+          data = rets2, inherit.aes = FALSE,
+          aes(
+            ymin = ymin, ymax = ymax,
+            xmax = xmax, xmin = xmin,
+            alpha = 0.001
+          ),
+          color = "red"
+        )
+      }
+    } +
     ylab("BAF") +
-    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
-          legend.position="none", text = element_text(size = font_size)) +
-    {if(add_centromeres) geom_vline(data = centromeres_df,
-                                    aes(xintercept= as.numeric(value)),
-                                    color = "blue",
-                                    linewidth = 0.8)}
+    theme(
+      axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
+      legend.position = "none", text = element_text(size = font_size)
+    ) +
+    {
+      if (add_centromeres) {
+        geom_vline(
+          data = centromeres_df,
+          aes(xintercept = as.numeric(value)),
+          color = "blue",
+          linewidth = 0.8
+        )
+      }
+    }
   return(p_baf)
 }
 
-#' Plot BAF histogram
+#' Plot BAF Histogram
 #'
-#' @param data_sample data.frame with BAF and genomic position information
-#' @param area_single area around the expected peak to be considered
-#' @param ploidy expected ploidy
-#' @param add_estimated_peaks add expected peaks lines
-#' @param add_expected_peaks add estimated peaks
-#' @param colors add area colors
-#' @param BAF_hist_overall if TRUE it plots the BAF histogram for entire genome
-#' @param ratio if TRUE plot the raw ratio
-#' @param rm_homozygous if TRUE removes the homozygous calls
-#' @param font_size graphic labels font size
+#' This function generates a histogram of BAF (B-allele frequency) values. It supports options for adding estimated and expected peaks, area colors, and filtering homozygous calls.
 #'
+#' @param data_sample A data.frame containing BAF and genomic position information. Must include columns `Chr`, `Position`, and `sample`.
+#' @param area_single Numeric value defining the area around the expected peak to be considered.
+#' @param ploidy Integer or vector specifying the expected ploidy. If a vector, it must match the number of chromosomes in `data_sample`.
+#' @param colors Logical. If TRUE, adds area colors to the histogram. Default is FALSE.
+#' @param add_estimated_peaks Logical. If TRUE, adds lines for estimated peaks. Default is TRUE.
+#' @param add_expected_peaks Logical. If TRUE, adds lines for expected peaks. Default is FALSE.
+#' @param BAF_hist_overall Logical. If TRUE, plots the BAF histogram for the entire genome. Default is FALSE.
+#' @param ratio Logical. If TRUE, plots the raw ratio instead of BAF. Default is FALSE.
+#' @param rm_homozygous Logical. If TRUE, removes homozygous calls from the histogram. Default is FALSE.
+#' @param font_size Numeric value for the font size of plot labels. Default is 12.
+#' @return A ggplot object representing the BAF histogram.
+#'
+#' @importFrom ggplot2 ggplot aes geom_histogram geom_vline scale_fill_manual scale_color_manual scale_linetype_manual scale_alpha facet_grid theme_bw theme xlab labs
+#' @importFrom dplyr filter
 #' @export
 plot_baf_hist <- function(data_sample,
                           area_single,
@@ -115,40 +142,40 @@ plot_baf_hist <- function(data_sample,
                           BAF_hist_overall = FALSE,
                           ratio = FALSE,
                           rm_homozygous = FALSE,
-                          font_size = 12){
-
-  if((add_estimated_peaks | add_expected_peaks | colors) & !all(is.na(ploidy))){
-    if(length(ploidy) == 1) {
+                          font_size = 12) {
+  if ((add_estimated_peaks | add_expected_peaks | colors) & !all(is.na(ploidy))) {
+    if (length(ploidy) == 1) {
       ploidy <- rep(ploidy, length(unique(data_sample$Chr)))
-    } else if(length(ploidy) != 1 & length(ploidy) != length(unique(data_sample$Chr)))
+    } else if (length(ploidy) != 1 & length(ploidy) != length(unique(data_sample$Chr))) {
       stop("Provide a ploidy for each chromosome.")
+    }
 
-    if(BAF_hist_overall) Chrs <- "all" else Chrs = sort(unique(data_sample$Chr))
+    if (BAF_hist_overall) Chrs <- "all" else Chrs <- sort(unique(data_sample$Chr))
     data_sample2 <- modes.df3 <- data.frame()
-    for(z in 1:length(Chrs)){
-      ymin <- seq(0, 1, 1/ploidy[z]) - (area_single/(ploidy[z]*2))
-      ymax <- seq(0, 1, 1/ploidy[z]) + (area_single/(ploidy[z]*2))
+    for (z in 1:length(Chrs)) {
+      ymin <- seq(0, 1, 1 / ploidy[z]) - (area_single / (ploidy[z] * 2))
+      ymax <- seq(0, 1, 1 / ploidy[z]) + (area_single / (ploidy[z] * 2))
 
       ymin[which(ymin < 0)] <- 0
       ymax[which(ymax > 1)] <- 1
       rets <- data.frame(ymin, ymax, xmax = Inf, xmin = -Inf, Chr = Chrs[z])
 
-      if(all(Chrs == "all")) {
+      if (all(Chrs == "all")) {
         split_data <- data_sample
       } else {
-        split_data <- data_sample[which(data_sample$Chr == sort(unique(data_sample$Chr))[z]),]
+        split_data <- data_sample[which(data_sample$Chr == sort(unique(data_sample$Chr))[z]), ]
       }
 
-      if(ratio) split_data$sample <- split_data$ratio
+      if (ratio) split_data$sample <- split_data$ratio
 
       idx_tot <- FALSE
       modes.df2 <- data.frame()
-      for(i in 1:nrow(rets)) {
+      for (i in 1:nrow(rets)) {
         idx <- split_data$sample >= rets$ymin[i] & split_data$sample <= rets$ymax[i]
         idx_tot <- idx_tot | idx
 
         estimated <- mode(split_data$sample[which(split_data$sample > rets$ymin[i] & split_data$sample < rets$ymax[i])])
-        expected <- seq(0, 1, 1/ploidy[z])[i]
+        expected <- seq(0, 1, 1 / ploidy[z])[i]
         modes.df <- cbind(Chr = Chrs[z], pivot_longer(data.frame(estimated, expected), cols = 1:2))
         modes.df2 <- rbind(modes.df2, modes.df)
       }
@@ -169,63 +196,124 @@ plot_baf_hist <- function(data_sample,
     add_estimated_peaks <- add_expected_peaks <- colors <- FALSE
   }
 
-  if(rm_homozygous) data_sample2 <- data_sample2 %>% filter(sample != 0 & sample != 1)
-  if(ratio) data_sample2$sample <- data_sample2$ratio
+  if (rm_homozygous) data_sample2 <- data_sample2 %>% filter(sample != 0 & sample != 1)
+  if (ratio) data_sample2$sample <- data_sample2$ratio
 
-  if(!BAF_hist_overall){
-    p_hist <- data_sample2 %>% ggplot(aes(x=sample)) +
-      {if(colors) geom_histogram(aes(fill = color)) else  geom_histogram()} +
-      #scale_x_continuous(breaks = round(seq(0, 1, 1/ploidy),2)) +
-      {if(add_estimated_peaks) geom_vline(data = modes.df3[which(modes.df3$name == "estimated"),],
-                                          aes(xintercept= value,
-                                              color = name,
-                                              linetype = name,
-                                              alpha = alpha),
-                                          linewidth = 0.8)} +
-      {if(add_expected_peaks) geom_vline(data = modes.df3[which(modes.df3$name == "expected"),],
-                                         aes(xintercept= value,
-                                             color = name,
-                                             linetype = name,
-                                             alpha = alpha),
-                                         linewidth = 0.8)} +
-      {if(colors) scale_fill_manual(values = c("red", "black"))} +
-      {if(add_expected_peaks | add_estimated_peaks) scale_color_manual(values = c("blue", "purple"))}+
-      scale_linetype_manual(values = c("dashed", "solid"), guide="none") +
-      scale_alpha(range = c(0.7, 1), guide="none") +
-      facet_grid(~ Chr, scales = "free_x") + theme_bw() +  xlab("BAF") +
-      theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
-            legend.position="bottom", text = element_text(size = font_size)) +
-      {if(add_expected_peaks | add_estimated_peaks) labs(color= "Peaks")} +
-      {if(colors) labs(fill= "Area")}
-
+  if (!BAF_hist_overall) {
+    p_hist <- data_sample2 %>% ggplot(aes(x = sample)) +
+      {
+        if (colors) geom_histogram(aes(fill = color)) else geom_histogram()
+      } +
+      # scale_x_continuous(breaks = round(seq(0, 1, 1/ploidy),2)) +
+      {
+        if (add_estimated_peaks) {
+          geom_vline(
+            data = modes.df3[which(modes.df3$name == "estimated"), ],
+            aes(
+              xintercept = value,
+              color = name,
+              linetype = name,
+              alpha = alpha
+            ),
+            linewidth = 0.8
+          )
+        }
+      } +
+      {
+        if (add_expected_peaks) {
+          geom_vline(
+            data = modes.df3[which(modes.df3$name == "expected"), ],
+            aes(
+              xintercept = value,
+              color = name,
+              linetype = name,
+              alpha = alpha
+            ),
+            linewidth = 0.8
+          )
+        }
+      } +
+      {
+        if (colors) scale_fill_manual(values = c("red", "black"))
+      } +
+      {
+        if (add_expected_peaks | add_estimated_peaks) scale_color_manual(values = c("blue", "purple"))
+      } +
+      scale_linetype_manual(values = c("dashed", "solid"), guide = "none") +
+      scale_alpha(range = c(0.7, 1), guide = "none") +
+      facet_grid(~Chr, scales = "free_x") +
+      theme_bw() +
+      xlab("BAF") +
+      theme(
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
+        legend.position = "bottom", text = element_text(size = font_size)
+      ) +
+      {
+        if (add_expected_peaks | add_estimated_peaks) labs(color = "Peaks")
+      } +
+      {
+        if (colors) labs(fill = "Area")
+      }
   } else {
-    if(rm_homozygous) data_sample <- data_sample %>% filter(sample != 0 & sample != 1)
-    if(ratio) data_sample$sample <- data_sample$ratio
+    if (rm_homozygous) data_sample <- data_sample %>% filter(sample != 0 & sample != 1)
+    if (ratio) data_sample$sample <- data_sample$ratio
 
-    p_hist_all <- data_sample %>% ggplot(aes(x=sample)) + geom_histogram() +
-      {if(colors) geom_histogram(aes(fill = color)) else  geom_histogram()} +
-      #scale_x_continuous(breaks = round(seq(0, 1, 1/ploidy),2)) +
-      {if(add_estimated_peaks) geom_vline(data = modes.df3[which(modes.df3$name == "estimated"),],
-                                          aes(xintercept= value,
-                                              color = name,
-                                              linetype = name,
-                                              alpha = alpha),
-                                          linewidth = 0.8)} +
-      {if(add_expected_peaks) geom_vline(data = modes.df3[which(modes.df3$name == "expected"),],
-                                         aes(xintercept= value,
-                                             color = name,
-                                             linetype = name,
-                                             alpha = alpha),
-                                         linewidth = 0.8)} +
-      {if(colors) scale_fill_manual(values = c("red", "black"))} +
-      {if(add_expected_peaks | add_estimated_peaks) scale_color_manual(values = c("blue", "purple"))}+
-      scale_linetype_manual(values = c("dashed", "solid"), guide="none") +
-      scale_alpha(range = c(0.7, 1), guide="none") +
-      theme_bw() +  {if(ratio) xlab("ratio") else xlab("BAF")} +
-      theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
-            legend.position="bottom", text = element_text(size = font_size)) +
-      {if(add_expected_peaks | add_estimated_peaks) labs(color= "Peaks")} +
-      {if(colors) labs(fill= "Area")}
+    p_hist_all <- data_sample %>% ggplot(aes(x = sample)) +
+      geom_histogram() +
+      {
+        if (colors) geom_histogram(aes(fill = color)) else geom_histogram()
+      } +
+      # scale_x_continuous(breaks = round(seq(0, 1, 1/ploidy),2)) +
+      {
+        if (add_estimated_peaks) {
+          geom_vline(
+            data = modes.df3[which(modes.df3$name == "estimated"), ],
+            aes(
+              xintercept = value,
+              color = name,
+              linetype = name,
+              alpha = alpha
+            ),
+            linewidth = 0.8
+          )
+        }
+      } +
+      {
+        if (add_expected_peaks) {
+          geom_vline(
+            data = modes.df3[which(modes.df3$name == "expected"), ],
+            aes(
+              xintercept = value,
+              color = name,
+              linetype = name,
+              alpha = alpha
+            ),
+            linewidth = 0.8
+          )
+        }
+      } +
+      {
+        if (colors) scale_fill_manual(values = c("red", "black"))
+      } +
+      {
+        if (add_expected_peaks | add_estimated_peaks) scale_color_manual(values = c("blue", "purple"))
+      } +
+      scale_linetype_manual(values = c("dashed", "solid"), guide = "none") +
+      scale_alpha(range = c(0.7, 1), guide = "none") +
+      theme_bw() +
+      {
+        if (ratio) xlab("ratio") else xlab("BAF")
+      } +
+      theme(
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
+        legend.position = "bottom", text = element_text(size = font_size)
+      ) +
+      {
+        if (add_expected_peaks | add_estimated_peaks) labs(color = "Peaks")
+      } +
+      {
+        if (colors) labs(fill = "Area")
+      }
 
     p_hist <- p_hist_all
   }
@@ -234,34 +322,32 @@ plot_baf_hist <- function(data_sample,
 }
 
 
-#' 3D plot to check raw data allele intensities (if array) or depth (if sequencing) data properties
-#' Qploidy can be used if that is not much variation among the individuals for the same marker.
-#' So we expect that the overall structure of the resulting graphic is a ramp.
+#' 3D Plot for Raw Data Inspection
 #'
-#' @param data_qploidy data.frame input for Qploidy
-#' @param R_lim limit the sum of intensities/depth axis to adjust the dimentions in case there are outliers
-#' @param n subset size
+#' This function generates a 3D surface plot to inspect raw data properties, such as allele intensities or sequencing depth. It helps identify variation among individuals for the same marker.
 #'
+#' @param data_qploidy A data.frame input for Qploidy. Must include columns `MarkerName`, `SampleName`, and `R`.
+#' @param R_lim Numeric value to limit the sum of intensities/depth axis. Useful for adjusting dimensions in case of outliers. Default is NULL.
+#' @param n Integer specifying the subset size for plotting. Default is 3000.
+#' @return A plotly object representing the 3D surface plot.
 #'
 #' @importFrom plotly plot_ly layout
-#' @import tidyr
-#'
+#' @importFrom tidyr pivot_wider
 #' @export
-plot_check <- function(data_qploidy, R_lim = NULL, n = 3000){
-
-  plot_df <- pivot_wider(data_qploidy[,c(1,2,5)], names_from = SampleName, values_from = R)
+plot_check <- function(data_qploidy, R_lim = NULL, n = 3000) {
+  plot_df <- pivot_wider(data_qploidy[, c(1, 2, 5)], names_from = SampleName, values_from = R)
   mk_names <- plot_df$MarkerName
-  plot_df <- as.matrix(plot_df[,-1])
+  plot_df <- as.matrix(plot_df[, -1])
   rownames(plot_df) <- mk_names
 
-  plot_df <- plot_df[sample(1:nrow(plot_df), n, replace =FALSE),]
-  plot_df <- plot_df[order(apply(plot_df, 1, sum)),]
+  plot_df <- plot_df[sample(1:nrow(plot_df), n, replace = FALSE), ]
+  plot_df <- plot_df[order(apply(plot_df, 1, sum)), ]
 
-  if(!is.null(R_lim)) {
+  if (!is.null(R_lim)) {
     plot_df[which(plot_df > R_lim)] <- NA
-    rm.mk <- apply(plot_df, 1, function(x) sum(is.na(x))/length(x))
+    rm.mk <- apply(plot_df, 1, function(x) sum(is.na(x)) / length(x))
     rm.mk <- which(rm.mk > 0.5)
-    if(length(rm.mk)>0) plot_df <- plot_df[-rm.mk,]
+    if (length(rm.mk) > 0) plot_df <- plot_df[-rm.mk, ]
   }
 
   axx <- list(title = "Individuals")
@@ -272,50 +358,43 @@ plot_check <- function(data_qploidy, R_lim = NULL, n = 3000){
   plot_df
   print(summary(as.numeric(plot_df)))
 
-  p <- plot_ly(z=plot_df, type="surface") %>%
-    layout(scene = list(xaxis=axx,yaxis=axy,zaxis=axz))
+  p <- plot_ly(z = plot_df, type = "surface") %>%
+    layout(scene = list(xaxis = axx, yaxis = axy, zaxis = axz))
   return(p)
 }
 
-#' Plot method for object of class 'qploidy_standardization'
+#' Plot Method for Qploidy Standardization
 #'
-#' @param x object of class 'qploidy_standardization'
-#' @param sample character indicating sample ID
-#' @param area_single area around the expected peak to be considered
-#' @param ploidy expected ploidy
-#' @param add_estimated_peaks add expected peaks lines
-#' @param add_expected_peaks add estimated peaks
-#' @param colors add area colors
-#' @param type character defining the graphic type. "all" plots all graphics,
-#'             it is equivalent to "het","ratio","BAF","zscore","BAF_hist", "BAF_hist_overall".
-#'             "het" plots the heterozygous locus counts inside genomic positions window defined in 'window_size'.
-#'             "ratio" plots raw Y/(X+Y) or alternative count/(alternative counts + reference counts).
-#'             "BAF" plots standardized ratios. "zscore" is the smoothed conditional means curve of standardized sum of intensities/counts.
-#'             "BAF_hist" is the histogram of standardized ratios. "BAF_hist_overall" add the histogram including all markers.
-#' @param window_size genomic position window to calculate the number of heterozygous locus
-#' @param het_interval interval to be considered as heterozygous (heterozygous ratio > 1 - het_interval and heterozygous ratio < 0 + het_interval)
-#' @param chr chromosome index to be plotted
-#' @param dot.size dot size
-#' @param centromeres centromeres position for each chromosome
-#' @param add_centromeres if TRUE add a vertical line at the centromere position
-#' @param rm_homozygous if TRUE remove the homozygous for the BAF histogram plots
-#' @param font_size graphic labels font size
+#' This function generates various plots for visualizing the results of Qploidy standardization. It supports multiple plot types, including BAF, z-score, and histograms.
 #'
-#' @param ... plot parameters
-#'
+#' @param x An object of class `qploidy_standardization`.
+#' @param sample Character string indicating the sample ID to plot.
+#' @param chr Character or numeric vector specifying the chromosomes to plot. Default is NULL (plots all chromosomes).
+#' @param type Character vector defining the plot types. Options include "all", "het", "BAF", "zscore", "BAF_hist", "BAF_hist_overall", and "Ratio_hist_overall". Default is "all".
+#' @param area_single Numeric value defining the area around the expected peak to be considered. Default is 0.75.
+#' @param ploidy Integer specifying the expected ploidy. Default is 4.
+#' @param dot.size Numeric value for the size of the dots in the plots. Default is 1.
+#' @param font_size Numeric value for the font size of plot labels. Default is 12.
+#' @param add_estimated_peaks Logical. If TRUE, adds lines for estimated peaks. Default is FALSE.
+#' @param add_expected_peaks Logical. If TRUE, adds lines for expected peaks. Default is FALSE.
+#' @param centromeres Named vector defining centromere positions for each chromosome. Names must match chromosome IDs in `x`.
+#' @param add_centromeres Logical. If TRUE, adds vertical lines at centromere positions. Default is FALSE.
+#' @param colors Logical. If TRUE, adds area colors to the plots. Default is FALSE.
+#' @param window_size Numeric value defining the genomic position window for heterozygous locus counts. Default is 2000000.
+#' @param het_interval Numeric value defining the interval to consider as heterozygous. Default is 0.1.
+#' @param rm_homozygous Logical. If TRUE, removes homozygous calls from BAF histogram plots. Default is FALSE.
+#' @param ... Additional plot parameters.
+#' @return A ggarrange object containing the requested plots.
+#' 
 #' @importFrom ggpubr ggarrange annotate_figure text_grob
-#' @import dplyr
-#' @import tidyr
-#' @import ggplot2
-#'
-#' @return printed information about Qploidy standardization process
-#'
-#'
+#' @importFrom ggplot2 ggplot aes geom_point geom_smooth geom_hline facet_grid theme_bw theme element_text
+#' @importFrom dplyr filter group_by summarise
+#' @importFrom tidyr pivot_wider
 #' @export
 plot_qploidy_standardization <- function(x,
                                          sample = NULL,
                                          chr = NULL,
-                                         type = c("all", "het", "BAF","zscore","BAF_hist", "BAF_hist_overall", "Ratio_hist_overall"),
+                                         type = c("all", "het", "BAF", "zscore", "BAF_hist", "BAF_hist_overall", "Ratio_hist_overall"),
                                          area_single = 0.75,
                                          ploidy = 4,
                                          dot.size = 1,
@@ -327,44 +406,46 @@ plot_qploidy_standardization <- function(x,
                                          colors = FALSE,
                                          window_size = 2000000,
                                          het_interval = 0.1,
-                                         rm_homozygous = FALSE, ...){
+                                         rm_homozygous = FALSE, ...) {
+  if (!inherits(x, "qploidy_standardization")) stop("Object is not of class qploidy_standardization")
 
-  if(!inherits(x, "qploidy_standardization")) stop("Object is not of class qploidy_standardization")
+  if (is.null(sample)) stop("Define sample ID")
 
-  if(is.null(sample)) stop("Define sample ID")
+  data_sample <- x$data[which(x$data$SampleName == sample), ]
 
-  data_sample <- x$data[which(x$data$SampleName == sample),]
+  if (is.numeric(chr)) chr <- sort(unique(data_sample$Chr))[chr] else if (is.null(chr)) chr <- sort(unique(data_sample$Chr))
 
-  if(is.numeric(chr)) chr <- sort(unique(data_sample$Chr))[chr] else if(is.null(chr)) chr <- sort(unique(data_sample$Chr))
-
-  data_sample <- data_sample %>% filter(Chr %in% chr) %>% select(MarkerName, SampleName, Chr, Position, baf, z, ratio)
+  data_sample <- data_sample %>%
+    filter(Chr %in% chr) %>%
+    select(MarkerName, SampleName, Chr, Position, baf, z, ratio)
   data_sample$Position <- as.numeric(data_sample$Position)
 
-  if(nrow(data_sample) == 0) stop("Sample or chromosome not found.")
+  if (nrow(data_sample) == 0) stop("Sample or chromosome not found.")
 
   baf_sample <- data_sample %>% pivot_wider(names_from = SampleName, values_from = baf)
   zscore_sample <- data_sample %>% pivot_wider(names_from = SampleName, values_from = z)
 
-  colnames(baf_sample)[ncol(baf_sample)] <-  "sample"
+  colnames(baf_sample)[ncol(baf_sample)] <- "sample"
 
   baf_point <- baf_hist <- p_z <- raw_ratio <- het_rate <- baf_hist_overall <- ratio_hist_overall <- NULL
 
-  if(any(type == "all" | type == "BAF")){
+  if (any(type == "all" | type == "BAF")) {
     baf_point <- plot_baf(baf_sample,
-                          area_single,
-                          ploidy,
-                          dot.size = dot.size,
-                          add_estimated_peaks,
-                          add_expected_peaks,
-                          centromeres,
-                          add_centromeres,
-                          colors,
-                          font_size = font_size)
+      area_single,
+      ploidy,
+      dot.size = dot.size,
+      add_estimated_peaks,
+      add_expected_peaks,
+      centromeres,
+      add_centromeres,
+      colors,
+      font_size = font_size
+    )
   }
 
-  if(add_centromeres){
-    #centromeres <- c("1 = 49130338, 5 = 49834357")
-    if(length(centromeres) == 1 & any(grepl(",", centromeres))){
+  if (add_centromeres) {
+    # centromeres <- c("1 = 49130338, 5 = 49834357")
+    if (length(centromeres) == 1 & any(grepl(",", centromeres))) {
       centromeres <- gsub("\ ", "", centromeres)
       centromeres <- unlist(strsplit(centromeres, ","))
       centromeres <- sapply(centromeres, function(x) strsplit(x, "="))
@@ -373,12 +454,12 @@ plot_qploidy_standardization <- function(x,
       centromeres_df <- data.frame(Chr = names(centromeres), value = centromeres)
     }
 
-    for(i in 1:length(centromeres)){
+    for (i in 1:length(centromeres)) {
       idx <- which(baf_sample$Chr == centromeres_df$Chr[i] & baf_sample$Position < centromeres_df$value[i])
       baf_sample$Chr[idx] <- paste0(baf_sample$Chr[idx], ".1")
       idx <- which(baf_sample$Chr == centromeres_df$Chr[i] & baf_sample$Position >= centromeres_df$value[i])
       baf_sample$Chr[idx] <- paste0(baf_sample$Chr[idx], ".2")
-      if(any(type == "zscore")){
+      if (any(type == "zscore")) {
         idx <- which(zscore_sample$Chr == centromeres_df$Chr[i] & zscore_sample$Position < centromeres_df$value[i])
         zscore_sample$Chr[idx] <- paste0(zscore_sample$Chr[idx], ".1")
         idx <- which(zscore_sample$Chr == centromeres_df$Chr[i] & zscore_sample$Position >= centromeres_df$value[i])
@@ -387,76 +468,88 @@ plot_qploidy_standardization <- function(x,
     }
   }
 
-  if(any(type == "all" | type == "BAF_hist")){
-    baf_hist <- plot_baf_hist(data_sample = baf_sample,
-                              area_single,
-                              ploidy,
-                              colors,
-                              add_estimated_peaks,
-                              add_expected_peaks,
-                              BAF_hist_overall = FALSE,
-                              rm_homozygous = rm_homozygous,
-                              font_size = font_size)
+  if (any(type == "all" | type == "BAF_hist")) {
+    baf_hist <- plot_baf_hist(
+      data_sample = baf_sample,
+      area_single,
+      ploidy,
+      colors,
+      add_estimated_peaks,
+      add_expected_peaks,
+      BAF_hist_overall = FALSE,
+      rm_homozygous = rm_homozygous,
+      font_size = font_size
+    )
   }
 
-  if(any(type == "all" | type == "BAF_hist_overall")){
-    baf_hist_overall <- plot_baf_hist(data_sample = baf_sample,
-                                      area_single,
-                                      ploidy,
-                                      colors,
-                                      add_estimated_peaks,
-                                      add_expected_peaks,
-                                      BAF_hist_overall = TRUE,
-                                      rm_homozygous = rm_homozygous,
-                                      font_size = font_size)
+  if (any(type == "all" | type == "BAF_hist_overall")) {
+    baf_hist_overall <- plot_baf_hist(
+      data_sample = baf_sample,
+      area_single,
+      ploidy,
+      colors,
+      add_estimated_peaks,
+      add_expected_peaks,
+      BAF_hist_overall = TRUE,
+      rm_homozygous = rm_homozygous,
+      font_size = font_size
+    )
   }
 
-  if(any(type == "all" | type == "Ratio_hist_overall")){
-    ratio_hist_overall <- plot_baf_hist(data_sample = baf_sample,
-                                        area_single,
-                                        ploidy,
-                                        colors,
-                                        add_estimated_peaks,
-                                        add_expected_peaks,
-                                        BAF_hist_overall = TRUE,
-                                        ratio = TRUE,
-                                        rm_homozygous = rm_homozygous,
-                                        font_size = font_size)
+  if (any(type == "all" | type == "Ratio_hist_overall")) {
+    ratio_hist_overall <- plot_baf_hist(
+      data_sample = baf_sample,
+      area_single,
+      ploidy,
+      colors,
+      add_estimated_peaks,
+      add_expected_peaks,
+      BAF_hist_overall = TRUE,
+      ratio = TRUE,
+      rm_homozygous = rm_homozygous,
+      font_size = font_size
+    )
   }
 
-  if(any(type == "zscore")){
+  if (any(type == "zscore")) {
     colnames(zscore_sample)[ncol(zscore_sample)] <- "z"
-    p_z <- zscore_sample  %>%
-      ggplot(aes(x = Position , y = z)) +
-      facet_grid(.~Chr, scales = "free") +
+    p_z <- zscore_sample %>%
+      ggplot(aes(x = Position, y = z)) +
+      facet_grid(. ~ Chr, scales = "free") +
       geom_smooth(method = "gam") +
-      theme_bw() + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
-                         text = element_text(size = font_size)) +
-      geom_hline(yintercept=median(zscore_sample$z), linetype="dashed")
-
+      theme_bw() +
+      theme(
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
+        text = element_text(size = font_size)
+      ) +
+      geom_hline(yintercept = median(zscore_sample$z), linetype = "dashed")
   }
 
-  if(any(type == "ratio")){
-    raw_ratio <- data_sample %>%  ggplot(aes(x = Position, y = ratio)) + geom_point(alpha =0.7, size=dot.size) +
-      facet_grid(.~Chr, scales = "free") + theme_bw() +
-      theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
-            text = element_text(size = font_size))
+  if (any(type == "ratio")) {
+    raw_ratio <- data_sample %>% ggplot(aes(x = Position, y = ratio)) +
+      geom_point(alpha = 0.7, size = dot.size) +
+      facet_grid(. ~ Chr, scales = "free") +
+      theme_bw() +
+      theme(
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
+        text = element_text(size = font_size)
+      )
   }
 
-  if(any(type == "het")){
+  if (any(type == "het")) {
     data_sample$het_rate <- NA
-    data_sample$het_rate[which(data_sample$ratio <= 0+het_interval | data_sample$ratio >= 1 - het_interval)] <- 0
-    data_sample$het_rate[which(data_sample$ratio > 0+het_interval & data_sample$ratio < 1 - het_interval)] <- 1
+    data_sample$het_rate[which(data_sample$ratio <= 0 + het_interval | data_sample$ratio >= 1 - het_interval)] <- 0
+    data_sample$het_rate[which(data_sample$ratio > 0 + het_interval & data_sample$ratio < 1 - het_interval)] <- 1
 
     data_sample_lst <- split.data.frame(data_sample, data_sample$Chr)
 
-    for(j in 1:length(data_sample_lst)){
+    for (j in 1:length(data_sample_lst)) {
       data_sample_lst[[j]]$window <- 1
-      if(length(unique(data_sample_lst[[j]]$Position)) == 1) next()
-      intervals_start <- c(seq(1,max(data_sample_lst[[j]]$Position), window_size))
-      intervals_end <- c(seq(1,max(data_sample_lst[[j]]$Position), window_size) - 1, max(data_sample_lst[[j]]$Position))
+      if (length(unique(data_sample_lst[[j]]$Position)) == 1) next()
+      intervals_start <- c(seq(1, max(data_sample_lst[[j]]$Position), window_size))
+      intervals_end <- c(seq(1, max(data_sample_lst[[j]]$Position), window_size) - 1, max(data_sample_lst[[j]]$Position))
       intervals_end <- intervals_end[-1]
-      for(i in 1:length(intervals_start)){
+      for (i in 1:length(intervals_start)) {
         data_sample_lst[[j]]$window[which(data_sample_lst[[j]]$Position >= intervals_start[i] & data_sample_lst[[j]]$Position <= intervals_end[i])] <- intervals_start[i]
       }
     }
@@ -465,18 +558,24 @@ plot_qploidy_standardization <- function(x,
 
     het_rate <- data_sample %>%
       group_by(Chr, window) %>%
-      summarise(prop_het = sum(het_rate, na.rm = TRUE)/length(which(het_rate == 1 | het_rate == 0))) %>%
-      ggplot(aes(x = window, y = prop_het, color = prop_het)) + geom_line() +
+      summarise(prop_het = sum(het_rate, na.rm = TRUE) / length(which(het_rate == 1 | het_rate == 0))) %>%
+      ggplot(aes(x = window, y = prop_het, color = prop_het)) +
+      geom_line() +
       scale_color_gradient(low = "black", high = "red") +
-      facet_grid(.~Chr, scales = "free") + theme_bw() + ylab("proportion of heterozygous loci") + xlab("Position")+
-      theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
-            legend.position = "none", text = element_text(size = font_size))
+      facet_grid(. ~ Chr, scales = "free") +
+      theme_bw() +
+      ylab("proportion of heterozygous loci") +
+      xlab("Position") +
+      theme(
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
+        legend.position = "none", text = element_text(size = font_size)
+      )
   }
 
-  p_all <- list(het_rate, raw_ratio, baf_point, baf_hist,baf_hist_overall, ratio_hist_overall, p_z)
+  p_all <- list(het_rate, raw_ratio, baf_point, baf_hist, baf_hist_overall, ratio_hist_overall, p_z)
 
   rm <- which(sapply(p_all, is.null))
-  if(length(rm) != 0) p_all <- p_all[-rm]
+  if (length(rm) != 0) p_all <- p_all[-rm]
 
   p_result <- ggarrange(plotlist = p_all, ncol = 1)
 
@@ -486,48 +585,317 @@ plot_qploidy_standardization <- function(x,
 }
 
 #' Plot graphics for ploidy visual inspection for each resolution
-#' It was made for parallelization purpose
 #'
-#' @param data_standardized result from standardization function
-#' @param sample sample name
-#' @param ploidy sample ploidy if known
-#' @param centromeres vector with centromeres positions
-#' @param file_name character defining the output file path and name
-#' @param chr vector containing which chromosomes should be included
+#' This function generates and saves plots for visual inspection of ploidy at different resolutions: chromosome, chromosome-arm, and sample levels. It is designed for parallelization purposes and supports customization of centromere positions and chromosome selection.
+#'
+#' @param data_standardized An object of class `qploidy_standardization` containing standardized data for ploidy analysis.
+#' @param sample A character string specifying the sample name to be analyzed.
+#' @param ploidy A numeric value indicating the expected ploidy of the sample. This parameter is required.
+#' @param centromeres A named vector with centromere positions (in base pairs) for each chromosome. The names must match the chromosome IDs in the dataset. This is used for chromosome-arm level resolution.
+#' @param file_name A character string defining the output file path and name prefix for the saved plots. The function appends resolution-specific suffixes to this prefix.
+#' @param chr A vector specifying the chromosomes to include in the analysis. If NULL, all chromosomes are included.
+#' @return This function does not return a value. It saves the generated plots as PNG files in the specified location.
+#' @details The function generates three types of plots:
+#' 
+#' - **Chromosome-level resolution**: Plots raw ratio and BAF histograms for each chromosome.
+#' - **Chromosome-arm level resolution**: Similar to chromosome-level but splits data by chromosome arms using centromere positions.
+#' - **Sample-level resolution**: Combines all markers in the sample to generate overall raw ratio and BAF histograms.
+#'
+#' The plots are saved as PNG files with the following suffixes:
+#' - `_res:chromosome.png`
+#' - `_res:chromosome_arm.png`
+#' - `_res:sample.png`
 #'
 #' @importFrom ggplot2 ggsave
-#'
+#' 
 #' @export
-all_resolutions_plots <- function(data_standardized, sample, ploidy, centromeres, file_name, chr){
-  # Raw ratio and BAF histograms (chromosome level resolution)
-  p <- plot_qploidy_standardization(x = data_standardized,
-                                    sample = sample,
-                                    type = c("Ratio_hist", "BAF_hist", "zscore"),
-                                    chr = chr,
-                                    add_expected_peaks = TRUE,
-                                    ploidy = ploidy)
+all_resolutions_plots <- function(data_standardized, sample, ploidy, centromeres, file_name = NULL, chr = NULL) {
+  # Input checks
+  if (!inherits(data_standardized, "qploidy_standardization")) {
+    stop("The 'data_standardized' parameter must be of class 'qploidy_standardization'.")
+  }
 
-  ggsave(p, filename = paste0(file_name, "_res:chromosome.png"))
+  if (!is.character(sample) || length(sample) != 1) {
+    stop("The 'sample' parameter must be a single character string.")
+  }
+
+  if (!is.numeric(ploidy) || length(ploidy) != 1) {
+    stop("The 'ploidy' parameter must be a single numeric value.")
+  }
+
+  if (!is.null(chr) && !is.vector(chr)) {
+    stop("The 'chr' parameter must be a vector or NULL.")
+  }
+
+  p_list <- list()
+  # Raw ratio and BAF histograms (chromosome level resolution)
+  p <- plot_qploidy_standardization(
+    x = data_standardized,
+    sample = sample,
+    type = c("Ratio_hist", "BAF_hist", "zscore"),
+    chr = chr,
+    add_expected_peaks = TRUE,
+    ploidy = ploidy
+  )
+  p_list[[1]] <- p
+  if(!is.null(file_name)) ggsave(p, filename = paste0(file_name, "_res:chromosome.png"))
 
   # Raw ratio and BAF histograms combining all markers in the sample (chromosome-arm level resolution)
-  p <- plot_qploidy_standardization(x = data_standardized,
-                                    sample = sample,
-                                    type = c("Ratio_hist", "BAF_hist", "zscore"),
-                                    chr = chr,
-                                    ploidy = ploidy,
-                                    add_expected_peaks = TRUE,
-                                    add_centromeres = TRUE,
-                                    centromeres = centromeres)
+  if (!is.null(centromeres)) {
+    if (!is.vector(centromeres) || is.null(names(centromeres))) {
+      stop("The 'centromeres' parameter must be a named vector with chromosome IDs as names.")
+    }
 
-  ggsave(p, filename = paste0(file_name, "_res:chromosome_arm.png"))
+    p <- plot_qploidy_standardization(
+      x = data_standardized,
+      sample = sample,
+      type = c("Ratio_hist", "BAF_hist", "zscore"),
+      chr = chr,
+      ploidy = ploidy,
+      add_expected_peaks = TRUE,
+      add_centromeres = TRUE,
+      centromeres = centromeres
+    )
+
+    p_list[[2]] <- p
+    if(!is.null(file_name)) ggsave(p, filename = paste0(file_name, "_res:chromosome_arm.png"))
+  }
 
   # Raw ratio and BAF histograms combining all markers in the sample (sample level resolution)
-  p <- plot_qploidy_standardization(x = data_standardized,
-                                    sample = sample,
-                                    type = c("Ratio_hist_overall", "BAF_hist_overall"),
-                                    chr = chr,
-                                    ploidy = ploidy,
-                                    add_expected_peaks = TRUE)
+  p <- plot_qploidy_standardization(
+    x = data_standardized,
+    sample = sample,
+    type = c("Ratio_hist_overall", "BAF_hist_overall"),
+    chr = chr,
+    ploidy = ploidy,
+    add_expected_peaks = TRUE
+  )
 
-  ggsave(p, filename = paste0(file_name, "_res:sample.png"))
+  p_list[[3]] <- p
+  if(!is.null(file_name)) ggsave(p, filename = paste0(file_name, "_res:sample.png"))
+
+  names(p_list) <- c("chromosome", "chromosome_arm", "sample")
+  return(p_list)
+}
+
+#' Generate plots for overall analysis
+#'
+#' @param est.ploidy.chr_df list of data.frames with ploidy estimation information
+#' @param filter_diff filter by difference on area proportion between first and second place
+#' @param filter_corr filter by correlation of observed and expected peak position
+#'
+#' @import tidyr
+#' @import dplyr
+#' @importFrom reshape2 melt
+#' @import ggplot2
+#' @importFrom ggpubr ggarrange
+#'
+#' @export
+plots_overall <- function(est.ploidy.chr_df, filter_diff = 0, filter_corr = 0) {
+  idx <- which(apply(est.ploidy.chr_df[[1]], 1, function(x) length(unique(x)) > 1))
+  if (length(idx) > 0) {
+    ploidies <- est.ploidy.chr_df[[1]][-idx, ]
+    if (is.null(dim(ploidies))) { # If only one individual
+      ploidies <- t(ploidies)
+      rownames(ploidies) <- rownames(est.ploidy.chr_df[[1]])[-idx]
+    }
+    ploidies.prop <- est.ploidy.chr_df[[2]][-idx, ]
+    if (is.null(dim(ploidies.prop))) { # If only one individual
+      ploidies.prop <- t(ploidies.prop)
+      rownames(ploidies.prop) <- rownames(est.ploidy.chr_df[[1]])[-idx]
+    }
+    ploidies.sd <- est.ploidy.chr_df[[4]][-idx, ]
+    if (is.null(dim(ploidies.sd))) { # If only one individual
+      ploidies.sd <- t(ploidies.sd)
+      rownames(ploidies.sd) <- rownames(est.ploidy.chr_df[[1]])[-idx]
+    }
+    ploidies.corr <- est.ploidy.chr_df[[5]][-idx, ]
+    if (is.null(dim(ploidies.corr))) { # If only one individual
+      ploidies.corr <- t(ploidies.corr)
+      rownames(ploidies.corr) <- rownames(est.ploidy.chr_df[[1]])[-idx]
+    }
+    ploidies.diff <- est.ploidy.chr_df[[3]][-idx, ]
+    if (is.null(dim(ploidies.diff))) { # If only one individual
+      ploidies.diff <- t(ploidies.diff)
+      rownames(ploidies.diff) <- rownames(est.ploidy.chr_df[[1]])[-idx]
+    }
+    # Graphics using only area method and aneuploidy individuals
+    aneuploids <- est.ploidy.chr_df[[1]][idx, ]
+    aneuploids.prop <- est.ploidy.chr_df[[2]][idx, ]
+    aneuploids.sd <- est.ploidy.chr_df[[4]][idx, ]
+    aneuploids.corr <- est.ploidy.chr_df[[5]][idx, ]
+    aneuploids.diff <- est.ploidy.chr_df[[3]][idx, ]
+
+    if (is.vector(aneuploids)) {
+      aneuploids <- data.frame(Var1 = rownames(est.ploidy.chr_df[[1]])[idx], Var2 = names(aneuploids), melt(aneuploids, value.name = "ploidy"))
+      aneuploids.prop <- data.frame(Var1 = rownames(est.ploidy.chr_df[[1]])[idx], Var2 = names(aneuploids.prop), melt(aneuploids.prop, value.name = "prop"))
+      aneuploids.sd <- data.frame(Var1 = rownames(est.ploidy.chr_df[[1]])[idx], Var2 = names(aneuploids.sd), melt(aneuploids.sd, value.name = "sd"))
+      aneuploids.corr <- data.frame(Var1 = rownames(est.ploidy.chr_df[[1]])[idx], Var2 = names(aneuploids.corr), melt(aneuploids.corr, value.name = "corr"))
+      aneuploids.diff <- data.frame(Var1 = rownames(est.ploidy.chr_df[[1]])[idx], Var2 = names(aneuploids.diff), melt(aneuploids.diff, value.name = "diff"))
+    } else {
+      aneuploids <- melt(aneuploids, value.name = "ploidy")
+      aneuploids.prop <- melt(aneuploids.prop, value.name = "prop")
+      aneuploids.sd <- melt(aneuploids.sd, value.name = "sd")
+      aneuploids.corr <- melt(aneuploids.corr, value.name = "corr")
+      aneuploids.diff <- melt(aneuploids.diff, value.name = "diff")
+    }
+
+    # Aneuploid table and samples list
+    main_ploidy <- aneuploids %>%
+      group_by(Var1) %>%
+      mutate(main_ploidy = mode(ploidy))
+
+    aneuploidy_df <- main_ploidy[-which(main_ploidy$ploidy == main_ploidy$main_ploidy), ]
+    colnames(aneuploidy_df) <- c("sample", "chromosome", "aneuploidy_ploidy", "main_ploidy")
+    aneuploidy_list <- aneuploidy_df %>%
+      group_by(chromosome, aneuploidy_ploidy, main_ploidy) %>%
+      summarise(samples = paste0(sample, collapse = " "))
+    aneuploidy_list <- aneuploidy_list[order(aneuploidy_list$main_ploidy, aneuploidy_list$aneuploidy_ploidy, aneuploidy_list$chromosome), ]
+    aneuploid_text <- paste0("<br/>Main ploidy - ", aneuploidy_list$main_ploidy, "; ploidy - ", aneuploidy_list$aneuploidy_ploidy, "; in chromosome - ", aneuploidy_list$chromosome, ":<br/>", aneuploidy_list$samples)
+
+    aneuploidy_all_weird <- unique(c(
+      as.character(aneuploids.corr$Var1)[which(aneuploids.corr$corr < filter_corr)],
+      as.character(aneuploids.diff$Var1)[which(aneuploids.diff$diff < filter_diff)]
+    ))
+
+    if (length(aneuploidy_all_weird) == 0) aneuploidy_all_weird <- "Set filters"
+
+    # Graphics
+    df_n <- melt(table(aneuploids$ploidy), varnames = "ploidy", value.name = "#individuals*#chrom")
+    df_n$ploidy <- as.factor(df_n$ploidy)
+    p1 <- ggplot(df_n, aes(x = ploidy, y = `#individuals*#chrom`, fill = ploidy)) +
+      geom_bar(stat = "identity") +
+      theme_bw()
+
+    df <- merge(aneuploids, aneuploids.prop, by = c(1, 2))
+    df <- merge(df, aneuploids.sd, by = c(1, 2))
+    df <- merge(df, aneuploids.corr, by = c(1, 2))
+    df <- merge(df, aneuploids.diff, by = c(1, 2))
+
+    df <- melt(df, id.vars = c("ploidy", "Var1", "Var2"))
+
+    df$variable <- gsub("sd", "standard deviation", df$variable)
+    df$variable <- gsub("prop", "proportion in area", df$variable)
+    df$variable <- gsub("corr", "correlation (Pearson)", df$variable)
+    df$variable <- gsub("diff", "difference in proportion", df$variable)
+
+    df$ploidy <- as.factor(df$ploidy)
+    p2 <- ggplot(df, aes(x = ploidy, y = value, group = ploidy, fill = ploidy)) +
+      geom_boxplot() +
+      facet_grid(variable ~ ., scales = "free") +
+      theme_bw()
+
+    p_aneuploids <- ggarrange(p1, p2, common.legend = T)
+
+    df <- as.data.frame(table(data.frame(chr = aneuploids$Var2, ploidy = aneuploids$ploidy)))
+    df <- df %>%
+      group_by(chr, ploidy) %>%
+      summarise(Freq_all = sum(Freq))
+    p_aneuploids2 <- ggplot(df, aes(chr, ploidy)) +
+      geom_tile(aes(fill = Freq_all)) +
+      geom_text(aes(label = Freq_all)) +
+      scale_fill_gradient(low = "white", high = "red")
+  } else {
+    ploidies <- est.ploidy.chr_df[[1]]
+    if (is.null(dim(ploidies))) { # If only one individual
+      ploidies <- t(ploidies)
+      rownames(ploidies) <- rownames(est.ploidy.chr_df[[1]])[-idx]
+    }
+    ploidies.prop <- est.ploidy.chr_df[[2]]
+    if (is.null(dim(ploidies.prop))) { # If only one individual
+      ploidies.prop <- t(ploidies.prop)
+      rownames(ploidies.prop) <- rownames(est.ploidy.chr_df[[1]])[-idx]
+    }
+    ploidies.sd <- est.ploidy.chr_df[[4]]
+    if (is.null(dim(ploidies.sd))) { # If only one individual
+      ploidies.sd <- t(ploidies.sd)
+      rownames(ploidies.sd) <- rownames(est.ploidy.chr_df[[1]])[-idx]
+    }
+    ploidies.corr <- est.ploidy.chr_df[[5]]
+    if (is.null(dim(ploidies.corr))) { # If only one individual
+      ploidies.corr <- t(ploidies.corr)
+      rownames(ploidies.corr) <- rownames(est.ploidy.chr_df[[1]])[-idx]
+    }
+    ploidies.diff <- est.ploidy.chr_df[[3]]
+    if (is.null(dim(ploidies.diff))) { # If only one individual
+      ploidies.diff <- t(ploidies.diff)
+      rownames(ploidies.diff) <- rownames(est.ploidy.chr_df[[1]])[-idx]
+    }
+
+    p_aneuploids <- paste0("No aneuploid samples")
+    p_aneuploids2 <- paste0("No aneuploid samples")
+    aneuploid_text <- paste0("No aneuploid samples")
+    aneuploidy_all_weird <- paste0("No aneuploid samples")
+    aneuploidy_df <- paste0("No aneuploid samples")
+  }
+
+  # Graphics using only area method and non-aneuploidy individuals
+  if (nrow(ploidies) < 2) {
+    ploidy_all_tex <- list(rownames(ploidies))
+    names(ploidy_all_tex) <- ploidies[, 1]
+  } else {
+    ploidy_all_tex <- split(names(ploidies[, 1]), ploidies[, 1])
+  }
+  text_ploidy <- vector()
+  for (i in 1:length(ploidy_all_tex)) {
+    line1 <- paste0("<br/>ploidy ", names(ploidy_all_tex)[i], ":<br/>")
+    line2 <- paste0(ploidy_all_tex[[i]], collapse = " ")
+    text_ploidy <- paste0(text_ploidy, line1, line2)
+  }
+
+  df_n <- melt(table(ploidies[, 1]), varnames = "ploidy", value.name = "#individuals")
+  df_n$ploidy <- as.factor(df_n$ploidy)
+  p1 <- ggplot(df_n, aes(x = ploidy, y = `#individuals`, fill = ploidy)) +
+    geom_bar(stat = "identity") +
+    theme_bw()
+
+  if (is.vector(ploidies)) {
+    ploidies <- data.frame(Var1 = rownames(est.ploidy.chr_df[[1]])[idx], Var2 = names(ploidies), melt(ploidies, value.name = "ploidy"))
+    ploidies.prop <- data.frame(Var1 = rownames(est.ploidy.chr_df[[1]])[idx], Var2 = names(ploidies.prop), melt(ploidies.prop, value.name = "prop"))
+    ploidies.sd <- data.frame(Var1 = rownames(est.ploidy.chr_df[[1]])[idx], Var2 = names(ploidies.sd), melt(ploidies.sd, value.name = "sd"))
+    ploidies.corr <- data.frame(Var1 = rownames(est.ploidy.chr_df[[1]])[idx], Var2 = names(ploidies.corr), melt(ploidies.corr, value.name = "corr"))
+    ploidies.diff <- data.frame(Var1 = rownames(est.ploidy.chr_df[[1]])[idx], Var2 = names(ploidies.diff), melt(ploidies.diff, value.name = "diff"))
+  } else {
+    ploidies <- melt(ploidies, value.name = "ploidy")
+    ploidies.prop <- melt(ploidies.prop, value.name = "prop")
+    ploidies.sd <- melt(ploidies.sd, value.name = "sd")
+    ploidies.corr <- melt(ploidies.corr, value.name = "corr")
+    ploidies.diff <- melt(ploidies.diff, value.name = "diff")
+  }
+
+  df <- merge(ploidies, ploidies.prop, by = c(1, 2))
+  df <- merge(df, ploidies.sd, by = c(1, 2))
+  df <- merge(df, ploidies.corr, by = c(1, 2))
+  df <- merge(df, ploidies.diff, by = c(1, 2))
+
+  df <- melt(df, id.vars = c("ploidy", "Var1", "Var2"))
+
+  df$variable <- gsub("sd", "standard deviation", df$variable)
+  df$variable <- gsub("prop", "proportion in area", df$variable)
+  df$variable <- gsub("corr", "correlation (Pearson)", df$variable)
+  df$variable <- gsub("diff", "difference in proportion", df$variable)
+
+  df$ploidy <- as.factor(df$ploidy)
+  p2 <- ggplot(df, aes(x = ploidy, y = value, group = ploidy, fill = ploidy)) +
+    geom_boxplot() +
+    facet_grid(variable ~ ., scales = "free") +
+    theme_bw()
+
+  p <- ggarrange(p1, p2, common.legend = T)
+
+  # Weird individuals
+  # set filters
+  # All
+  ploidy_all_weird <- unique(c(
+    as.character(ploidies.corr$Var1)[which(ploidies.corr$corr < filter_corr)],
+    as.character(ploidies.diff$Var1)[which(ploidies.diff$diff < filter_diff)]
+  ))
+
+  if (length(ploidy_all_weird) == 0) ploidy_all_weird <- "Set filters"
+
+
+  list(
+    p, p_aneuploids, p_aneuploids2, text_ploidy, aneuploid_text,
+    aneuploidy_df, ploidy_all_weird, aneuploidy_all_weird
+  )
 }

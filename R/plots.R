@@ -18,6 +18,7 @@ globalVariables(c("Chr", "baf", "z", "ratio", "median", "window", "prop_het"))
 #'
 #' @importFrom ggplot2 ggplot aes geom_point geom_rect geom_vline scale_color_manual facet_grid theme_bw theme element_text ylab
 #' @importFrom dplyr filter
+#' @importFrom dplyr %>%
 #' @export
 plot_baf <- function(data_sample,
                      area_single,
@@ -49,7 +50,7 @@ plot_baf <- function(data_sample,
     }
 
     data_sample2 <- rets2 <- data.frame()
-    for (z in 1:length(unique(data_sample$Chr))) {
+    for (z in seq_along(unique(data_sample$Chr))) {
       ymin <- seq(0, 1, 1 / ploidy[z]) - (area_single / (ploidy[z] * 2))
       ymax <- seq(0, 1, 1 / ploidy[z]) + (area_single / (ploidy[z] * 2))
 
@@ -60,7 +61,7 @@ plot_baf <- function(data_sample,
       data_chr <- data_sample[which(data_sample$Chr == sort(unique(data_sample$Chr))[z]), ]
       idx_tot <- FALSE
       idx <- list()
-      for (i in 1:nrow(rets)) {
+      for (i in seq_len(nrow(rets))) {
         idx <- data_chr$sample >= rets$ymin[i] & data_chr$sample <= rets$ymax[i]
         idx_tot <- idx_tot | idx
       }
@@ -152,7 +153,7 @@ plot_baf_hist <- function(data_sample,
 
     if (BAF_hist_overall) Chrs <- "all" else Chrs <- sort(unique(data_sample$Chr))
     data_sample2 <- modes.df3 <- data.frame()
-    for (z in 1:length(Chrs)) {
+    for (z in seq_along(Chrs)) {
       ymin <- seq(0, 1, 1 / ploidy[z]) - (area_single / (ploidy[z] * 2))
       ymax <- seq(0, 1, 1 / ploidy[z]) + (area_single / (ploidy[z] * 2))
 
@@ -170,7 +171,7 @@ plot_baf_hist <- function(data_sample,
 
       idx_tot <- FALSE
       modes.df2 <- data.frame()
-      for (i in 1:nrow(rets)) {
+      for (i in seq_len(nrow(rets))) {
         idx <- split_data$sample >= rets$ymin[i] & split_data$sample <= rets$ymax[i]
         idx_tot <- idx_tot | idx
 
@@ -309,7 +310,7 @@ plot_baf_hist <- function(data_sample,
         legend.position = "bottom", text = element_text(size = font_size)
       ) +
       {
-        if (add_expected_peaks | add_estimated_peaks) labs(color = "Peaks")
+        if (add_expected_peaks || add_estimated_peaks) labs(color = "Peaks")
       } +
       {
         if (colors) labs(fill = "Area")
@@ -340,7 +341,7 @@ plot_check <- function(data_qploidy, R_lim = NULL, n = 3000) {
   plot_df <- as.matrix(plot_df[, -1])
   rownames(plot_df) <- mk_names
 
-  plot_df <- plot_df[sample(1:nrow(plot_df), n, replace = FALSE), ]
+  plot_df <- plot_df[sample(seq_len(nrow(plot_df)), n, replace = FALSE), ]
   plot_df <- plot_df[order(apply(plot_df, 1, sum)), ]
 
   if (!is.null(R_lim)) {
@@ -370,7 +371,16 @@ plot_check <- function(data_qploidy, R_lim = NULL, n = 3000) {
 #' @param x An object of class `qploidy_standardization`.
 #' @param sample Character string indicating the sample ID to plot.
 #' @param chr Character or numeric vector specifying the chromosomes to plot. Default is NULL (plots all chromosomes).
-#' @param type Character vector defining the plot types. Options include "all", "het", "BAF", "zscore", "BAF_hist", "BAF_hist_overall", and "Ratio_hist_overall". Default is "all".
+#' @param type Character vector defining the plot types. Options include:
+#'   - "all": Generates all available plot types.
+#'   - "het": Plots heterozygous locus counts across genomic windows.
+#'   - "BAF": Plots B-allele frequency (BAF) for each chromosome.
+#'   - "zscore": Plots z-scores for each chromosome.
+#'   - "BAF_hist": Plots BAF histograms for each chromosome.
+#'   - "BAF_hist_overall": Plots a BAF histogram for the entire genome.
+#'   - "Ratio_hist_overall": Plots a histogram of raw ratios for the entire genome.
+#'   - "ratio": Plots raw ratios for each chromosome.
+#'   Default is "all".
 #' @param area_single Numeric value defining the area around the expected peak to be considered. Default is 0.75.
 #' @param ploidy Integer specifying the expected ploidy. Default is 4.
 #' @param dot.size Numeric value for the size of the dots in the plots. Default is 1.
@@ -385,7 +395,19 @@ plot_check <- function(data_qploidy, R_lim = NULL, n = 3000) {
 #' @param rm_homozygous Logical. If TRUE, removes homozygous calls from BAF histogram plots. Default is FALSE.
 #' @param ... Additional plot parameters.
 #' @return A ggarrange object containing the requested plots.
+#'
+#' @details The function supports the following plot types:
 #' 
+#' - **all**: Generates all available plot types.
+#' - **het**: Plots the proportion of heterozygous loci across genomic windows, useful for identifying regions with high or low heterozygosity.
+#' - **BAF**: Plots the B-allele frequency (BAF) for each chromosome, showing the distribution of allele frequencies.
+#' - **zscore**: Plots z-scores for each chromosome, which can help identify outliers or regions with unusual data distributions.
+#' - **BAF_hist**: Plots histograms of BAF values for each chromosome, providing a summary of allele frequency distributions.
+#' - **BAF_hist_overall**: Plots a single histogram of BAF values for the entire genome, summarizing allele frequency distributions genome-wide.
+#' - **Ratio_hist_overall**: Plots a histogram of raw ratios for the entire genome, useful for visualizing overall ratio distributions.
+#' - **ratio**: Plots raw ratios for each chromosome, showing the distribution of observed ratios.
+#'
+#'
 #' @importFrom ggpubr ggarrange annotate_figure text_grob
 #' @importFrom ggplot2 ggplot aes geom_point geom_smooth geom_hline facet_grid theme_bw theme element_text
 #' @importFrom dplyr filter group_by summarise
@@ -394,7 +416,7 @@ plot_check <- function(data_qploidy, R_lim = NULL, n = 3000) {
 plot_qploidy_standardization <- function(x,
                                          sample = NULL,
                                          chr = NULL,
-                                         type = c("all", "het", "BAF", "zscore", "BAF_hist", "BAF_hist_overall", "Ratio_hist_overall"),
+                                         type = c("all", "het", "BAF", "zscore", "BAF_hist", "ratio","BAF_hist_overall", "Ratio_hist_overall"),
                                          area_single = 0.75,
                                          ploidy = 4,
                                          dot.size = 1,
@@ -418,6 +440,7 @@ plot_qploidy_standardization <- function(x,
   data_sample <- data_sample %>%
     filter(Chr %in% chr) %>%
     select(MarkerName, SampleName, Chr, Position, baf, z, ratio)
+
   data_sample$Position <- as.numeric(data_sample$Position)
 
   if (nrow(data_sample) == 0) stop("Sample or chromosome not found.")
@@ -592,12 +615,33 @@ plot_qploidy_standardization <- function(x,
 #' @param sample A character string specifying the sample name to be analyzed.
 #' @param ploidy A numeric value indicating the expected ploidy of the sample. This parameter is required.
 #' @param centromeres A named vector with centromere positions (in base pairs) for each chromosome. The names must match the chromosome IDs in the dataset. This is used for chromosome-arm level resolution.
-#' @param file_name A character string defining the output file path and name prefix for the saved plots. The function appends resolution-specific suffixes to this prefix.
+#' @param file_name A character string defining the output file path and name prefix for the saved plots. The function appends resolution-specific suffixes to this prefix. If NULL, plots are not saved to files.
 #' @param chr A vector specifying the chromosomes to include in the analysis. If NULL, all chromosomes are included.
-#' @return This function does not return a value. It saves the generated plots as PNG files in the specified location.
+#' @param types_chromosome A character vector defining the plot types for chromosome-level resolution. Options include:
+#'   - "het": Plots heterozygous locus counts.
+#'   - "BAF": Plots B-allele frequency (BAF).
+#'   - "zscore": Plots z-scores.
+#'   - "BAF_hist": Plots BAF histograms for each chromosome.
+#'   - "ratio": Plots raw ratios for each chromosome.
+#'   Default is c("Ratio_hist", "BAF_hist", "zscore").
+#' @param types_chromosome_arm A character vector defining the plot types for chromosome-arm level resolution. Options include:
+#'   - "het": Plots heterozygous locus counts.
+#'   - "BAF": Plots B-allele frequency (BAF).
+#'   - "zscore": Plots z-scores.
+#'   - "BAF_hist": Plots BAF histograms for each chromosome arm.
+#'   - "ratio": Plots raw ratios for each chromosome arm.
+#'   Default is c("Ratio_hist", "BAF_hist", "zscore").
+#' @param types_sample A character vector defining the plot types for sample-level resolution. Options include:
+#'   - "Ratio_hist_overall": Plots a histogram of raw ratios for the entire genome.
+#'   - "BAF_hist_overall": Plots a BAF histogram for the entire genome.
+#'   Default is c("Ratio_hist_overall", "BAF_hist_overall").
+#' @return A list containing the generated plots for each resolution:
+#' - `chromosome`: Plot for chromosome-level resolution.
+#' - `chromosome_arm`: Plot for chromosome-arm level resolution (if centromeres are provided).
+#' - `sample`: Plot for sample-level resolution.
 #' @details The function generates three types of plots:
 #' 
-#' - **Chromosome-level resolution**: Plots raw ratio and BAF histograms for each chromosome.
+#' - **Chromosome-level resolution**: Plots raw ratio, BAF histograms, z-scores, heterozygous locus counts, and BAF for each chromosome.
 #' - **Chromosome-arm level resolution**: Similar to chromosome-level but splits data by chromosome arms using centromere positions.
 #' - **Sample-level resolution**: Combines all markers in the sample to generate overall raw ratio and BAF histograms.
 #'
@@ -606,10 +650,21 @@ plot_qploidy_standardization <- function(x,
 #' - `_res:chromosome_arm.png`
 #' - `_res:sample.png`
 #'
+#' If `file_name` is NULL, the plots are not saved to files but are returned in the output list.
+#'
 #' @importFrom ggplot2 ggsave
-#' 
 #' @export
-all_resolutions_plots <- function(data_standardized, sample, ploidy, centromeres, file_name = NULL, chr = NULL) {
+all_resolutions_plots <- function(
+    data_standardized,
+    sample,
+    ploidy,
+    centromeres,
+    types_chromosome = c("Ratio_hist", "BAF_hist", "zscore"),
+    types_chromosome_arm = c("Ratio_hist", "BAF_hist", "zscore"),
+    types_sample = c("Ratio_hist_overall", "BAF_hist_overall"),
+    file_name = NULL,
+    chr = NULL) {
+
   # Input checks
   if (!inherits(data_standardized, "qploidy_standardization")) {
     stop("The 'data_standardized' parameter must be of class 'qploidy_standardization'.")
@@ -632,13 +687,13 @@ all_resolutions_plots <- function(data_standardized, sample, ploidy, centromeres
   p <- plot_qploidy_standardization(
     x = data_standardized,
     sample = sample,
-    type = c("Ratio_hist", "BAF_hist", "zscore"),
+    type = types_chromosome,
     chr = chr,
     add_expected_peaks = TRUE,
     ploidy = ploidy
   )
   p_list[[1]] <- p
-  if(!is.null(file_name)) ggsave(p, filename = paste0(file_name, "_res:chromosome.png"))
+  if (!is.null(file_name)) ggsave(p, filename = paste0(file_name, "_res:chromosome.png"))
 
   # Raw ratio and BAF histograms combining all markers in the sample (chromosome-arm level resolution)
   if (!is.null(centromeres)) {
@@ -649,7 +704,7 @@ all_resolutions_plots <- function(data_standardized, sample, ploidy, centromeres
     p <- plot_qploidy_standardization(
       x = data_standardized,
       sample = sample,
-      type = c("Ratio_hist", "BAF_hist", "zscore"),
+      type = types_chromosome_arm,
       chr = chr,
       ploidy = ploidy,
       add_expected_peaks = TRUE,
@@ -658,21 +713,21 @@ all_resolutions_plots <- function(data_standardized, sample, ploidy, centromeres
     )
 
     p_list[[2]] <- p
-    if(!is.null(file_name)) ggsave(p, filename = paste0(file_name, "_res:chromosome_arm.png"))
+    if (!is.null(file_name)) ggsave(p, filename = paste0(file_name, "_res:chromosome_arm.png"))
   }
 
   # Raw ratio and BAF histograms combining all markers in the sample (sample level resolution)
   p <- plot_qploidy_standardization(
     x = data_standardized,
     sample = sample,
-    type = c("Ratio_hist_overall", "BAF_hist_overall"),
+    type = types_sample,
     chr = chr,
     ploidy = ploidy,
     add_expected_peaks = TRUE
   )
 
   p_list[[3]] <- p
-  if(!is.null(file_name)) ggsave(p, filename = paste0(file_name, "_res:sample.png"))
+  if (!is.null(file_name)) ggsave(p, filename = paste0(file_name, "_res:sample.png"))
 
   names(p_list) <- c("chromosome", "chromosome_arm", "sample")
   return(p_list)

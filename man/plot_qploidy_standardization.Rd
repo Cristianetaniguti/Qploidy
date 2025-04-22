@@ -8,7 +8,7 @@ plot_qploidy_standardization(
   x,
   sample = NULL,
   chr = NULL,
-  type = c("all", "het", "BAF", "zscore", "BAF_hist", "BAF_hist_overall",
+  type = c("all", "het", "BAF", "zscore", "BAF_hist", "ratio", "BAF_hist_overall",
     "Ratio_hist_overall"),
   area_single = 0.75,
   ploidy = 4,
@@ -32,7 +32,16 @@ plot_qploidy_standardization(
 
 \item{chr}{Character or numeric vector specifying the chromosomes to plot. Default is NULL (plots all chromosomes).}
 
-\item{type}{Character vector defining the plot types. Options include "all", "het", "BAF", "zscore", "BAF_hist", "BAF_hist_overall", and "Ratio_hist_overall". Default is "all".}
+\item{type}{Character vector defining the plot types. Options include:
+- "all": Generates all available plot types.
+- "het": Plots heterozygous locus counts across genomic windows.
+- "BAF": Plots B-allele frequency (BAF) for each chromosome.
+- "zscore": Plots z-scores for each chromosome.
+- "BAF_hist": Plots BAF histograms for each chromosome.
+- "BAF_hist_overall": Plots a BAF histogram for the entire genome.
+- "Ratio_hist_overall": Plots a histogram of raw ratios for the entire genome.
+- "ratio": Plots raw ratios for each chromosome.
+Default is "all".}
 
 \item{area_single}{Numeric value defining the area around the expected peak to be considered. Default is 0.75.}
 
@@ -65,4 +74,16 @@ A ggarrange object containing the requested plots.
 }
 \description{
 This function generates various plots for visualizing the results of Qploidy standardization. It supports multiple plot types, including BAF, z-score, and histograms.
+}
+\details{
+The function supports the following plot types:
+
+- **all**: Generates all available plot types.
+- **het**: Plots the proportion of heterozygous loci across genomic windows, useful for identifying regions with high or low heterozygosity.
+- **BAF**: Plots the B-allele frequency (BAF) for each chromosome, showing the distribution of allele frequencies.
+- **zscore**: Plots z-scores for each chromosome, which can help identify outliers or regions with unusual data distributions.
+- **BAF_hist**: Plots histograms of BAF values for each chromosome, providing a summary of allele frequency distributions.
+- **BAF_hist_overall**: Plots a single histogram of BAF values for the entire genome, summarizing allele frequency distributions genome-wide.
+- **Ratio_hist_overall**: Plots a histogram of raw ratios for the entire genome, useful for visualizing overall ratio distributions.
+- **ratio**: Plots raw ratios for each chromosome, showing the distribution of observed ratios.
 }

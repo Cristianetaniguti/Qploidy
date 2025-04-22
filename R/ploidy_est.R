@@ -6,12 +6,14 @@ globalVariables(c("color", "xmax", "xmin", "value", "name",
 
 #' Estimate ploidy using area method
 #'
-#' @param qploidy_standardization object of class qploidy_standardization
-#' @param samples if "all" all samples contained in the qploidy_standardization object will be evaluate. If vector with sample names is provided, only those will be evaluated.
-#' @param level character identifying the level of the analysis. If `chromosome` the number of copies will be estimated by chromosome, if `sample` it will be by sample; if `chromosome-arm` it will be peformed by chromosome arm (only if `centromeres` argument is defined.)
-#' @param ploidies range of ploidies to by tested
-#' @param area area around the expected peak to be considered
-#' @param centromeres vector with centromeres genomic position in bp. The vector should be named with the chromosomes ID. The information will only be used if `chromosome-arm` level is defined.
+#' This function estimates ploidy using the area method. It evaluates the number of copies by chromosome, sample, or chromosome arm. Note that this function does not have optimal performance, and visual inspection of the plots is required to confirm the estimated ploidy.
+#'
+#' @param qploidy_standardization Object of class qploidy_standardization.
+#' @param samples If "all", all samples contained in the qploidy_standardization object will be evaluated. If a vector with sample names is provided, only those will be evaluated.
+#' @param level Character identifying the level of the analysis. Must be one of "chromosome", "sample", or "chromosome-arm". If `chromosome-arm`, the analysis will be performed by chromosome arm (only if `centromeres` argument is defined).
+#' @param ploidies Vector of ploidy levels to test. This parameter must be defined.
+#' @param area Area around the expected peak to be considered. Default is 0.75.
+#' @param centromeres Vector with centromere genomic positions in bp. The vector should be named with the chromosome IDs. This information will only be used if `chromosome-arm` level is defined.
 #'
 #' @import tidyr
 #' @import dplyr
@@ -22,41 +24,64 @@ area_estimate_ploidy <- function(qploidy_standardization = NULL,
                                  level = "chromosome",
                                  ploidies = NULL,
                                  area = 0.75,
-                                 centromeres= NULL){
+                                 centromeres = NULL) {
 
-  if(all(samples == "all")) {
-    data_sample <- qploidy_standardization$data[,c(9,10,2,8)] %>% filter(!is.na(baf))
-  } else {
-    data_sample <- qploidy_standardization$data[,c(9,10,2,8)] %>% filter(SampleName %in% samples & !is.na(baf))
+  # Input checks
+  if (!level %in% c("sample", "chromosome", "chromosome-arm")) {
+    stop("Invalid level. Must be one of 'sample', 'chromosome', or 'chromosome-arm'.")
   }
 
+  if (is.null(ploidies)) {
+    stop("The parameter 'ploidies' must be defined.")
+  }
+
+  if (!is.null(centromeres)) {
+    if (!is.vector(centromeres) || is.null(names(centromeres))) {
+      stop("The 'centromeres' parameter must be a named vector with chromosome IDs as names.")
+    }
+
+    chr_ids <- unique(qploidy_standardization$data$Chr)
+    if (!all(names(centromeres) %in% chr_ids)) {
+      stop("Chromosome names in 'centromeres' vector do not match the ones in the dataset.")
+    }
+  }
+
+  # Filter data based on samples
+  if (all(samples == "all")) {
+    data_sample <- qploidy_standardization$data[, c(9, 10, 2, 8)] %>% filter(!is.na(baf))
+  } else {
+    data_sample <- qploidy_standardization$data[, c(9, 10, 2, 8)] %>% filter(SampleName %in% samples & !is.na(baf))
+  }
+
+  # Check for duplicated marker positions
   one_sample <- data_sample$Position[which(data_sample$SampleName %in% data_sample$SampleName[1])]
-  if(any(duplicated(one_sample))) {
+  if (any(duplicated(one_sample))) {
     warning("There are duplicated marker positions. Only the first one will be kept.")
     data_sample <- data_sample %>% group_by(SampleName) %>% filter(!duplicated(Position))
   }
 
   data_sample <- pivot_wider(data_sample, names_from = SampleName, values_from = baf)
 
-  if(is.null(data_sample) | is.null(ploidies)) stop("Define data_sample and ploidies arguments")
+  if (is.null(data_sample)) stop("Define data_sample argument.")
 
-  if(level == "chromosome" | level == "chromosome-arm"){
+  # Split data by level
+  if (level == "chromosome" || level == "chromosome-arm") {
     by_chr <- split(data_sample, data_sample$Chr)
 
-    if(!is.null(centromeres) & level == "chromosome-arm"){
+    if (!is.null(centromeres) && level == "chromosome-arm") {
       chrs <- match(names(centromeres), names(by_chr))
-      if(length(chrs) == 0) stop("Chromosome names in centromeres vector do not match the ones in dataset.")
-      for(i in 1:length(chrs)){
+      if (length(chrs) == 0) stop("Chromosome names in centromeres vector do not match the ones in dataset.")
+      for (i in seq_along(chrs)) {
         idx <- which(by_chr[[chrs[i]]]$Position <= centromeres[i])
-        by_chr[[chrs[i]]]$Chr[idx] <- paste0(by_chr[[chrs[i]]]$Chr[idx],".1")
+        by_chr[[chrs[i]]]$Chr[idx] <- paste0(by_chr[[chrs[i]]]$Chr[idx], ".1")
         idx <- which(by_chr[[chrs[i]]]$Position > centromeres[i])
-        by_chr[[chrs[i]]]$Chr[idx] <- paste0(by_chr[[chrs[i]]]$Chr[idx],".2")
+        by_chr[[chrs[i]]]$Chr[idx] <- paste0(by_chr[[chrs[i]]]$Chr[idx], ".2")
         by_chr[[chrs[i]]] <- split(by_chr[[chrs[i]]], by_chr[[chrs[i]]]$Chr)
       }
       names(by_chr) <- NULL
       skip <- which(sapply(by_chr, length) != 2)
-      if(length(skip) != 0){
-        for(i in 1:length(skip)){
+      if (length(skip) != 0) {
+        for (i in seq_along(skip)) {
           by_chr[[i]] <- list(by_chr[[i]])
           names(by_chr[[i]]) <- unique(by_chr[[i]][[1]]$Chr)
         }
@@ -64,30 +89,29 @@ area_estimate_ploidy <- function(qploidy_standardization = NULL,
 
       by_chr <- unlist(by_chr, recursive = F)
     }
-  } else if(level == "sample"){
+  } else if (level == "sample") {
     by_chr <- list(data_sample)
   }
 
-  freq <- pascalTriangle(ploidies[2])
+  freq <- pascalTriangle(max(ploidies))
   freq <- freq[-1]
-  ploidies <- ploidies[1]:ploidies[2]
   ploidies <- unique(c(1, ploidies))
   dots.int_tot <- corr_tot <- max_sd_tot <- modes_paste_tot <- as.list(rep(NA, length(by_chr)))
-  for(j in 1:length(ploidies)){
+  for (p in ploidies) {
     # Area method
-    ymin <- seq(0, 1, 1/ploidies[j]) - (area/(ploidies[j]*2))
-    ymax <- seq(0, 1, 1/ploidies[j]) + (area/(ploidies[j]*2))
+    ymin <- seq(0, 1, 1 / p) - (area / (p * 2))
+    ymax <- seq(0, 1, 1 / p) + (area / (p * 2))
 
     ymin[which(ymin < 0)] <- 0
     ymax[which(ymax > 1)] <- 1
     rets <- data.frame(ymin, ymax)
 
-    prop_tot <- modes_tot  <- sd_areas_tot <- as.list(rep(NA, length(by_chr)))
-    for(z in 1:length(by_chr)){
-      for(i in 1:nrow(rets)){
-        prop <- apply(by_chr[[z]][,-c(1,2)], 2, function(x) sum(x >= rets$ymin[i] & x <= rets$ymax[i], na.rm = TRUE))
-        modes <- apply(by_chr[[z]][,-c(1,2)], 2, function(x) mode(x[x >= rets$ymin[i] & x <= rets$ymax[i]]))
-        sd_areas <- apply(by_chr[[z]][,-c(1,2)], 2, function(x) sd(x[x >= rets$ymin[i] & x <= rets$ymax[i]], na.rm = TRUE))
+    prop_tot <- modes_tot <- sd_areas_tot <- as.list(rep(NA, length(by_chr)))
+    for (z in seq_along(by_chr)) {
+      for (i in seq_len(nrow(rets))) {
+        prop <- apply(by_chr[[z]][, -c(1, 2)], 2, function(x) sum(x >= rets$ymin[i] & x <= rets$ymax[i], na.rm = TRUE))
+        modes <- apply(by_chr[[z]][, -c(1, 2)], 2, function(x) mode(x[x >= rets$ymin[i] & x <= rets$ymax[i]]))
+        sd_areas <- apply(by_chr[[z]][, -c(1, 2)], 2, function(x) sd(x[x >= rets$ymin[i] & x <= rets$ymax[i]], na.rm = TRUE))
 
         prop_tot[[z]] <- rbind(prop_tot[[z]], prop)
         modes_tot[[z]] <- rbind(modes_tot[[z]], modes)
@@ -96,16 +120,16 @@ area_estimate_ploidy <- function(qploidy_standardization = NULL,
     }
 
     # remove NAs
-    prop_tot <- lapply(prop_tot, function(x) x[-1,])
-    for(z in 1:length(prop_tot)){
-      if(is.null(ncol(prop_tot[[z]]))) dots.int <- sum(prop_tot[[z]], na.rm = TRUE)/dim(by_chr[[z]])[1] else
-        dots.int <- apply(prop_tot[[z]], 2, function(x) sum(x, na.rm = TRUE)/dim(by_chr[[z]])[1])
+    prop_tot <- lapply(prop_tot, function(x) x[-1, ])
+    for (z in seq_along(prop_tot)) {
+      if (is.null(ncol(prop_tot[[z]]))) dots.int <- sum(prop_tot[[z]], na.rm = TRUE) / dim(by_chr[[z]])[1] else
+        dots.int <- apply(prop_tot[[z]], 2, function(x) sum(x, na.rm = TRUE) / dim(by_chr[[z]])[1])
       dots.int_tot[[z]] <- rbind(dots.int_tot[[z]], dots.int)
 
-      modes_paste <- apply(modes_tot[[z]], 2, function(x) paste0(round(x[-1],3), collapse = "/"))
+      modes_paste <- apply(modes_tot[[z]], 2, function(x) paste0(round(x[-1], 3), collapse = "/"))
       modes_paste_tot[[z]] <- rbind(modes_paste_tot[[z]], modes_paste)
 
-      corr <- apply(modes_tot[[z]], 2, function(x) cor(x = x[-1], y = seq(0,1,1/ploidies[j])))
+      corr <- apply(modes_tot[[z]], 2, function(x) cor(x = x[-1], y = seq(0, 1, 1 / p)))
       corr_tot[[z]] <- rbind(corr_tot[[z]], corr)
 
       max_sd <- apply(sd_areas_tot[[z]], 2, function(x) max(x[-1]))
@@ -113,27 +137,27 @@ area_estimate_ploidy <- function(qploidy_standardization = NULL,
     }
   }
 
-  dots.int_tot <- lapply(dots.int_tot, function(x) x[-1,])
-  modes_paste_tot <- lapply(modes_paste_tot, function(x) x[-1,])
-  corr_tot <- lapply(corr_tot, function(x) x[-1,])
-  max_sd_tot <- lapply(max_sd_tot, function(x) x[-1,])
+  dots.int_tot <- lapply(dots.int_tot, function(x) x[-1, ])
+  modes_paste_tot <- lapply(modes_paste_tot, function(x) x[-1, ])
+  corr_tot <- lapply(corr_tot, function(x) x[-1, ])
+  max_sd_tot <- lapply(max_sd_tot, function(x) x[-1, ])
 
   # Area method
-  result.ploidy  <- diff.count <- second <- diff.second <- diff.first.second <- list()
-  for(z in 1:length(dots.int_tot)){
-    if(is.null(rownames(dots.int_tot[[z]]))) {
+  result.ploidy <- diff.count <- second <- diff.second <- diff.first.second <- list()
+  for (z in seq_along(dots.int_tot)) {
+    if (is.null(rownames(dots.int_tot[[z]]))) {
       names(dots.int_tot[[z]]) <- ploidies
-      result.ploidy[[z]] <- ploidies[order(dots.int_tot[[z]], decreasing =T)][1]
+      result.ploidy[[z]] <- ploidies[order(dots.int_tot[[z]], decreasing = T)][1]
 
-      diff.count[[z]] <- dots.int_tot[[z]][order(dots.int_tot[[z]], decreasing =T)][1]
-      second[[z]] <- ploidies[order(dots.int_tot[[z]], decreasing =T)][2]
-      diff.second[[z]] <- dots.int_tot[[z]][order(dots.int_tot[[z]], decreasing =T)][2]
+      diff.count[[z]] <- dots.int_tot[[z]][order(dots.int_tot[[z]], decreasing = T)][1]
+      second[[z]] <- ploidies[order(dots.int_tot[[z]], decreasing = T)][2]
+      diff.second[[z]] <- dots.int_tot[[z]][order(dots.int_tot[[z]], decreasing = T)][2]
     } else {
       rownames(dots.int_tot[[z]]) <- ploidies
-      result.ploidy[[z]] <- apply(dots.int_tot[[z]], 2, function(x) ploidies[order(x, decreasing =T)][1])
-      diff.count[[z]] <- apply(dots.int_tot[[z]], 2, function(x) x[order(x, decreasing =T)][1])
-      second[[z]] <- apply(dots.int_tot[[z]], 2, function(x) ploidies[order(x, decreasing =T)][2])
-      diff.second[[z]] <- apply(dots.int_tot[[z]], 2, function(x) x[order(x, decreasing =T)][2])
+      result.ploidy[[z]] <- apply(dots.int_tot[[z]], 2, function(x) ploidies[order(x, decreasing = T)][1])
+      diff.count[[z]] <- apply(dots.int_tot[[z]], 2, function(x) x[order(x, decreasing = T)][1])
+      second[[z]] <- apply(dots.int_tot[[z]], 2, function(x) ploidies[order(x, decreasing = T)][2])
+      diff.second[[z]] <- apply(dots.int_tot[[z]], 2, function(x) x[order(x, decreasing = T)][2])
     }
     diff.first.second[[z]] <- diff.count[[z]] - diff.second[[z]]
   }
@@ -141,12 +165,12 @@ area_estimate_ploidy <- function(qploidy_standardization = NULL,
   result.ploidy <- do.call(rbind, result.ploidy)
   diff.first.second <- do.call(rbind, diff.first.second)
 
-  if(is.vector(max_sd_tot[[1]])){ # only one individual selected
+  if (is.vector(max_sd_tot[[1]])) { # only one individual selected
     max_sd_tot <- lapply(max_sd_tot, as.matrix)
     corr_tot <- lapply(corr_tot, as.matrix)
     modes_paste_tot <- lapply(modes_paste_tot, as.matrix)
     dots.int_tot <- lapply(dots.int_tot, as.matrix)
-  } else if(dim(max_sd_tot[[1]])[1] == 1){
+  } else if (dim(max_sd_tot[[1]])[1] == 1) {
     max_sd_tot <- lapply(max_sd_tot, t)
     corr_tot <- lapply(corr_tot, t)
     modes_paste_tot <- lapply(modes_paste_tot, t)
@@ -154,12 +178,12 @@ area_estimate_ploidy <- function(qploidy_standardization = NULL,
   }
 
   sd_tot_mt <- corr_tot_mt <- dots.int_tot_mt <- modes_paste_tot_mt <- matrix(NA, nrow = dim(result.ploidy)[1], ncol = dim(result.ploidy)[2])
-  for(i in 1:dim(result.ploidy)[2]){ # Ind
-    for(j in 1:dim(result.ploidy)[1]){ # Chr
-      sd_tot_mt[j, i] <- max_sd_tot[[j]][which(ploidies == result.ploidy[j,i]),i]
-      corr_tot_mt[j,i] <- corr_tot[[j]][which(ploidies == result.ploidy[j,i]),i]
-      modes_paste_tot_mt[j,i] <- modes_paste_tot[[j]][which(ploidies == result.ploidy[j,i]),i]
-      dots.int_tot_mt[j,i] <- dots.int_tot[[j]][which(ploidies == result.ploidy[j,i]),i]
+  for (i in seq_len(dim(result.ploidy)[2])) { # Ind
+    for (j in seq_len(dim(result.ploidy)[1])) { # Chr
+      sd_tot_mt[j, i] <- max_sd_tot[[j]][which(ploidies == result.ploidy[j, i]), i]
+      corr_tot_mt[j, i] <- corr_tot[[j]][which(ploidies == result.ploidy[j, i]), i]
+      modes_paste_tot_mt[j, i] <- modes_paste_tot[[j]][which(ploidies == result.ploidy[j, i]), i]
+      dots.int_tot_mt[j, i] <- dots.int_tot[[j]][which(ploidies == result.ploidy[j, i]), i]
     }
   }
 
@@ -178,9 +202,9 @@ area_estimate_ploidy <- function(qploidy_standardization = NULL,
 
   # Find homozygous
   idx <- which(result.ploidy == 1)
-  if(length(idx) > 0) result.ploidy[idx] <- NA
+  if (length(idx) > 0) result.ploidy[idx] <- NA
 
-  if(level == "sample") n.inbred <- length(idx) else {
+  if (level == "sample") n.inbred <- length(idx) else {
     n.inbred <- sum(apply(result.ploidy, 1, function(x) all(is.na(x))))
   }
 

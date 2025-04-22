@@ -44,6 +44,9 @@ devtools::install_github("cristianetaniguti/Qploidy")
 
 * [`Qploidy` tutorial](https://cristianetaniguti.github.io/Qploidy/Qploidy.html) for directions on how to run
 
+## Contributing
+
+Contributions are welcome! If you'd like to contribute, please fork the repository and submit a pull request. For major changes, open an issue first to discuss your ideas.
 
 ## Bug Reports
 

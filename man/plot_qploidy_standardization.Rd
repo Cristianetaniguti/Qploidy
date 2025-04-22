@@ -2,7 +2,7 @@
 % Please edit documentation in R/plots.R
 \name{plot_qploidy_standardization}
 \alias{plot_qploidy_standardization}
-\title{Plot method for object of class 'qploidy_standardization'}
+\title{Plot Method for Qploidy Standardization}
 \usage{
 plot_qploidy_standardization(
   x,
@@ -26,48 +26,43 @@ plot_qploidy_standardization(
 )
 }
 \arguments{
-\item{x}{object of class 'qploidy_standardization'}
+\item{x}{An object of class `qploidy_standardization`.}
 
-\item{sample}{character indicating sample ID}
+\item{sample}{Character string indicating the sample ID to plot.}
 
-\item{chr}{chromosome index to be plotted}
+\item{chr}{Character or numeric vector specifying the chromosomes to plot. Default is NULL (plots all chromosomes).}
 
-\item{type}{character defining the graphic type. "all" plots all graphics,
-it is equivalent to "het","ratio","BAF","zscore","BAF_hist", "BAF_hist_overall".
-"het" plots the heterozygous locus counts inside genomic positions window defined in 'window_size'.
-"ratio" plots raw Y/(X+Y) or alternative count/(alternative counts + reference counts).
-"BAF" plots standardized ratios. "zscore" is the smoothed conditional means curve of standardized sum of intensities/counts.
-"BAF_hist" is the histogram of standardized ratios. "BAF_hist_overall" add the histogram including all markers.}
+\item{type}{Character vector defining the plot types. Options include "all", "het", "BAF", "zscore", "BAF_hist", "BAF_hist_overall", and "Ratio_hist_overall". Default is "all".}
 
-\item{area_single}{area around the expected peak to be considered}
+\item{area_single}{Numeric value defining the area around the expected peak to be considered. Default is 0.75.}
 
-\item{ploidy}{expected ploidy}
+\item{ploidy}{Integer specifying the expected ploidy. Default is 4.}
 
-\item{dot.size}{dot size}
+\item{dot.size}{Numeric value for the size of the dots in the plots. Default is 1.}
 
-\item{font_size}{graphic labels font size}
+\item{font_size}{Numeric value for the font size of plot labels. Default is 12.}
 
-\item{add_estimated_peaks}{add expected peaks lines}
+\item{add_estimated_peaks}{Logical. If TRUE, adds lines for estimated peaks. Default is FALSE.}
 
-\item{add_expected_peaks}{add estimated peaks}
+\item{add_expected_peaks}{Logical. If TRUE, adds lines for expected peaks. Default is FALSE.}
 
-\item{centromeres}{centromeres position for each chromosome}
+\item{centromeres}{Named vector defining centromere positions for each chromosome. Names must match chromosome IDs in `x`.}
 
-\item{add_centromeres}{if TRUE add a vertical line at the centromere position}
+\item{add_centromeres}{Logical. If TRUE, adds vertical lines at centromere positions. Default is FALSE.}
 
-\item{colors}{add area colors}
+\item{colors}{Logical. If TRUE, adds area colors to the plots. Default is FALSE.}
 
-\item{window_size}{genomic position window to calculate the number of heterozygous locus}
+\item{window_size}{Numeric value defining the genomic position window for heterozygous locus counts. Default is 2000000.}
 
-\item{het_interval}{interval to be considered as heterozygous (heterozygous ratio > 1 - het_interval and heterozygous ratio < 0 + het_interval)}
+\item{het_interval}{Numeric value defining the interval to consider as heterozygous. Default is 0.1.}
 
-\item{rm_homozygous}{if TRUE remove the homozygous for the BAF histogram plots}
+\item{rm_homozygous}{Logical. If TRUE, removes homozygous calls from BAF histogram plots. Default is FALSE.}
 
-\item{...}{plot parameters}
+\item{...}{Additional plot parameters.}
 }
 \value{
-printed information about Qploidy standardization process
+A ggarrange object containing the requested plots.
 }
 \description{
-Plot method for object of class 'qploidy_standardization'
+This function generates various plots for visualizing the results of Qploidy standardization. It supports multiple plot types, including BAF, z-score, and histograms.
 }

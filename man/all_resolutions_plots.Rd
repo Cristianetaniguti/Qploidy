@@ -2,32 +2,45 @@
 % Please edit documentation in R/plots.R
 \name{all_resolutions_plots}
 \alias{all_resolutions_plots}
-\title{Plot graphics for ploidy visual inspection for each resolution
-It was made for parallelization purpose}
+\title{Plot graphics for ploidy visual inspection for each resolution}
 \usage{
 all_resolutions_plots(
   data_standardized,
   sample,
   ploidy,
   centromeres,
-  file_name,
-  chr
+  file_name = NULL,
+  chr = NULL
 )
 }
 \arguments{
-\item{data_standardized}{result from standardization function}
+\item{data_standardized}{An object of class `qploidy_standardization` containing standardized data for ploidy analysis.}
 
-\item{sample}{sample name}
+\item{sample}{A character string specifying the sample name to be analyzed.}
 
-\item{ploidy}{sample ploidy if known}
+\item{ploidy}{A numeric value indicating the expected ploidy of the sample. This parameter is required.}
 
-\item{centromeres}{vector with centromeres positions}
+\item{centromeres}{A named vector with centromere positions (in base pairs) for each chromosome. The names must match the chromosome IDs in the dataset. This is used for chromosome-arm level resolution.}
 
-\item{file_name}{character defining the output file path and name}
+\item{file_name}{A character string defining the output file path and name prefix for the saved plots. The function appends resolution-specific suffixes to this prefix.}
 
-\item{chr}{vector containing which chromosomes should be included}
+\item{chr}{A vector specifying the chromosomes to include in the analysis. If NULL, all chromosomes are included.}
+}
+\value{
+This function does not return a value. It saves the generated plots as PNG files in the specified location.
 }
 \description{
-Plot graphics for ploidy visual inspection for each resolution
-It was made for parallelization purpose
+This function generates and saves plots for visual inspection of ploidy at different resolutions: chromosome, chromosome-arm, and sample levels. It is designed for parallelization purposes and supports customization of centromere positions and chromosome selection.
+}
+\details{
+The function generates three types of plots:
+
+- **Chromosome-level resolution**: Plots raw ratio and BAF histograms for each chromosome.
+- **Chromosome-arm level resolution**: Similar to chromosome-level but splits data by chromosome arms using centromere positions.
+- **Sample-level resolution**: Combines all markers in the sample to generate overall raw ratio and BAF histograms.
+
+The plots are saved as PNG files with the following suffixes:
+- `_res:chromosome.png`
+- `_res:chromosome_arm.png`
+- `_res:sample.png`
 }

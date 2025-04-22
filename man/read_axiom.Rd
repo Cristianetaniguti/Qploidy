@@ -4,19 +4,12 @@
 \alias{read_axiom}
 \title{Convert Axiom Array Summary File to Qploidy Input}
 \usage{
-read_axiom(
-  summary_file,
-  ind_names = NULL,
-  sd.normalization = FALSE,
-  atan = FALSE
-)
+read_axiom(summary_file, ind_names = NULL, atan = FALSE)
 }
 \arguments{
 \item{summary_file}{Path to the Axiom summary file.}
 
 \item{ind_names}{Optional. A file with two columns: Plate_name (sample IDs in the summary file) and Sample_Name (desired sample names).}
-
-\item{sd.normalization}{Logical. If TRUE, performs standard normalization.}
 
 \item{atan}{Logical. If TRUE, calculates theta using atan2.}
 }

@@ -4,12 +4,10 @@
 \alias{get_R_theta}
 \title{Get R and Theta Values from Summary File}
 \usage{
-get_R_theta(cleaned_summary, sd.normalization = FALSE, atan = FALSE)
+get_R_theta(cleaned_summary, atan = FALSE)
 }
 \arguments{
 \item{cleaned_summary}{A summary object from the clean_summary function.}
-
-\item{sd.normalization}{Logical. If TRUE, performs standard normalization.}
 
 \item{atan}{Logical. If TRUE, calculates theta using atan2.}
 }

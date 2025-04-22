@@ -119,13 +119,12 @@ find_header_line <- function(summary_file, word = "probeset_id", max_lines = 600
 #'
 #' @param summary_file Path to the Axiom summary file.
 #' @param ind_names Optional. A file with two columns: Plate_name (sample IDs in the summary file) and Sample_Name (desired sample names).
-#' @param sd.normalization Logical. If TRUE, performs standard normalization.
 #' @param atan Logical. If TRUE, calculates theta using atan2.
 #' @return A data frame formatted for Qploidy analysis.
 #' @export
 #' @importFrom tidyr pivot_longer
 #' @importFrom tidyr pivot_wider
-read_axiom <- function(summary_file, ind_names = NULL, sd.normalization = FALSE, atan = FALSE){
+read_axiom <- function(summary_file, ind_names = NULL, atan = FALSE){
 
   skip_line <- find_header_line(summary_file)
   raw <- vroom(summary_file, skip = as.numeric(skip_line) -1)
@@ -141,7 +140,7 @@ read_axiom <- function(summary_file, ind_names = NULL, sd.normalization = FALSE,
     colnames(summary_filt$B_probes)[which(!is.na(new.names))] <- new.names[which(!is.na(new.names))]
   }
 
-  R_theta <- get_R_theta(cleaned_summary = summary_filt, sd.normalization, atan)
+  R_theta <- get_R_theta(cleaned_summary = summary_filt, atan)
 
   fitpoly_input <- summary_to_fitpoly(R_theta$R_all, R_theta$theta_all)
 
@@ -173,12 +172,11 @@ clean_summary <- function(summary_df){
 #' This function calculates R and theta values from a cleaned summary file. It optionally performs standard normalization by plate and markers.
 #'
 #' @param cleaned_summary A summary object from the clean_summary function.
-#' @param sd.normalization Logical. If TRUE, performs standard normalization.
 #' @param atan Logical. If TRUE, calculates theta using atan2.
 #' @return A list containing R and theta values.
 #' @export
 #' @importFrom dplyr mutate
-get_R_theta <- function(cleaned_summary, sd.normalization = FALSE, atan = FALSE){
+get_R_theta <- function(cleaned_summary, atan = FALSE){
   R_all <- as.data.frame(cleaned_summary$A_probes[,-1] + cleaned_summary$B_probes[,-1])
   if(atan){
     theta_all <- as.data.frame((atan2(as.matrix(cleaned_summary$B_probes[,-1]), as.matrix(cleaned_summary$A_probes[,-1])))/(pi/2))
@@ -193,47 +191,6 @@ get_R_theta <- function(cleaned_summary, sd.normalization = FALSE, atan = FALSE)
   theta_all <- cbind(MarkerName = probes_names, theta_all)
 
   colnames(theta_all)[1] <- colnames(R_all)[1] <- "MarkerName"
-
-  # R Quantile normalization
-  if(sd.normalization){
-    R_melt <- pivot_longer(R_all, cols = -1, names_to = "ind", values_to = "R")
-
-    exp <- sapply(strsplit(array.id[-1], "-"), "[[", 4)
-    exp <- sapply(strsplit(exp, "_"), "[[", 1)
-
-    array_ids <- data.frame(array=exp, inds = ids[-1])
-    R_melt$array <- array_ids$array[match(R_melt$ind, array_ids$inds)]
-
-    R_z <- R_melt %>% group_by(.data$MarkerName, .data$array) %>% mutate(zscore = (.data$R-mean(.data$R))/sd(.data$R))
-    R_all <- pivot_wider(R_z[,c(1,2,5)], names_from = ind, values_from = zscore)
-  }
-
-  return(list(R_all=R_all, theta_all = theta_all))
-}
-
-#' Get R and theta values from Illumina intensities file with option to do standard normalization by 
-#' plate and markers
-#'
-#' @param cleaned_illumina List with X and Y intensities.
-#' @param atan logical. If TRUE calculates the theta using atan2
-#'
-#' @examples NULL
-#' @import tidyr
-#' @importFrom dplyr mutate
-#'
-#' @export
-get_R_theta_illumina <- function(cleaned_illumina, atan = FALSE){
-  R_all <- as.data.frame(cleaned_illumina$X[,-1] + cleaned_illumina$Y[,-1])
-  if(atan){
-    theta_all <- as.data.frame((atan2(as.matrix(cleaned_illumina$Y[,-1]), as.matrix(cleaned_illumina$X[,-1])))/(pi/2))
-  }  else {
-    theta_all <- as.data.frame(as.matrix(cleaned_illumina$Y[,-1])/(as.matrix(cleaned_illumina$Y[,-1]) + as.matrix(cleaned_illumina$X[,-1])))
-  }
-
-  probes_names <-  cleaned_illumina$X[,1]
-
-  R_all <- cbind(MarkerName = probes_names, R_all)
-  theta_all <- cbind(MarkerName = probes_names, theta_all)
 
   return(list(R_all=R_all, theta_all = theta_all))
 }

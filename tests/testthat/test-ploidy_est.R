@@ -67,6 +67,7 @@ test_that("area_estimate_ploidy handles missing data correctly", {
   p_list <- all_resolutions_plots(
     data_standardized = qploidy_standardization,
     sample = "S1",
+    types_chromosome = c("BAF", "BAF_hist", "zscore", "het", "ratio"),
     ploidy = 4,
     centromeres = c("1" = 500000, "2" = 500000, "3" = 500000),
     file_name = temp2

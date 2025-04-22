@@ -25,12 +25,9 @@ Imports:
     reshape2,
     tidyr,
     vroom,
-    RColorBrewer,
     ggpubr,
     multtest,
     vcfR,
-    emmeans,
-    lme4,
     plotly,
     stringr
 Encoding: UTF-8

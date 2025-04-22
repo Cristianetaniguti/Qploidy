@@ -453,13 +453,11 @@ rm_outlier <- function(data, alpha=0.05){
 #'   \item{data}{A data.frame containing merged BAF, Z-score, and genotype information by marker and sample.}
 #' }
 #'
-#'
-#' @import dplyr
-#' @import tidyr
-#' @import vroom
-#' @import parallel
-#' @import lme4
-#' @import emmeans
+#' @importFrom dplyr group_by summarize filter mutate inner_join full_join
+#' @importFrom tidyr pivot_wider pivot_longer
+#' @importFrom vroom vroom_write
+#' @importFrom parallel makeCluster stopCluster clusterExport parLapply
+#' @importFrom stats sd
 #'
 #' @export
 standardize <- function(data = NULL,

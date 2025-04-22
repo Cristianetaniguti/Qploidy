@@ -1,5 +1,6 @@
 Package: Qploidy
 Title: Qploidy
+Keywords: ploidy, aneuploidy, SNP, genotyping, polyploid
 Version: 1.0.0
 Authors@R: c(person(given='Cristiane', 
                     family='Taniguti', 
@@ -31,6 +32,8 @@ Imports:
     plotly,
     stringr
 Encoding: UTF-8
+URL: https://github.com/Cristianetaniguti/Qploidy
+BugReports: https://github.com/Cristianetaniguti/Qploidy/issues
 LazyData: true
 RoxygenNote: 7.3.2
 Suggests: 

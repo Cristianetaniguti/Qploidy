@@ -78,8 +78,11 @@ xi_fun <- function(p, eps, h) {
 #' @param max_markers An integer specifying the maximum number of markers allowed in the VCF file. Default is 10,000.
 #' @param verbose A logical value indicating whether to print detailed messages during the checks. Default is FALSE.
 #'
-#' @return A named logical vector indicating the results of various checks. Each element corresponds to a specific check, with TRUE indicating the check passed and FALSE indicating it failed.
-#'
+#' @return A list containing:
+#' - `checks`: A named vector indicating the results of each check (TRUE or FALSE).
+#' - `messages`: A data frame containing messages for each check, indicating success or failure.
+#' - `duplicates`: A list containing any duplicated sample or marker IDs found in the VCF file.
+#' 
 #' @details The function performs the following checks:
 #' - **VCF_header**: Verifies the presence of the `##fileformat` header.
 #' - **VCF_columns**: Ensures required columns (`#CHROM`, `POS`, `ID`, `REF`, `ALT`, `QUAL`, `FILTER`, `INFO`) are present.
@@ -91,6 +94,8 @@ xi_fun <- function(p, eps, h) {
 #' - **ref_alt**: Ensures `REF` and `ALT` fields contain valid nucleotide codes.
 #' - **multiallelics**: Identifies multiallelic sites (ALT field with commas).
 #' - **phased_GT**: Checks for phased genotypes (presence of `|` in the `GT` field).
+#' - **duplicated_samples**: Checks for duplicated sample IDs.
+#' - **duplicated_markers**: Checks for duplicated marker IDs.
 #' 
 #' @importFrom stats setNames
 #'

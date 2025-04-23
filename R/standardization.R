@@ -8,6 +8,9 @@ globalVariables(c("theta", "R", "geno", "Var1", "array.id",
 #' @param threshold.n.clusters minimum number of dosage clusters (heterozygous classes) to account with the marker for standardization
 #' @param rm.mks vector for logical indicating which markers should be removed, names of the vector are names of the markers
 #'
+#' @import tidyr
+#' @import dplyr
+#' 
 #'@export
 updog_centers <- function(multidog_obj, threshold.n.clusters=2, rm.mks){
 
@@ -540,7 +543,7 @@ standardize <- function(data = NULL,
 
     if(verbose) cat("Going to parallel mode...\n")
     clust <- makeCluster(n.cores, type = parallel.type)
-    clusterExport(clust, c("get_centers"))
+    clusterExport(clust, c("get_centers", "%>%"))
     clusters <- parLapply(clust, lst_standardization, get_centers,
                           ploidy= ploidy.standardization,
                           n.clusters.thr = threshold.n.clusters,

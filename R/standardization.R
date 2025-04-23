@@ -22,7 +22,7 @@ updog_centers <- function(multidog_obj, threshold.n.clusters=2, rm.mks){
   bias <- snpdf$bias
 
   result <- list()
-  for(i in 1:length(bias)){
+  for(i in seq_along(bias)){
     centers_theta <- xi_fun(p = (0:ploidy[i])/ploidy[i], eps = seq[i], h = bias[i])
 
     result[[i]] <- list(rm = if(n.clusters.df[i,]$n.clusters >= threshold.n.clusters) 0 else 1,
@@ -100,7 +100,7 @@ get_baf <- function(theta_subject, centers_theta, ploidy){
 get_baf_par <- function(par_all_item, ploidy=2){
   baf <- list()
   i <- 1
-  for(i in 1:nrow(par_all_item[[1]])){
+  for(i in seq_len(nrow(par_all_item[[1]]))){
     baf[[i]] <- get_baf(theta_subject = as.numeric(par_all_item[[1]][i,-1]),
                         centers_theta = as.numeric(par_all_item[[2]][i,-1]),
                         ploidy = ploidy)
@@ -175,7 +175,7 @@ get_centers <- function(ratio_geno,
     } else centers <- lapply(plot_data_split, function(x) apply(x[,3:4], 2, function(y) mean(y, na.rm = TRUE)))
   }
 
-  if(length(centers) == 0 | length(centers) < n.clusters.thr) {
+  if(length(centers) == 0 || length(centers) < n.clusters.thr) {
     return(list(rm= {if(length(centers) == 0) 1 else if(length(centers) < n.clusters.thr) 2},
                 centers_theta = centers,
                 MarkerName = unique(ratio_geno$MarkerName),

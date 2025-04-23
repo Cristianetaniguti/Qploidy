@@ -2,18 +2,31 @@
 % Please edit documentation in R/simulate_inputs.R
 \name{simulate_vcf}
 \alias{simulate_vcf}
-\title{Simulate a VCF file with GT, DP, and AD format fields for 2 chromosomes and 50 samples}
+\title{Simulate a VCF file with GT, DP, and AD format fields for 2 chromosomes}
 \usage{
-simulate_vcf(file_path, seed)
+simulate_vcf(
+  file_path,
+  seed,
+  n_tetraploid = 35,
+  n_diploid = 5,
+  n_triploid = 10,
+  n_markers = 100
+)
 }
 \arguments{
 \item{file_path}{The path where the simulated VCF file will be saved.}
 
 \item{seed}{The seed for random number generation to ensure reproducibility.}
+
+\item{n_tetraploid}{Number of tetraploid samples. Default is 35.}
+
+\item{n_diploid}{Number of diploid samples. Default is 5.}
+
+\item{n_triploid}{Number of triploid samples. Default is 10.}
 }
 \value{
 None. The function writes the simulated VCF content to the specified file.
 }
 \description{
-Simulate a VCF file with GT, DP, and AD format fields for 2 chromosomes and 50 samples
+Simulate a VCF file with GT, DP, and AD format fields for 2 chromosomes
 }

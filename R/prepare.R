@@ -15,9 +15,24 @@ globalVariables(c("ind", "zscore", "chr", "write.csv"))
 #' @importFrom tidyr pivot_longer
 qploidy_read_vcf <- function(vcf_file, geno = FALSE, geno.pos = FALSE) {
 
+  checks <- vcf_sanity_check(vcf_file)
+  checks$checks
+
+  # Check if the required checks are TRUE
+  required <- c("VCF_header", "VCF_columns", "GT", "allele_counts", "samples", "chrom_info", "pos_info")
+  if(!all(checks$checks[required])) {
+    stop(paste(checks$message[1,required][which(!checks$checks[required])], collapse = "\n"))
+  }
+
+  # Check if the required checks are FALSE
+  required_not <- c("multiallelics", "phased_GT")
+  if(any(checks$checks[required_not])) {
+    stop(paste(checks$message[2,required_not][which(checks$checks[required_not])], collapse = "\n"))
+  }
+  
   vcf <- read.vcfR(vcf_file)
 
-  if(!(geno | geno.pos)){
+  if(!(geno || geno.pos)){
     DP <- extract.gt(vcf, "AD")
 
     mknames <- pivot_longer(data.frame(mks = rownames(DP), DP), cols = 2:(ncol(DP)+1))

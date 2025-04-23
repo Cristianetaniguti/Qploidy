@@ -9,7 +9,8 @@ read_axiom(summary_file, ind_names = NULL, atan = FALSE)
 \arguments{
 \item{summary_file}{Path to the Axiom summary file.}
 
-\item{ind_names}{Optional. A file with two columns: Plate_name (sample IDs in the summary file) and Sample_Name (desired sample names).}
+\item{ind_names}{Optional. A file with two columns: Plate_name (sample IDs 
+in the summary file) and Sample_Name (desired sample names).}
 
 \item{atan}{Logical. If TRUE, calculates theta using atan2.}
 }
@@ -17,5 +18,6 @@ read_axiom(summary_file, ind_names = NULL, atan = FALSE)
 A data frame formatted for Qploidy analysis.
 }
 \description{
-This function processes an Axiom array summary file and converts it into a format compatible with Qploidy and fitpoly analysis.
+This function processes an Axiom array summary file and converts it into a 
+format compatible with Qploidy and fitpoly analysis.
 }

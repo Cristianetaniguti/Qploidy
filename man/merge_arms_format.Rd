@@ -9,7 +9,8 @@ merge_arms_format(x, filter_diff = NULL)
 \arguments{
 \item{x}{object of class qploidy_area_ploidy_estimation}
 
-\item{filter_diff}{filter by difference on area proportion between first and second place}
+\item{filter_diff}{filter by difference on area proportion between first and 
+second place}
 }
 \description{
 Merges chromosome-arm level analysis results into chromosome level format

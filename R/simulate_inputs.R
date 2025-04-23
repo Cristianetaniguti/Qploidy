@@ -5,10 +5,12 @@
 #' @param n_tetraploid Number of tetraploid samples. Default is 35.
 #' @param n_diploid Number of diploid samples. Default is 5.
 #' @param n_triploid Number of triploid samples. Default is 10.
+#' @param n_markers Number of markers to simulate. Default is 100.
 #' @return None. The function writes the simulated VCF content to the specified file.
 #'
-#' @export
 #' @importFrom stats rbinom
+#' 
+#' @export
 simulate_vcf <- function(
     file_path, seed,
     n_tetraploid = 35,

@@ -91,7 +91,8 @@ xi_fun <- function(p, eps, h) {
 #' - **ref_alt**: Ensures `REF` and `ALT` fields contain valid nucleotide codes.
 #' - **multiallelics**: Identifies multiallelic sites (ALT field with commas).
 #' - **phased_GT**: Checks for phased genotypes (presence of `|` in the `GT` field).
-#'
+#' 
+#' @importFrom stats setNames
 #'
 #' @export
 vcf_sanity_check <- function(
@@ -118,7 +119,9 @@ vcf_sanity_check <- function(
     "pos_info",
     "ref_alt",
     "multiallelics",
-    "phased_GT"
+    "phased_GT",
+    "duplicated_samples",
+    "duplicated_markers"
   )
   checks <- setNames(rep(NA, length(checks_names)), checks_names)
 
@@ -134,21 +137,29 @@ vcf_sanity_check <- function(
     "pos_info" = c("Position information is not available in the VCF file.", "Position information is available in the VCF file."),
     "ref_alt" = c("REF/ALT fields contain invalid nucleotide codes.", "REF/ALT fields are valid."),
     "multiallelics" = c("Multiallelic sites not found in the VCF file.", "Multiallelic sites found in the VCF file."),
-    "phased_GT" = c("Phased genotypes (|) are not present in the VCF file.", "Phased genotypes (|) are present in the VCF file.")
+    "phased_GT" = c("Phased genotypes (|) are not present in the VCF file.", "Phased genotypes (|) are present in the VCF file."),
+    "duplicated_samples" = c("Duplicated sample IDs found.", "No duplicated sample IDs found."),
+    "duplicated_markers" = c("Duplicated marker IDs found.", "No duplicated marker IDs found.")
   )
   rownames(messages) <- c("false", "true")
 
-  # --- 1. Header checks ---
+  # Container for duplicated IDs
+  duplicates <- list(
+    duplicated_samples = character(0),
+    duplicated_markers = character(0)
+  )
+
+  # --- Header checks ---
   header_lines <- grep("^##", lines, value = TRUE)
   if (!any(grepl("^##fileformat=VCFv", header_lines))) {
     checks["VCF_header"] <- FALSE
-    warning("Missing ##fileformat header.")
+    if (verbose) warning("Missing ##fileformat header.")
   } else {
     checks["VCF_header"] <- TRUE
-    if (verbose) cat("✅ VCF header is present.\n")
+    if (verbose) cat("VCF header is present.\n")
   }
 
-  # --- 2. Column header line ---
+  # --- Column header line ---
   column_header_line <- grep("^#CHROM", lines, value = TRUE)
   if (length(column_header_line) != 1) stop("Missing or multiple #CHROM lines.")
   column_names <- unlist(strsplit(column_header_line, "\t"))
@@ -157,22 +168,40 @@ vcf_sanity_check <- function(
   required_columns <- c("#CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO")
   checks["VCF_columns"] <- all(required_columns %in% column_names[1:8])
   if (checks["VCF_columns"]) {
-    if (verbose) cat("✅ Required VCF columns are present.\n")
+    if (verbose) cat("Required VCF columns are present.\n")
   } else {
-    warning("❌ Missing one or more required VCF columns.")
+    if (verbose) warning("Missing one or more required VCF columns.")
   }
 
-  # --- 3. Total marker count ---
+  # --- Total marker count ---
   data_line_indices <- grep("^[^#]", lines)
   total_markers <- length(data_line_indices)
   if (verbose) cat(sprintf("Total markers (data rows): %d\n", total_markers))
 
   checks["max_markers"] <- total_markers <= max_markers
   if (!checks["max_markers"]) {
-    warning(sprintf("⚠ More than %d markers found. Consider subsampling.", max_markers))
+    warning(sprintf("More than %d markers found. Consider subsampling.", max_markers))
   }
 
-  # --- 4. FORMAT field checks (GT, AD, etc.) ---
+  # --- Check for duplicated marker IDs ---
+  if (total_markers > 0) {
+    marker_ids <- sapply(lines[data_line_indices], function(line) {
+      fields <- strsplit(line, "\t")[[1]]
+      if (length(fields) >= 3) fields[3] else NA
+    })
+    marker_ids <- marker_ids[!is.na(marker_ids)]
+    duplicated_markers <- marker_ids[duplicated(marker_ids)]
+    duplicates$duplicated_markers <- duplicated_markers
+    if (length(duplicated_markers) > 0) {
+      checks["duplicated_markers"] <- TRUE
+      if (verbose) warning("Duplicated marker IDs found: ", paste(head(duplicated_markers, 10), collapse = ", "), "...")
+    } else {
+      if (verbose) cat("No duplicated marker IDs.\n")
+      checks["duplicated_markers"] <- FALSE
+    }
+  }
+
+  # --- FORMAT field checks (GT, AD, etc.) ---
   if (has_genotypes) {
     checks["samples"] <- TRUE
     sample_indices <- head(data_line_indices, n_data_lines)
@@ -189,7 +218,7 @@ vcf_sanity_check <- function(
     # GT check
     checks["GT"] <- "GT" %in% format_fields
     if (verbose) {
-      if (checks["GT"]) cat("✅ FORMAT field 'GT' (genotype) is present.\n") else warning("❌ FORMAT field 'GT' is missing.")
+      if (checks["GT"]) cat("FORMAT field 'GT' (genotype) is present.\n") else warning("FORMAT field 'GT' is missing.")
     }
     # Allele counts check
     support_fields <- c("AD", "RA", "AO", "RO", "NR", "NV", "SB", "F1R2", "F2R1")
@@ -197,22 +226,35 @@ vcf_sanity_check <- function(
     if (checks["allele_counts"]) {
       if (verbose) {
         cat(sprintf(
-          "✅ Allele count FORMAT field(s) found: %s\n",
+          "Allele count FORMAT field(s) found: %s\n",
           paste(intersect(support_fields, format_fields), collapse = ", ")
         ))
       }
     } else {
-      warning("❌ No allele-level count fields found (e.g., AD, RA, AO, RO).")
+      warning(" No allele-level count fields found (e.g., AD, RA, AO, RO).")
     }
 
     # Optional: phased GT (presence of '|' instead of '/' in genotypes)
     phased_lines <- grep("\\|", lines[sample_indices])
     checks["phased_GT"] <- length(phased_lines) > 0
+
+    # --- Check for duplicated sample names ---
+    sample_names <- column_names[10:length(column_names)]
+    duplicated_samples <- sample_names[duplicated(sample_names)]
+    duplicates$duplicated_samples <- duplicated_samples
+    if (length(duplicated_samples) > 0) {
+      if(verbose) warning("Duplicated sample names found: ", paste(duplicated_samples, collapse = ", "))
+      checks["duplicated_samples"] <- TRUE
+    } else {
+      if (verbose) cat("No duplicated sample names.\n")
+      checks["duplicated_samples"] <- FALSE
+    }
   } else {
     checks["samples"] <- FALSE
     checks["GT"] <- FALSE
     checks["allele_counts"] <- FALSE
     checks["phased_GT"] <- FALSE
+    checks["duplicated_samples"] <- FALSE
 
     warning("No sample/genotype columns found.")
   }
@@ -222,10 +264,10 @@ vcf_sanity_check <- function(
   checks["pos_info"] <- "POS" %in% column_names
 
   if (checks["chrom_info"] && checks["pos_info"]) {
-    if (verbose) cat("✅ Both CHROM and POS columns are present.\n")
+    if (verbose) cat("Both CHROM and POS columns are present.\n")
   } else {
-    if (!checks["chrom_info"]) warning("❌ Column 'CHROM' is missing.")
-    if (!checks["pos_info"]) warning("❌ Column 'POS' is missing.")
+    if (!checks["chrom_info"]) warning(" Column 'CHROM' is missing.")
+    if (!checks["pos_info"]) warning(" Column 'POS' is missing.")
   }
 
   # --- 6. REF/ALT basic check on sample rows ---
@@ -248,5 +290,5 @@ vcf_sanity_check <- function(
 
   # --- Done ---
   if (verbose) cat("Sanity check complete.\n")
-  return(list(checks = checks, messages = messages))
+  return(list(checks = checks, messages = messages, duplicates = duplicates))
 }

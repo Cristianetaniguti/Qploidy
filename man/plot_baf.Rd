@@ -18,29 +18,41 @@ plot_baf(
 )
 }
 \arguments{
-\item{data_sample}{A data.frame containing BAF and genomic position information. Must include columns `Chr`, `Position`, and `sample`.}
+\item{data_sample}{A data.frame containing BAF and genomic position
+information. Must include columns `Chr`, `Position`, and `sample`.}
 
-\item{area_single}{Numeric value defining the area around the expected peak to be considered.}
+\item{area_single}{Numeric value defining the area around the expected peak
+to be considered.}
 
-\item{ploidy}{Integer or vector specifying the expected ploidy. If a vector, it must match the number of chromosomes in `data_sample`.}
+\item{ploidy}{Integer or vector specifying the expected ploidy. If a vector,
+it must match the number of chromosomes in `data_sample`.}
 
-\item{dot.size}{Numeric value for the size of the dots in the plot. Default is 1.}
+\item{dot.size}{Numeric value for the size of the dots in the plot. Default
+is 1.}
 
-\item{add_estimated_peaks}{Logical. If TRUE, adds lines for estimated peaks. Default is FALSE.}
+\item{add_estimated_peaks}{Logical. If TRUE, adds lines for estimated peaks.
+Default is FALSE.}
 
-\item{add_expected_peaks}{Logical. If TRUE, adds lines for expected peaks. Default is FALSE.}
+\item{add_expected_peaks}{Logical. If TRUE, adds lines for expected peaks.
+Default is FALSE.}
 
-\item{centromeres}{Named vector defining centromere positions for each chromosome. Names must match chromosome IDs in `data_sample`.}
+\item{centromeres}{Named vector defining centromere positions for each
+chromosome. Names must match chromosome IDs in `data_sample`.}
 
-\item{add_centromeres}{Logical. If TRUE, adds vertical lines at centromere positions. Default is FALSE.}
+\item{add_centromeres}{Logical. If TRUE, adds vertical lines at centromere
+positions. Default is FALSE.}
 
-\item{colors}{Logical. If TRUE, adds area colors to the plot. Default is FALSE.}
+\item{colors}{Logical. If TRUE, adds area colors to the plot. Default is
+FALSE.}
 
-\item{font_size}{Numeric value for the font size of plot labels. Default is 12.}
+\item{font_size}{Numeric value for the font size of plot labels. Default is
+12.}
 }
 \value{
 A ggplot object representing the BAF plot.
 }
 \description{
-This function generates a BAF (B-allele frequency) plot for visualizing genomic data. It allows customization of dot size, expected and estimated peaks, centromere positions, and area colors.
+This function generates a BAF (B-allele frequency) plot for visualizing
+genomic data. It allows customization of dot size, expected and estimated
+peaks, centromere positions, and area colors.
 }

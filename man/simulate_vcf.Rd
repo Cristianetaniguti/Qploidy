@@ -23,6 +23,8 @@ simulate_vcf(
 \item{n_diploid}{Number of diploid samples. Default is 5.}
 
 \item{n_triploid}{Number of triploid samples. Default is 10.}
+
+\item{n_markers}{Number of markers to simulate. Default is 100.}
 }
 \value{
 None. The function writes the simulated VCF content to the specified file.

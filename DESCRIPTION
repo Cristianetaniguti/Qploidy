@@ -20,16 +20,15 @@ Authors@R: c(person(given='Cristiane',
 Description: Provides tools for estimating ploidy and detecting aneuploidy in individuals using allele dosage information from high-throughput genotyping platforms, such as SNP arrays and sequencing-based technologies. The package includes functions for standardizing signal intensities, calculating B-allele frequencies (BAF) and z-scores, and identifying copy number variation patterns.
 License: AGPL (>= 3)
 Depends: R (>= 3.6.0)
+biocViews:
 Imports: 
     dplyr,
     ggplot2,
-    reshape2,
     tidyr,
     vroom,
     ggpubr,
     multtest,
     vcfR,
-    plotly,
     stringr
 Encoding: UTF-8
 URL: https://github.com/Cristianetaniguti/Qploidy

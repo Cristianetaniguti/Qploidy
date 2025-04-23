@@ -16,7 +16,7 @@ globalVariables(c("Chr", "baf", "z", "ratio", "median", "window", "prop_het"))
 #' @param font_size Numeric value for the font size of plot labels. Default is 12.
 #' @return A ggplot object representing the BAF plot.
 #'
-#' @importFrom ggplot2 ggplot aes geom_point geom_rect geom_vline scale_color_manual facet_grid theme_bw theme element_text ylab
+#' @import ggplot2
 #' @importFrom dplyr filter
 #' @importFrom dplyr %>%
 #' @export
@@ -131,7 +131,7 @@ plot_baf <- function(data_sample,
 #' @param font_size Numeric value for the font size of plot labels. Default is 12.
 #' @return A ggplot object representing the BAF histogram.
 #'
-#' @importFrom ggplot2 ggplot aes geom_histogram geom_vline scale_fill_manual scale_color_manual scale_linetype_manual scale_alpha facet_grid theme_bw theme xlab labs
+#' @import ggplot2
 #' @importFrom dplyr filter
 #' @export
 plot_baf_hist <- function(data_sample,
@@ -322,48 +322,6 @@ plot_baf_hist <- function(data_sample,
   return(p_hist)
 }
 
-
-#' 3D Plot for Raw Data Inspection
-#'
-#' This function generates a 3D surface plot to inspect raw data properties, such as allele intensities or sequencing depth. It helps identify variation among individuals for the same marker.
-#'
-#' @param data_qploidy A data.frame input for Qploidy. Must include columns `MarkerName`, `SampleName`, and `R`.
-#' @param R_lim Numeric value to limit the sum of intensities/depth axis. Useful for adjusting dimensions in case of outliers. Default is NULL.
-#' @param n Integer specifying the subset size for plotting. Default is 3000.
-#' @return A plotly object representing the 3D surface plot.
-#'
-#' @importFrom plotly plot_ly layout
-#' @importFrom tidyr pivot_wider
-#' @export
-plot_check <- function(data_qploidy, R_lim = NULL, n = 3000) {
-  plot_df <- pivot_wider(data_qploidy[, c(1, 2, 5)], names_from = SampleName, values_from = R)
-  mk_names <- plot_df$MarkerName
-  plot_df <- as.matrix(plot_df[, -1])
-  rownames(plot_df) <- mk_names
-
-  plot_df <- plot_df[sample(seq_len(nrow(plot_df)), n, replace = FALSE), ]
-  plot_df <- plot_df[order(apply(plot_df, 1, sum)), ]
-
-  if (!is.null(R_lim)) {
-    plot_df[which(plot_df > R_lim)] <- NA
-    rm.mk <- apply(plot_df, 1, function(x) sum(is.na(x)) / length(x))
-    rm.mk <- which(rm.mk > 0.5)
-    if (length(rm.mk) > 0) plot_df <- plot_df[-rm.mk, ]
-  }
-
-  axx <- list(title = "Individuals")
-  axy <- list(title = "Markers")
-  axz <- list(title = "Sum of intensities/depth")
-
-  cat("Values summary:\n")
-  plot_df
-  print(summary(as.numeric(plot_df)))
-
-  p <- plot_ly(z = plot_df, type = "surface") %>%
-    layout(scene = list(xaxis = axx, yaxis = axy, zaxis = axz))
-  return(p)
-}
-
 #' Plot Method for Qploidy Standardization
 #'
 #' This function generates various plots for visualizing the results of Qploidy standardization. It supports multiple plot types, including BAF, z-score, and histograms.
@@ -409,7 +367,7 @@ plot_check <- function(data_qploidy, R_lim = NULL, n = 3000) {
 #'
 #'
 #' @importFrom ggpubr ggarrange annotate_figure text_grob
-#' @importFrom ggplot2 ggplot aes geom_point geom_smooth geom_hline facet_grid theme_bw theme element_text
+#' @import ggplot2
 #' @importFrom dplyr filter group_by summarise
 #' @importFrom tidyr pivot_wider
 #' @export
@@ -477,7 +435,7 @@ plot_qploidy_standardization <- function(x,
       centromeres_df <- data.frame(Chr = names(centromeres), value = centromeres)
     }
 
-    for (i in 1:length(centromeres)) {
+    for (i in seq_along(centromeres)) {
       idx <- which(baf_sample$Chr == centromeres_df$Chr[i] & baf_sample$Position < centromeres_df$value[i])
       baf_sample$Chr[idx] <- paste0(baf_sample$Chr[idx], ".1")
       idx <- which(baf_sample$Chr == centromeres_df$Chr[i] & baf_sample$Position >= centromeres_df$value[i])
@@ -566,13 +524,13 @@ plot_qploidy_standardization <- function(x,
 
     data_sample_lst <- split.data.frame(data_sample, data_sample$Chr)
 
-    for (j in 1:length(data_sample_lst)) {
+    for (j in seq_along(data_sample_lst)) {
       data_sample_lst[[j]]$window <- 1
       if (length(unique(data_sample_lst[[j]]$Position)) == 1) next()
       intervals_start <- c(seq(1, max(data_sample_lst[[j]]$Position), window_size))
       intervals_end <- c(seq(1, max(data_sample_lst[[j]]$Position), window_size) - 1, max(data_sample_lst[[j]]$Position))
       intervals_end <- intervals_end[-1]
-      for (i in 1:length(intervals_start)) {
+      for (i in seq_along(intervals_start)) {
         data_sample_lst[[j]]$window[which(data_sample_lst[[j]]$Position >= intervals_start[i] & data_sample_lst[[j]]$Position <= intervals_end[i])] <- intervals_start[i]
       }
     }
@@ -652,7 +610,7 @@ plot_qploidy_standardization <- function(x,
 #'
 #' If `file_name` is NULL, the plots are not saved to files but are returned in the output list.
 #'
-#' @importFrom ggplot2 ggsave
+#' @import ggplot2
 #' @export
 all_resolutions_plots <- function(
     data_standardized,

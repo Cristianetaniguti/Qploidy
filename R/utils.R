@@ -82,7 +82,8 @@ xi_fun <- function(p, eps, h) {
 #' - `checks`: A named vector indicating the results of each check (TRUE or FALSE).
 #' - `messages`: A data frame containing messages for each check, indicating success or failure.
 #' - `duplicates`: A list containing any duplicated sample or marker IDs found in the VCF file.
-#' 
+#' - `ploidy_max`: The maximum ploidy detected from the genotype field, if applicable.
+#'
 #' @details The function performs the following checks:
 #' - **VCF_header**: Verifies the presence of the `##fileformat` header.
 #' - **VCF_columns**: Ensures required columns (`#CHROM`, `POS`, `ID`, `REF`, `ALT`, `QUAL`, `FILTER`, `INFO`) are present.
@@ -96,7 +97,7 @@ xi_fun <- function(p, eps, h) {
 #' - **phased_GT**: Checks for phased genotypes (presence of `|` in the `GT` field).
 #' - **duplicated_samples**: Checks for duplicated sample IDs.
 #' - **duplicated_markers**: Checks for duplicated marker IDs.
-#' 
+#'
 #' @importFrom stats setNames
 #'
 #' @export
@@ -126,7 +127,8 @@ vcf_sanity_check <- function(
     "multiallelics",
     "phased_GT",
     "duplicated_samples",
-    "duplicated_markers"
+    "duplicated_markers",
+    "mixed_ploidies"
   )
   checks <- setNames(rep(NA, length(checks_names)), checks_names)
 
@@ -143,8 +145,9 @@ vcf_sanity_check <- function(
     "ref_alt" = c("REF/ALT fields contain invalid nucleotide codes.", "REF/ALT fields are valid."),
     "multiallelics" = c("Multiallelic sites not found in the VCF file.", "Multiallelic sites found in the VCF file."),
     "phased_GT" = c("Phased genotypes (|) are not present in the VCF file.", "Phased genotypes (|) are present in the VCF file."),
-    "duplicated_samples" = c("Duplicated sample IDs found.", "No duplicated sample IDs found."),
-    "duplicated_markers" = c("Duplicated marker IDs found.", "No duplicated marker IDs found.")
+    "duplicated_samples" = c( "No duplicated sample IDs found.","Duplicated sample IDs found."),
+    "duplicated_markers" = c( "No duplicated marker IDs found.","Duplicated marker IDs found."),
+    "mixed_ploidies" = c("Mixed ploidies detected.", "No mixed ploidies detected.")
   )
   rownames(messages) <- c("false", "true")
 
@@ -248,7 +251,7 @@ vcf_sanity_check <- function(
     duplicated_samples <- sample_names[duplicated(sample_names)]
     duplicates$duplicated_samples <- duplicated_samples
     if (length(duplicated_samples) > 0) {
-      if(verbose) warning("Duplicated sample names found: ", paste(duplicated_samples, collapse = ", "))
+      if (verbose) warning("Duplicated sample names found: ", paste(duplicated_samples, collapse = ", "))
       checks["duplicated_samples"] <- TRUE
     } else {
       if (verbose) cat("No duplicated sample names.\n")
@@ -264,7 +267,47 @@ vcf_sanity_check <- function(
     warning("No sample/genotype columns found.")
   }
 
-  # --- 5. CHROM and POS column checks ---
+  # --- Ploidy inference (based on GT) ---
+  ploidy_max <- NA # default if GT not found or no valid genotypes
+
+  if (checks["GT"]) {
+    ploidy_values <- c()
+
+    for (i in seq_along(sample_indices)) {
+      fields <- strsplit(lines[sample_indices[i]], "\t")[[1]]
+
+      # Skip if not enough fields
+      if (length(fields) < 10) next
+
+      format_keys <- unlist(strsplit(fields[9], ":"))
+      gt_index <- which(format_keys == "GT")
+
+      # Loop through samples (from column 10 onward)
+      for (sample_field in fields[10:length(fields)]) {
+        sample_fields <- unlist(strsplit(sample_field, ":"))
+        if (length(sample_fields) >= gt_index) {
+          gt_raw <- sample_fields[gt_index]
+          if (grepl("[/|]", gt_raw)) {
+            ploidy <- length(unlist(strsplit(gt_raw, "[/|]")))
+            ploidy_values <- c(ploidy_values, ploidy)
+          }
+        }
+      }
+    }
+
+    if (length(ploidy_values) > 0) {
+      ploidy_max <- max(ploidy_values, na.rm = TRUE)
+      if (verbose) cat("Highest ploidy detected from GT field:", ploidy_max, "\n")
+    }
+    if(length(ploidy_values) > 1) {
+      checks['mixed_ploidies'] <- TRUE
+      if (verbose) cat("Mixed ploidies\n")
+    } else {
+      checks['mixed_ploidies'] <- FALSE
+    }
+  }
+
+  # --- CHROM and POS column checks ---
   checks["chrom_info"] <- "#CHROM" %in% column_names
   checks["pos_info"] <- "POS" %in% column_names
 
@@ -275,7 +318,7 @@ vcf_sanity_check <- function(
     if (!checks["pos_info"]) warning(" Column 'POS' is missing.")
   }
 
-  # --- 6. REF/ALT basic check on sample rows ---
+  # --- REF/ALT basic check on sample rows ---
   sample_lines <- lines[head(data_line_indices, n_data_lines)]
   ref_alt_valid <- sapply(sample_lines, function(line) {
     fields <- strsplit(line, "\t")[[1]]
@@ -289,11 +332,11 @@ vcf_sanity_check <- function(
   })
   checks["ref_alt"] <- all(ref_alt_valid)
 
-  # --- 7. Multiallelic site check (ALT with ',' separator) ---
+  # --- Multiallelic site check (ALT with ',' separator) ---
   multiallelic_flags <- grepl(",", sapply(sample_lines, function(line) strsplit(line, "\t")[[1]][5]))
   checks["multiallelics"] <- any(multiallelic_flags)
 
   # --- Done ---
   if (verbose) cat("Sanity check complete.\n")
-  return(list(checks = checks, messages = messages, duplicates = duplicates))
+  return(list(checks = checks, messages = messages, duplicates = duplicates, ploidy_max = ploidy_max))
 }

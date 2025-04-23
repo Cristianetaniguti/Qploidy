@@ -399,7 +399,7 @@ simu_data_standardized <- standardize(
   geno.pos = genos.pos,
   ploidy.standardization = 4,
   threshold.n.clusters = 5,
-  n.cores = 2,
+  n.cores = 1,
   out_filename = temp_file,
   verbose = TRUE
 )
@@ -415,7 +415,7 @@ simu_data_standardized <- standardize(
   geno.pos = genos.pos,
   ploidy.standardization = 4,
   threshold.n.clusters = 5,
-  n.cores = 2,
+  n.cores = 1,
   out_filename = "my_standardized_data.tsv.gz",
   verbose = TRUE
 )
@@ -825,7 +825,7 @@ simu_data_standardized_round2 <- standardize(
   geno.pos = genos.pos,
   ploidy.standardization = 4,
   threshold.n.clusters = 5,
-  n.cores = 2,
+  n.cores = 1,
   out_filename = "my_round2_standardization.tsv.gz",
   verbose = TRUE
 )

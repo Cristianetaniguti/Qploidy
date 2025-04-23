@@ -21,7 +21,11 @@ vcf_sanity_check(
 \item{verbose}{A logical value indicating whether to print detailed messages during the checks. Default is FALSE.}
 }
 \value{
-A named logical vector indicating the results of various checks. Each element corresponds to a specific check, with TRUE indicating the check passed and FALSE indicating it failed.
+A list containing:
+- `checks`: A named vector indicating the results of each check (TRUE or FALSE).
+- `messages`: A data frame containing messages for each check, indicating success or failure.
+- `duplicates`: A list containing any duplicated sample or marker IDs found in the VCF file.
+- `ploidy_max`: The maximum ploidy detected from the genotype field, if applicable.
 }
 \description{
 This function performs a series of checks on a VCF file to ensure its validity and integrity. It verifies the presence of required headers, columns, and data fields, and checks for common issues such as missing or malformed data.
@@ -38,4 +42,6 @@ The function performs the following checks:
 - **ref_alt**: Ensures `REF` and `ALT` fields contain valid nucleotide codes.
 - **multiallelics**: Identifies multiallelic sites (ALT field with commas).
 - **phased_GT**: Checks for phased genotypes (presence of `|` in the `GT` field).
+- **duplicated_samples**: Checks for duplicated sample IDs.
+- **duplicated_markers**: Checks for duplicated marker IDs.
 }

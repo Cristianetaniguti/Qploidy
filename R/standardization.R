@@ -543,7 +543,7 @@ standardize <- function(data = NULL,
 
     if(verbose) cat("Going to parallel mode...\n")
     clust <- makeCluster(n.cores, type = parallel.type)
-    clusterExport(clust, c("get_centers", "%>%"))
+    clusterExport(clust, c("get_centers"))
     clusters <- parLapply(clust, lst_standardization, get_centers,
                           ploidy= ploidy.standardization,
                           n.clusters.thr = threshold.n.clusters,

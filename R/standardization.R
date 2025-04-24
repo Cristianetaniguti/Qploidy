@@ -359,7 +359,7 @@ rm_outlier <- function(data, alpha=0.05){
     rawp.BHStud = 2 * (1 - pnorm(abs(studresid)))
     #Produce a Bonferroni-Holm tests for the adjusted p-values
     #The output is a list
-    test.BHStud< multtest::mt.rawp2adjp(rawp.BHStud,proc=c("Holm"),alpha = alpha)
+    test.BHStud <- multtest::mt.rawp2adjp(rawp.BHStud,proc=c("Holm"),alpha = alpha)
     #Create vectors/matrices out of the list of the BH tests
     adjp = cbind(test.BHStud[[1]][,1])
     bholm = cbind(test.BHStud[[1]][,2])

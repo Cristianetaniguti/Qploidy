@@ -163,7 +163,7 @@ get_centers <- function(ratio_geno,
     if(is.null(n.clusters.thr)) n.clusters.thr <- ploidy + 1
 
     # Adjust codification
-    ad <- ratio_geno %>% filter(!is.na(theta) & !is.na(geno)) %>% group_by(geno) %>% summarise(mean = mean(theta))
+    ad <- ratio_geno %>% dplyr::filter(!is.na(theta) & !is.na(geno)) %>% dplyr::group_by(geno) %>% dplyr::summarise(mean = mean(theta))
     if(ad$mean[1] > ad$mean[nrow(ad)]) {
       genos = data.frame(geno = 0:ploidy, geno.new = ploidy:0)
       ratio_geno$geno <- genos$geno.new[match(ratio_geno$geno,genos$geno)]
@@ -543,7 +543,7 @@ standardize <- function(data = NULL,
 
     if(verbose) cat("Going to parallel mode...\n")
     clust <- makeCluster(n.cores, type = parallel.type)
-    clusterExport(clust, c("get_centers", "rm_outlier", "%>%", "filter", "group_by", "summarise"))
+    clusterExport(clust, c("get_centers", "rm_outlier", "%>%"))
     clusters <- parLapply(clust, lst_standardization, get_centers,
                           ploidy= ploidy.standardization,
                           n.clusters.thr = threshold.n.clusters,

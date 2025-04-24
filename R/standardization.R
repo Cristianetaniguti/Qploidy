@@ -597,7 +597,7 @@ standardize <- function(data = NULL,
   if(verbose) cat("Going to parallel mode...\n")
 
   clust <- makeCluster(n.cores, type = parallel.type)
-  clusterExport(clust, c("get_baf_par"))
+  clusterExport(clust, c("get_baf_par", "get_baf"))
   bafs <- parLapply(clust, par_all, get_baf_par, ploidy = ploidy.standardization)
 
   stopCluster(clust)

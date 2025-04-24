@@ -38,7 +38,6 @@ test_that("area_estimate_ploidy handles missing data correctly", {
   expect_true(!is.null(result$ploidy))
 
   result_merged <- merge_arms_format(result, filter_diff = 0.001)
-  result_merged$ploidy
 
   expect_s3_class(result_merged, "qploidy_area_ploidy_estimation")
   expect_true(!is.null(result_merged$ploidy))

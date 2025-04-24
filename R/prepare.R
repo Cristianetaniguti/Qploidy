@@ -4,23 +4,46 @@ globalVariables(c("ind", "zscore", "chr", "write.csv"))
 
 #' Convert VCF File to Qploidy Data
 #'
-#' This function converts a VCF file into a format compatible with Qploidy analysis. It extracts genotype and allele depth information and formats it into a data frame.
+#' This function converts a VCF file into a format compatible with Qploidy 
+#' analysis. It extracts genotype and allele depth information and formats 
+#' it into a data frame.
 #'
 #' @param vcf_file Path to the VCF file.
-#' @param geno Logical. If TRUE, the output columns will include MarkerName, SampleName, geno, and prob. If FALSE, the output will include MarkerName, SampleName, X, Y, R, and ratio.
-#' @param geno.pos Logical. If TRUE, the output will include MarkerName, Chromosome, and Position columns.
+#' @param geno Logical. If TRUE, the output columns will include MarkerName, 
+#' SampleName, geno, and prob. If FALSE, the output will include MarkerName, 
+#' SampleName, X, Y, R, and ratio.
+#' @param geno.pos Logical. If TRUE, the output will include MarkerName, 
+#' Chromosome, and Position columns.
 #' @return A data frame containing the processed VCF data.
 #' @export
 #' @import vcfR
 #' @importFrom tidyr pivot_longer
 qploidy_read_vcf <- function(vcf_file, geno = FALSE, geno.pos = FALSE) {
 
-  vcf <- read.vcfR(vcf_file)
+  checks <- vcf_sanity_check(vcf_file)
 
-  if(!(geno | geno.pos)){
+  # Check if the required checks are TRUE
+  required <- c("VCF_header", "VCF_columns", "GT", "allele_counts", 
+                "samples", "chrom_info", "pos_info")
+  if(!all(checks$checks[required])) {
+    stop(paste(checks$message[1,required][which(!checks$checks[required])], 
+               collapse = "\n"))
+  }
+
+  # Check if the required checks are FALSE
+  required_not <- c("multiallelics", "phased_GT")
+  if(any(checks$checks[required_not])) {
+    stop(paste(checks$message[2,required_not][which(checks$checks[required_not])], 
+               collapse = "\n"))
+  }
+
+  vcf <- read.vcfR(vcf_file,  verbose = FALSE)
+
+  if(!(geno || geno.pos)){
     DP <- extract.gt(vcf, "AD")
 
-    mknames <- pivot_longer(data.frame(mks = rownames(DP), DP), cols = 2:(ncol(DP)+1))
+    mknames <- pivot_longer(data.frame(mks = rownames(DP), DP), 
+                            cols = 2:(ncol(DP)+1))
 
     dp_split <- strsplit(mknames$value, ",")
 
@@ -40,15 +63,18 @@ qploidy_read_vcf <- function(vcf_file, geno = FALSE, geno.pos = FALSE) {
                                ratio = alt/(ref+alt))
   } else if(geno){
     GT <- extract.gt(vcf, "GT")
-    GT <- pivot_longer(data.frame(mks = rownames(GT), GT), cols = 2:(ncol(GT)+1))
+    GT <- pivot_longer(data.frame(mks = rownames(GT), GT), 
+                       cols = 2:(ncol(GT)+1))
     GT$value <- stringr::str_count(GT$value, "1")
     colnames(GT) <- c("MarkerName","SampleName","geno")
 
     prob <- extract.gt(vcf, "MPP")
-    prob <- pivot_longer(data.frame(mks = rownames(prob), prob), cols = 2:(ncol(prob)+1))
+    prob <- pivot_longer(data.frame(mks = rownames(prob), prob), 
+                         cols = 2:(ncol(prob)+1))
     colnames(prob) <- c("MarkerName","SampleName","prob")
 
-    data_qploidy <- merge.data.frame(GT, prob, by = c("MarkerName", "SampleName"))
+    data_qploidy <- merge.data.frame(GT, prob, by = c("MarkerName", 
+                                                      "SampleName"))
     data_qploidy$prob <- as.numeric(data_qploidy$prob)
 
 
@@ -65,7 +91,9 @@ qploidy_read_vcf <- function(vcf_file, geno = FALSE, geno.pos = FALSE) {
 
 #' Read Illumina Array Files
 #'
-#' This function reads Illumina array files and processes them into a format suitable for Qploidy analysis. It adds a suffix to sample IDs if multiple files are provided.
+#' This function reads Illumina array files and processes them into a format 
+#' suitable for Qploidy analysis. It adds a suffix to sample IDs if multiple 
+#' files are provided.
 #'
 #' @param ... One or more Illumina array filenames.
 #' @return A data frame containing the processed Illumina array data.
@@ -75,7 +103,7 @@ read_illumina_array <- function(...){
   files <- list(...)
 
   raw_all <- vector()
-  for(i in 1:length(files)){
+  for (i in seq_along(files)) {
     skipn <- find_header_line(files[[i]], word = "SNP Name")
     raw <- vroom(files[[i]], delim = "\t", skip = skipn-1)
     raw1 <- raw[,c("SNP Name","Sample ID","X","Y")]
@@ -83,7 +111,8 @@ read_illumina_array <- function(...){
     raw_all <- rbind(raw_all, raw1)
   }
 
-  fitpoly_potato_input <- cbind(raw_all, R = raw_all$X + raw_all$Y, ratio = raw_all$Y/(raw_all$X + raw_all$Y))
+  fitpoly_potato_input <- cbind(raw_all, R = raw_all$X + raw_all$Y, 
+                                ratio = raw_all$Y/(raw_all$X + raw_all$Y))
   colnames(fitpoly_potato_input)[1:2] <- c("MarkerName", "SampleName")
   return(fitpoly_potato_input)
 }
@@ -91,16 +120,19 @@ read_illumina_array <- function(...){
 
 #' Find the Header Line in a File
 #'
-#' This function scans a file to locate the first line containing a specific keyword, such as 'probeset_id'.
-#' It is useful for identifying the starting point of data in files with headers or metadata.
+#' This function scans a file to locate the first line containing a specific 
+#' keyword, such as 'probeset_id'. It is useful for identifying the starting 
+#' point of data in files with headers or metadata.
 #'
 #' @param summary_file The path to the file to be scanned.
 #' @param max_lines The maximum number of lines to scan. Default is 6000.
-#' @param word The keyword to search for in the first column. Default is "probeset_id".
+#' @param word The keyword to search for in the first column. Default is 
+#' "probeset_id".
 #' @return The line number where the keyword is found.
 #' 
 #' @export
-find_header_line <- function(summary_file, word = "probeset_id", max_lines = 6000) {
+find_header_line <- function(summary_file, word = "probeset_id", 
+                             max_lines = 6000) {
   con <- file(summary_file, open = "r")
   on.exit(close(con))
   
@@ -110,15 +142,18 @@ find_header_line <- function(summary_file, word = "probeset_id", max_lines = 600
     if (startsWith(line, word)) return(i)
   }
   
-  stop(substitute(word)," not found in the first column within the first ", max_lines, " lines.")
+  stop(substitute(word)," not found in the first column within the first ", 
+       max_lines, " lines.")
 }
 
 #' Convert Axiom Array Summary File to Qploidy Input
 #'
-#' This function processes an Axiom array summary file and converts it into a format compatible with Qploidy and fitpoly analysis.
+#' This function processes an Axiom array summary file and converts it into a 
+#' format compatible with Qploidy and fitpoly analysis.
 #'
 #' @param summary_file Path to the Axiom summary file.
-#' @param ind_names Optional. A file with two columns: Plate_name (sample IDs in the summary file) and Sample_Name (desired sample names).
+#' @param ind_names Optional. A file with two columns: Plate_name (sample IDs 
+#' in the summary file) and Sample_Name (desired sample names).
 #' @param atan Logical. If TRUE, calculates theta using atan2.
 #' @return A data frame formatted for Qploidy analysis.
 #' @export
@@ -135,9 +170,12 @@ read_axiom <- function(summary_file, ind_names = NULL, atan = FALSE){
   if(!is.null(ind_names)){
     ind.names <- vroom(ind_names)
 
-    new.names <- ind.names$Sample_Name[match(colnames(summary_filt$A_probes), ind.names$Plate_Name)]
-    colnames(summary_filt$A_probes)[which(!is.na(new.names))] <- new.names[which(!is.na(new.names))]
-    colnames(summary_filt$B_probes)[which(!is.na(new.names))] <- new.names[which(!is.na(new.names))]
+    new.names <- ind.names$Sample_Name[match(colnames(summary_filt$A_probes), 
+                                             ind.names$Plate_Name)]
+    colnames(summary_filt$A_probes)[which(!is.na(new.names))] <- 
+      new.names[which(!is.na(new.names))]
+    colnames(summary_filt$B_probes)[which(!is.na(new.names))] <- 
+      new.names[which(!is.na(new.names))]
   }
 
   R_theta <- get_R_theta(cleaned_summary = summary_filt, atan)
@@ -150,7 +188,8 @@ read_axiom <- function(summary_file, ind_names = NULL, atan = FALSE){
 
 #' Clean Axiom Summary File
 #'
-#' This function removes consecutive A allele probes from an Axiom summary file.
+#' This function removes consecutive A allele probes from an Axiom summary 
+#' file.
 #'
 #' @param summary_df A data frame containing A and B probe intensities.
 #' @return A list with cleaned A and B probes.
@@ -158,9 +197,12 @@ read_axiom <- function(summary_file, ind_names = NULL, atan = FALSE){
 #' @export
 clean_summary <- function(summary_df){
   summaries_filt <- summary_df
-  if(length(grep("Contig", summary_df$probeset_id)) > 0) summaries_filt <- summary_df[-grep("Contig", summaries_filt$probeset_id),]
-  if(length(grep("contig", summaries_filt$probeset_id)) > 0) summaries_filt <- summaries_filt[-grep("contig", summaries_filt$probeset_id),]
-  if(length(grep("comp", summaries_filt$probeset_id)) > 0) summaries_filt <- summaries_filt[-grep("comp", summaries_filt$probeset_id),]
+  if(length(grep("Contig", summary_df$probeset_id)) > 0) 
+    summaries_filt <- summary_df[-grep("Contig", summaries_filt$probeset_id),]
+  if(length(grep("contig", summaries_filt$probeset_id)) > 0) 
+    summaries_filt <- summaries_filt[-grep("contig", summaries_filt$probeset_id),]
+  if(length(grep("comp", summaries_filt$probeset_id)) > 0) 
+    summaries_filt <- summaries_filt[-grep("comp", summaries_filt$probeset_id),]
 
   A_probes <- summaries_filt[seq(1,dim(summaries_filt)[1], 2),]
   B_probes <- summaries_filt[seq(2,dim(summaries_filt)[1], 2),]
@@ -169,7 +211,8 @@ clean_summary <- function(summary_df){
 
 #' Get R and Theta Values from Summary File
 #'
-#' This function calculates R and theta values from a cleaned summary file. It optionally performs standard normalization by plate and markers.
+#' This function calculates R and theta values from a cleaned summary file. 
+#' It optionally performs standard normalization by plate and markers.
 #'
 #' @param cleaned_summary A summary object from the clean_summary function.
 #' @param atan Logical. If TRUE, calculates theta using atan2.
@@ -177,11 +220,14 @@ clean_summary <- function(summary_df){
 #' @export
 #' @importFrom dplyr mutate
 get_R_theta <- function(cleaned_summary, atan = FALSE){
-  R_all <- as.data.frame(cleaned_summary$A_probes[,-1] + cleaned_summary$B_probes[,-1])
+  R_all <- as.data.frame(cleaned_summary$A_probes[,-1] + 
+                         cleaned_summary$B_probes[,-1])
   if(atan){
-    theta_all <- as.data.frame((atan2(as.matrix(cleaned_summary$B_probes[,-1]), as.matrix(cleaned_summary$A_probes[,-1])))/(pi/2))
+    theta_all <- as.data.frame((atan2(as.matrix(cleaned_summary$B_probes[,-1]), 
+                                      as.matrix(cleaned_summary$A_probes[,-1])))/(pi/2))
   }  else {
-    theta_all <- as.data.frame(cleaned_summary$B_probes[,-1]/(cleaned_summary$B_probes[,-1] + cleaned_summary$A_probes[,-1]))
+    theta_all <- as.data.frame(cleaned_summary$B_probes[,-1]/(cleaned_summary$B_probes[,-1] + 
+                                                              cleaned_summary$A_probes[,-1]))
   }
 
   probes_names <-  cleaned_summary$A_probes[,1]
@@ -209,10 +255,14 @@ summary_to_fitpoly <- function(R_all, theta_all){
   X_all <- cbind(MarkerName= R_all[,1], X_all)
   Y_all <- cbind(MarkerName = R_all[,1], Y_all)
 
-  R <- pivot_longer(R_all, cols = 2:ncol(R_all), values_to = "R", names_to = "SampleName")
-  theta <- pivot_longer(theta_all, cols = 2:ncol(theta_all), values_to = "ratio", names_to = "SampleName")
-  X <- pivot_longer(X_all, cols = 2:ncol(X_all), values_to = "X", names_to = "SampleName")
-  Y <- pivot_longer(Y_all, cols = 2:ncol(Y_all), values_to = "Y", names_to = "SampleName")
+  R <- pivot_longer(R_all, cols = 2:ncol(R_all), values_to = "R", 
+                    names_to = "SampleName")
+  theta <- pivot_longer(theta_all, cols = 2:ncol(theta_all), values_to = "ratio", 
+                        names_to = "SampleName")
+  X <- pivot_longer(X_all, cols = 2:ncol(X_all), values_to = "X", 
+                    names_to = "SampleName")
+  Y <- pivot_longer(Y_all, cols = 2:ncol(Y_all), values_to = "Y", 
+                    names_to = "SampleName")
 
   fitpoly_input <- cbind(X, Y = Y[,3], R = R[,3], ratio = theta[,3])
 

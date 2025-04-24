@@ -8,6 +8,9 @@ globalVariables(c("theta", "R", "geno", "Var1", "array.id",
 #' @param threshold.n.clusters minimum number of dosage clusters (heterozygous classes) to account with the marker for standardization
 #' @param rm.mks vector for logical indicating which markers should be removed, names of the vector are names of the markers
 #'
+#' @import tidyr
+#' @import dplyr
+#' 
 #'@export
 updog_centers <- function(multidog_obj, threshold.n.clusters=2, rm.mks){
 
@@ -22,7 +25,7 @@ updog_centers <- function(multidog_obj, threshold.n.clusters=2, rm.mks){
   bias <- snpdf$bias
 
   result <- list()
-  for(i in 1:length(bias)){
+  for(i in seq_along(bias)){
     centers_theta <- xi_fun(p = (0:ploidy[i])/ploidy[i], eps = seq[i], h = bias[i])
 
     result[[i]] <- list(rm = if(n.clusters.df[i,]$n.clusters >= threshold.n.clusters) 0 else 1,
@@ -100,7 +103,7 @@ get_baf <- function(theta_subject, centers_theta, ploidy){
 get_baf_par <- function(par_all_item, ploidy=2){
   baf <- list()
   i <- 1
-  for(i in 1:nrow(par_all_item[[1]])){
+  for(i in seq_len(nrow(par_all_item[[1]]))){
     baf[[i]] <- get_baf(theta_subject = as.numeric(par_all_item[[1]][i,-1]),
                         centers_theta = as.numeric(par_all_item[[2]][i,-1]),
                         ploidy = ploidy)
@@ -160,7 +163,7 @@ get_centers <- function(ratio_geno,
     if(is.null(n.clusters.thr)) n.clusters.thr <- ploidy + 1
 
     # Adjust codification
-    ad <- ratio_geno %>% filter(!is.na(theta) & !is.na(geno)) %>% group_by(geno) %>% summarise(mean = mean(theta))
+    ad <- ratio_geno %>% dplyr::filter(!is.na(theta) & !is.na(geno)) %>% dplyr::group_by(geno) %>% dplyr::summarise(mean = mean(theta))
     if(ad$mean[1] > ad$mean[nrow(ad)]) {
       genos = data.frame(geno = 0:ploidy, geno.new = ploidy:0)
       ratio_geno$geno <- genos$geno.new[match(ratio_geno$geno,genos$geno)]
@@ -175,7 +178,7 @@ get_centers <- function(ratio_geno,
     } else centers <- lapply(plot_data_split, function(x) apply(x[,3:4], 2, function(y) mean(y, na.rm = TRUE)))
   }
 
-  if(length(centers) == 0 | length(centers) < n.clusters.thr) {
+  if(length(centers) == 0 || length(centers) < n.clusters.thr) {
     return(list(rm= {if(length(centers) == 0) 1 else if(length(centers) < n.clusters.thr) 2},
                 centers_theta = centers,
                 MarkerName = unique(ratio_geno$MarkerName),
@@ -217,15 +220,21 @@ get_centers <- function(ratio_geno,
         }
       } else if(select_type == "intensities"){
         input <- mean(diff(centers_df$theta)/diff(as.numeric(names(centers))))
-        for(i in 1:length(mis)){
-          if(mis[i] < wi[1]) new_centers_df$theta[mis[i]] <- new_centers_df$theta[wi[1]] - (wi[1]-mis[i])*input
-          if(mis[i] > wi[1]) new_centers_df$theta[mis[i]] <- new_centers_df$theta[wi[length(wi)]] + diff(c(wi[length(wi)],mis[i]))*input
+        for (i in seq_along(mis)) {
+          if (mis[i] < wi[1]) {
+            new_centers_df$theta[mis[i]] <- new_centers_df$theta[wi[1]] - 
+              (wi[1] - mis[i]) * input
+          }
+          if (mis[i] > wi[1]) {
+            new_centers_df$theta[mis[i]] <- new_centers_df$theta[wi[length(wi)]] + 
+              diff(c(wi[length(wi)], mis[i])) * input
+          }
         }
       }
       centers_df <- new_centers_df
     }
 
-    centers_df <- cbind(centers_df, cluster = 1:nrow(centers_df))
+    centers_df <- cbind(centers_df, cluster = seq_len(nrow(centers_df)))
 
     return(list(rm = 0,
                 centers_theta = centers_df$theta,
@@ -340,7 +349,9 @@ rm_outlier <- function(data, alpha=0.05){
   theta <- data$theta
   rm.na <- which(is.na(theta))
   if(length(rm.na) > 0) theta <- theta[-rm.na]
-  if(length(theta) < 2 | length(unique(theta)) == 1) return(data) else {
+  if(length(theta) < 2 || length(unique(theta)) == 1) {
+    return(data)
+  } else {
     lm.object <- lm(theta ~ 1)
     resid <- lm.object$residuals
     studresid <- resid/sd(resid, na.rm=TRUE)
@@ -348,7 +359,7 @@ rm_outlier <- function(data, alpha=0.05){
     rawp.BHStud = 2 * (1 - pnorm(abs(studresid)))
     #Produce a Bonferroni-Holm tests for the adjusted p-values
     #The output is a list
-    test.BHStud<-mt.rawp2adjp(rawp.BHStud,proc=c("Holm"),alpha = alpha)
+    test.BHStud <- multtest::mt.rawp2adjp(rawp.BHStud,proc=c("Holm"),alpha = alpha)
     #Create vectors/matrices out of the list of the BH tests
     adjp = cbind(test.BHStud[[1]][,1])
     bholm = cbind(test.BHStud[[1]][,2])
@@ -476,7 +487,10 @@ standardize <- function(data = NULL,
                         rm_outlier = TRUE,
                         cluster_median = TRUE){
 
-  if(is.null(data) | is.null(genos) | is.null(geno.pos) | is.null(ploidy.standardization) | is.null(threshold.n.clusters)) stop("Not all required inputs were defined.")
+  if(is.null(data) || is.null(genos) || is.null(geno.pos) || 
+     is.null(ploidy.standardization) || is.null(threshold.n.clusters)) {
+    stop("Not all required inputs were defined.")
+  }
 
   if(!all(colnames(data) %in% c("MarkerName", "SampleName", "X", "Y", "R", "ratio"))) stop("Column names of the provided data object does not match the required.")
   if(!all(colnames(genos) %in% c("MarkerName", "SampleName", "geno", "prob"))) stop("Column names of the provided genos object does not match the required.")
@@ -529,7 +543,7 @@ standardize <- function(data = NULL,
 
     if(verbose) cat("Going to parallel mode...\n")
     clust <- makeCluster(n.cores, type = parallel.type)
-    clusterExport(clust, c("get_centers"))
+    clusterExport(clust, c("get_centers", "rm_outlier", "%>%"))
     clusters <- parLapply(clust, lst_standardization, get_centers,
                           ploidy= ploidy.standardization,
                           n.clusters.thr = threshold.n.clusters,
@@ -565,7 +579,8 @@ standardize <- function(data = NULL,
   centers_filt <- data.frame(mks=keep.mks, centers_filt)
   centers_filt <- centers_filt[match(theta_filt$MarkerName, centers_filt$mks),]
 
-  par <- rep(1:n.cores, each=round((nrow(theta_filt)/n.cores)+1,0))[1:nrow(theta_filt)]
+  par <- rep(seq_len(n.cores),
+             each = round((nrow(theta_filt) / n.cores) + 1, 0))[seq_len(nrow(theta_filt))]
 
   par_theta <- split.data.frame(theta_filt, par)
   par_clusters_filt <- split(centers_filt, par)
@@ -582,7 +597,7 @@ standardize <- function(data = NULL,
   if(verbose) cat("Going to parallel mode...\n")
 
   clust <- makeCluster(n.cores, type = parallel.type)
-  clusterExport(clust, c("get_baf_par"))
+  clusterExport(clust, c("get_baf_par", "get_baf"))
   bafs <- parLapply(clust, par_all, get_baf_par, ploidy = ploidy.standardization)
 
   stopCluster(clust)
@@ -602,7 +617,7 @@ standardize <- function(data = NULL,
   chr <- geno.pos$Chromosome[match(bafs_df$mks,geno.pos$MarkerName)]
   pos <- geno.pos$Position[match(bafs_df$mks,geno.pos$MarkerName)]
 
-  bafs_join <- cbind(MarkerName=bafs_df$mks, Chr = chr, Position = pos, bafs_df[,-1])
+  bafs_join <- cbind(MarkerName=bafs_df$mks, Chr = chr, Position = as.numeric(pos), bafs_df[,-1])
 
   no.geno.info <- length(which(is.na(bafs_join$Chr)))
   if(no.geno.info > 0)
@@ -644,19 +659,6 @@ standardize <- function(data = NULL,
     vroom_write(result$data, file = out_filename, append = TRUE, col_names = T)
   }
 
-  result <- structure(list(info = c(threshold.missing.geno = threshold.missing.geno,
-                                    threshold.geno.prob = threshold.geno.prob,
-                                    ploidy.standardization = ploidy.standardization,
-                                    threshold.n.clusters = threshold.n.clusters,
-                                    out_filename = out_filename,
-                                    type = if(!is.null(multidog_obj)) "updog" else type),
-                           filters = c(n.markers.start = length(unique(data$MarkerName)),
-                                       geno.prob.rm = prob.rm,
-                                       miss.rm = mis.rm,
-                                       clusters.rm= clusters.rm,
-                                       no.geno.info.rm = no.geno.info,
-                                       n.markers.end = length(unique(baf_melt$MarkerName))),
-                           data = qploidy_data), class = "qploidy_standardization")
   if(verbose) cat("Done!\n")
   return(result)
 }
@@ -721,13 +723,13 @@ print.qploidy_standardization <- function(x, ...){
 #'
 #' @export
 read_qploidy_standardization <- function(qploidy_standardization_file){
-  info <- vroom(qploidy_standardization_file,n_max = 1)
+  info <- vroom(qploidy_standardization_file,n_max = 1, progress = FALSE)
   info_v <- as.character(info)
   names(info_v) <- colnames(info)
-  filters <- vroom(qploidy_standardization_file, skip = 2, n_max=1)
+  filters <- vroom(qploidy_standardization_file, skip = 2, n_max=1, progress = FALSE)
   filters_v <- as.numeric(filters)
   names(filters_v) <- colnames(filters)
-  data <- vroom(qploidy_standardization_file, skip = 4)
+  data <- vroom(qploidy_standardization_file, skip = 4, progress = FALSE)
 
   return(structure(list(info = info_v,
                         filters = filters_v,

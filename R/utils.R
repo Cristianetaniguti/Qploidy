@@ -1,14 +1,21 @@
 globalVariables(c("rnom", "X", "Y", "runif", "prob"))
 
-#' Pascal triangle to define the expected peaks for each ploidy
+#' Pascal Triangle for Expected Peaks Calculation
 #'
-#' @param h ploidy value
+#' This function generates the Pascal triangle for a given ploidy value. The Pascal triangle is used to define the expected peaks for each ploidy level, which can be useful in various genetic analyses.
+#'
+#' @param h An integer representing the ploidy value.
+#'
+#' @return A list where each element corresponds to a row of the Pascal triangle, up to the specified ploidy value.
+#'
+#' @examples
+#' pascalTriangle(2) # Returns the first three rows of the Pascal triangle
+#' pascalTriangle(3) # Returns the first four rows of the Pascal triangle
 #'
 #' @export
 pascalTriangle <- function(h) {
   lapply(0:h, function(i) choose(i, 0:i))
 }
-
 
 #' Calculate the Statistical Mode
 #'
@@ -28,7 +35,6 @@ mode <- function(x) {
   ux <- unique(x)
   ux[which.max(tabulate(match(x, ux)))]
 }
-
 
 #' Adjust allele dosage using sequencing error and allele bias - function adapted from updog
 #'

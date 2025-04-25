@@ -1,6 +1,6 @@
 ---
 title: "Qploidy"
-date: "Last update: 2024-12-18"
+date: "Last update: 2025-04-21"
 vignette: >
   %\VignetteIndexEntry{Qploidy}
   %\VignetteEngine{knitr::rmarkdown}

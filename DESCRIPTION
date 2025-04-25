@@ -1,7 +1,7 @@
 Package: Qploidy
 Title: Qploidy
 Keywords: ploidy, aneuploidy, SNP, genotyping, polyploid
-Version: 1.0.0
+Version: 1.0.1
 Authors@R: c(person(given='Cristiane', 
                     family='Taniguti', 
                     email = 'cht47@cornell.edu', 

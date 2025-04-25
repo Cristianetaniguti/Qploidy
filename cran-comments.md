@@ -4,6 +4,8 @@
 
 * This is a new release.
 * The package is not yet on CRAN, so no reverse dependencies.
+* DESCRIPTION file updated to remove Keywords field and better describe the package.
+* README.md included in the .Rbuildignore file.
 
 ## Spell Check Notes
 

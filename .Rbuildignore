@@ -18,3 +18,5 @@ $run_dev.*
 ^docs$
 ^data$
 ^cran-comments\.md$
+^CRAN-SUBMISSION$
+^README\.md$

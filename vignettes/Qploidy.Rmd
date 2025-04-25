@@ -1,6 +1,6 @@
 ---
 title: "Qploidy"
-date: "Last update: 2024-12-18"
+date: "Last update: 2025-04-21"
 vignette: >
   %\VignetteIndexEntry{Qploidy}
   %\VignetteEngine{knitr::rmarkdown}
@@ -791,7 +791,7 @@ for (i in seq_along(samples)) {
 ```
 
 By visualizing the plots, you can correct the results from `area_estimate_ploidy` and add resolution information for each sample. In our
-perfect simualted data, all samples correctly identified therefore we will just move forward with the analysis.
+perfect simulated data, all samples correctly identified therefore we will just move forward with the analysis.
 
 ```{r}
 ploidy_corrected <- estimated_ploidies_chromosome$ploidy

@@ -906,7 +906,7 @@ margin-left: 0 !important;
         
 
       <!-- html_clean authors -->
-         <h4 class="date"><em>Last update: 2024-12-18</em></h4>
+         <h4 class="date"><em>Last update: 2025-04-21</em></h4>
       
       
    
@@ -1307,7 +1307,7 @@ fitpoly software:</p>
 <span id="cb30-3"><a href="#cb30-3" tabindex="-1"></a>  <span class="at">ploidy =</span> <span class="dv">4</span>, <span class="co"># Most common ploidy among Texas Garden Roses collection</span></span>
 <span id="cb30-4"><a href="#cb30-4" tabindex="-1"></a>  <span class="at">data =</span> data_reference, <span class="co"># output of the previous function</span></span>
 <span id="cb30-5"><a href="#cb30-5" tabindex="-1"></a>  <span class="at">filePrefix =</span> <span class="st">&quot;fitpoly_output/texas_roses&quot;</span>, <span class="co"># Define the path and prefix for the result files</span></span>
-<span id="cb30-6"><a href="#cb30-6" tabindex="-1"></a>  <span class="at">ncores =</span> <span class="dv">8</span></span>
+<span id="cb30-6"><a href="#cb30-6" tabindex="-1"></a>  <span class="at">ncores =</span> <span class="dv">2</span></span>
 <span id="cb30-7"><a href="#cb30-7" tabindex="-1"></a>) <span class="co"># Change it accordingly to your system!!!!</span></span>
 <span id="cb30-8"><a href="#cb30-8" tabindex="-1"></a></span>
 <span id="cb30-9"><a href="#cb30-9" tabindex="-1"></a><span class="fu">library</span>(vroom) <span class="co"># Package to speed up reading files</span></span>
@@ -1370,7 +1370,7 @@ these information in a separate file as the following example.</p>
 ## Generating z scores...
 ## Z scores ready!
 ## Merging results into qploidy_standardization object...
-## Writting Qploidy app input file:/var/folders/0v/yvmmxrp55jxdjsky45t_cmt40000gp/T//RtmpDaZ8FY/file987a15b205bc.tsv.gzDone!</code></pre>
+## Writting Qploidy app input file:/var/folders/0v/yvmmxrp55jxdjsky45t_cmt40000gp/T//Rtmpi15GPE/file42c54d9e36ce.tsv.gzDone!</code></pre>
 <pre><code>## This is on object of class &#39;ploidy_standardization&#39;
 ## --------------------------------------------------------------------
 ## Parameters
@@ -1402,7 +1402,7 @@ these information in a separate file as the following example.</p>
 <span id="cb38-4"><a href="#cb38-4" tabindex="-1"></a>  <span class="at">geno.pos =</span> genos.pos,</span>
 <span id="cb38-5"><a href="#cb38-5" tabindex="-1"></a>  <span class="at">ploidy.standardization =</span> <span class="dv">4</span>,</span>
 <span id="cb38-6"><a href="#cb38-6" tabindex="-1"></a>  <span class="at">threshold.n.clusters =</span> <span class="dv">5</span>,</span>
-<span id="cb38-7"><a href="#cb38-7" tabindex="-1"></a>  <span class="at">n.cores =</span> <span class="dv">8</span>,</span>
+<span id="cb38-7"><a href="#cb38-7" tabindex="-1"></a>  <span class="at">n.cores =</span> <span class="dv">1</span>,</span>
 <span id="cb38-8"><a href="#cb38-8" tabindex="-1"></a>  <span class="at">out_filename =</span> <span class="st">&quot;my_standardized_data.tsv.gz&quot;</span>,</span>
 <span id="cb38-9"><a href="#cb38-9" tabindex="-1"></a>  <span class="at">verbose =</span> <span class="cn">TRUE</span></span>
 <span id="cb38-10"><a href="#cb38-10" tabindex="-1"></a>)</span>
@@ -1813,81 +1813,26 @@ iii. Run standardization again using this subset as the reference.<br />
 iv. Reevaluate the plots and estimate the ploidy once more.</p>
 <div class="sourceCode" id="cb96"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb96-1"><a href="#cb96-1" tabindex="-1"></a><span class="co"># i) Select the highest resolution plots from the first standardization round.</span></span>
 <span id="cb96-2"><a href="#cb96-2" tabindex="-1"></a>tetraploids <span class="ot">&lt;-</span> <span class="fu">apply</span>(ploidy_corrected, <span class="dv">1</span>, <span class="cf">function</span>(x) <span class="fu">all</span>(x <span class="sc">==</span> <span class="dv">4</span>))</span>
-<span id="cb96-3"><a href="#cb96-3" tabindex="-1"></a>tetraploids</span></code></pre></div>
-<pre><code>##  Tetraploid1  Tetraploid2  Tetraploid3  Tetraploid4  Tetraploid5  Tetraploid6 
-##         TRUE         TRUE         TRUE         TRUE         TRUE         TRUE 
-##  Tetraploid7  Tetraploid8  Tetraploid9 Tetraploid10 Tetraploid11 Tetraploid12 
-##         TRUE         TRUE         TRUE         TRUE         TRUE         TRUE 
-## Tetraploid13 Tetraploid14 Tetraploid15 Tetraploid16 Tetraploid17 Tetraploid18 
-##         TRUE         TRUE         TRUE         TRUE         TRUE         TRUE 
-## Tetraploid19 Tetraploid20 Tetraploid21 Tetraploid22 Tetraploid23 Tetraploid24 
-##         TRUE         TRUE         TRUE         TRUE         TRUE         TRUE 
-## Tetraploid25 Tetraploid26 Tetraploid27 Tetraploid28 Tetraploid29 Tetraploid30 
-##         TRUE         TRUE         TRUE         TRUE         TRUE         TRUE 
-## Tetraploid31 Tetraploid32 Tetraploid33 Tetraploid34 Tetraploid35     Diploid1 
-##         TRUE         TRUE         TRUE         TRUE         TRUE        FALSE 
-##     Diploid2     Diploid3     Diploid4     Diploid5    Triploid1    Triploid2 
-##        FALSE        FALSE        FALSE        FALSE        FALSE        FALSE 
-##    Triploid3    Triploid4    Triploid5    Triploid6    Triploid7    Triploid8 
-##        FALSE        FALSE        FALSE        FALSE        FALSE        FALSE 
-##    Triploid9   Triploid10 
-##        FALSE        FALSE</code></pre>
-<div class="sourceCode" id="cb98"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb98-1"><a href="#cb98-1" tabindex="-1"></a>data_reference2 <span class="ot">&lt;-</span> <span class="fu">rownames</span>(ploidy_corrected)[<span class="fu">which</span>(tetraploids)]</span>
-<span id="cb98-2"><a href="#cb98-2" tabindex="-1"></a><span class="fu">length</span>(data_reference2) </span></code></pre></div>
-<pre><code>## [1] 35</code></pre>
-<div class="sourceCode" id="cb100"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb100-1"><a href="#cb100-1" tabindex="-1"></a><span class="co"># ii) Filter these samples from the `data` object.</span></span>
-<span id="cb100-2"><a href="#cb100-2" tabindex="-1"></a>genos_round2 <span class="ot">&lt;-</span> genos[<span class="fu">which</span>(genos<span class="sc">$</span>SampleName <span class="sc">%in%</span> data_reference2), ]</span>
-<span id="cb100-3"><a href="#cb100-3" tabindex="-1"></a></span>
-<span id="cb100-4"><a href="#cb100-4" tabindex="-1"></a><span class="co"># iii) Run standardization again using this subset as the reference.</span></span>
-<span id="cb100-5"><a href="#cb100-5" tabindex="-1"></a>simu_data_standardized_round2 <span class="ot">&lt;-</span> <span class="fu">standardize</span>(</span>
-<span id="cb100-6"><a href="#cb100-6" tabindex="-1"></a>  <span class="at">data =</span> data,</span>
-<span id="cb100-7"><a href="#cb100-7" tabindex="-1"></a>  <span class="at">genos =</span> genos_round2,</span>
-<span id="cb100-8"><a href="#cb100-8" tabindex="-1"></a>  <span class="at">geno.pos =</span> genos.pos,</span>
-<span id="cb100-9"><a href="#cb100-9" tabindex="-1"></a>  <span class="at">ploidy.standardization =</span> <span class="dv">4</span>,</span>
-<span id="cb100-10"><a href="#cb100-10" tabindex="-1"></a>  <span class="at">threshold.n.clusters =</span> <span class="dv">5</span>,</span>
-<span id="cb100-11"><a href="#cb100-11" tabindex="-1"></a>  <span class="at">n.cores =</span> <span class="dv">8</span>,</span>
-<span id="cb100-12"><a href="#cb100-12" tabindex="-1"></a>  <span class="at">out_filename =</span> <span class="st">&quot;my_round2_standardization.tsv.gz&quot;</span>,</span>
-<span id="cb100-13"><a href="#cb100-13" tabindex="-1"></a>  <span class="at">verbose =</span> <span class="cn">TRUE</span></span>
-<span id="cb100-14"><a href="#cb100-14" tabindex="-1"></a>)</span></code></pre></div>
-<pre><code>## Generating standardize BAFs...
-## [1] &quot;Percentage of genotypes turned into missing data because of low genotype probability:0&quot;
-## [1] &quot;Markers remove because of excess of missing data:0&quot;
-## Going to parallel mode...
-## Back to single core usage
-## [1] &quot;Markers remove because of smaller number of clusters than set threshold:186&quot;
-## Going to parallel mode...
-## Back to single core usage
-## BAFs ready!
-## Generating z scores...
-## Z scores ready!
-## Merging results into qploidy_standardization object...
-## Writting Qploidy app input file:my_round2_standardization.tsv.gzDone!</code></pre>
-<div class="sourceCode" id="cb102"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb102-1"><a href="#cb102-1" tabindex="-1"></a>simu_data_standardized_round2</span></code></pre></div>
-<pre><code>## This is on object of class &#39;ploidy_standardization&#39;
-## --------------------------------------------------------------------
-## Parameters
-##                                                                         
-## 1 standardization type:                                      intensities
-## 2 Ploidy:                                                    4          
-## 3 Minimum number of heterozygous classes (clusters) present: 5          
-## 4 Maximum number of missing genotype by marker:              0.1        
-## 5 Minimum genotype probability:                              0.8        
-## --------------------------------------------------------------------
-## Filters
-##                                                                            
-## 1 Number of markers at raw data:                                           
-## 2 Percentage of filtered genotypes by probability threshold:               
-## 3 Number of markers filtered by missing data:                              
-## 4 Number of markers filtered for not having the minimum number of clusters:
-## 5 Number of markers filtered for not having genomic information:           
-## 6 Number of markers with estimated BAF:                                    
-##                
-## 1 1000 (100%)  
-## 2 -    (0 %)   
-## 3 0    (0 %)   
-## 4 186  (18.6 %)
-## 5 0    (0 %)   
-## 6 814  (81.4 %)</code></pre>
+<span id="cb96-3"><a href="#cb96-3" tabindex="-1"></a>tetraploids</span>
+<span id="cb96-4"><a href="#cb96-4" tabindex="-1"></a></span>
+<span id="cb96-5"><a href="#cb96-5" tabindex="-1"></a>data_reference2 <span class="ot">&lt;-</span> <span class="fu">rownames</span>(ploidy_corrected)[<span class="fu">which</span>(tetraploids)]</span>
+<span id="cb96-6"><a href="#cb96-6" tabindex="-1"></a><span class="fu">length</span>(data_reference2) </span>
+<span id="cb96-7"><a href="#cb96-7" tabindex="-1"></a></span>
+<span id="cb96-8"><a href="#cb96-8" tabindex="-1"></a><span class="co"># ii) Filter these samples from the `data` object.</span></span>
+<span id="cb96-9"><a href="#cb96-9" tabindex="-1"></a>genos_round2 <span class="ot">&lt;-</span> genos[<span class="fu">which</span>(genos<span class="sc">$</span>SampleName <span class="sc">%in%</span> data_reference2), ]</span>
+<span id="cb96-10"><a href="#cb96-10" tabindex="-1"></a></span>
+<span id="cb96-11"><a href="#cb96-11" tabindex="-1"></a><span class="co"># iii) Run standardization again using this subset as the reference.</span></span>
+<span id="cb96-12"><a href="#cb96-12" tabindex="-1"></a>simu_data_standardized_round2 <span class="ot">&lt;-</span> <span class="fu">standardize</span>(</span>
+<span id="cb96-13"><a href="#cb96-13" tabindex="-1"></a>  <span class="at">data =</span> data,</span>
+<span id="cb96-14"><a href="#cb96-14" tabindex="-1"></a>  <span class="at">genos =</span> genos_round2,</span>
+<span id="cb96-15"><a href="#cb96-15" tabindex="-1"></a>  <span class="at">geno.pos =</span> genos.pos,</span>
+<span id="cb96-16"><a href="#cb96-16" tabindex="-1"></a>  <span class="at">ploidy.standardization =</span> <span class="dv">4</span>,</span>
+<span id="cb96-17"><a href="#cb96-17" tabindex="-1"></a>  <span class="at">threshold.n.clusters =</span> <span class="dv">5</span>,</span>
+<span id="cb96-18"><a href="#cb96-18" tabindex="-1"></a>  <span class="at">n.cores =</span> <span class="dv">1</span>,</span>
+<span id="cb96-19"><a href="#cb96-19" tabindex="-1"></a>  <span class="at">out_filename =</span> <span class="st">&quot;my_round2_standardization.tsv.gz&quot;</span>,</span>
+<span id="cb96-20"><a href="#cb96-20" tabindex="-1"></a>  <span class="at">verbose =</span> <span class="cn">TRUE</span></span>
+<span id="cb96-21"><a href="#cb96-21" tabindex="-1"></a>)</span>
+<span id="cb96-22"><a href="#cb96-22" tabindex="-1"></a>simu_data_standardized_round2</span></code></pre></div>
 <p>For our perfect simulated data, plot resolution didn’t change between
 first and second round but see how it look like for our real roses
 dataset:</p>

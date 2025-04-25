@@ -18,29 +18,41 @@ plot_baf_hist(
 )
 }
 \arguments{
-\item{data_sample}{A data.frame containing BAF and genomic position information. Must include columns `Chr`, `Position`, and `sample`.}
+\item{data_sample}{A data.frame containing BAF and genomic position
+information. Must include columns `Chr`, `Position`, and `sample`.}
 
-\item{area_single}{Numeric value defining the area around the expected peak to be considered.}
+\item{area_single}{Numeric value defining the area around the expected peak
+to be considered.}
 
-\item{ploidy}{Integer or vector specifying the expected ploidy. If a vector, it must match the number of chromosomes in `data_sample`.}
+\item{ploidy}{Integer or vector specifying the expected ploidy. If a vector,
+it must match the number of chromosomes in `data_sample`.}
 
-\item{colors}{Logical. If TRUE, adds area colors to the histogram. Default is FALSE.}
+\item{colors}{Logical. If TRUE, adds area colors to the histogram. Default
+is FALSE.}
 
-\item{add_estimated_peaks}{Logical. If TRUE, adds lines for estimated peaks. Default is TRUE.}
+\item{add_estimated_peaks}{Logical. If TRUE, adds lines for estimated peaks.
+Default is TRUE.}
 
-\item{add_expected_peaks}{Logical. If TRUE, adds lines for expected peaks. Default is FALSE.}
+\item{add_expected_peaks}{Logical. If TRUE, adds lines for expected peaks.
+Default is FALSE.}
 
-\item{BAF_hist_overall}{Logical. If TRUE, plots the BAF histogram for the entire genome. Default is FALSE.}
+\item{BAF_hist_overall}{Logical. If TRUE, plots the BAF histogram for the
+entire genome. Default is FALSE.}
 
-\item{ratio}{Logical. If TRUE, plots the raw ratio instead of BAF. Default is FALSE.}
+\item{ratio}{Logical. If TRUE, plots the raw ratio instead of BAF. Default
+is FALSE.}
 
-\item{rm_homozygous}{Logical. If TRUE, removes homozygous calls from the histogram. Default is FALSE.}
+\item{rm_homozygous}{Logical. If TRUE, removes homozygous calls from the
+histogram. Default is FALSE.}
 
-\item{font_size}{Numeric value for the font size of plot labels. Default is 12.}
+\item{font_size}{Numeric value for the font size of plot labels. Default is
+12.}
 }
 \value{
 A ggplot object representing the BAF histogram.
 }
 \description{
-This function generates a histogram of BAF (B-allele frequency) values. It supports options for adding estimated and expected peaks, area colors, and filtering homozygous calls.
+This function generates a histogram of BAF (B-allele frequency) values. It
+supports options for adding estimated and expected peaks, area colors, and
+filtering homozygous calls.
 }

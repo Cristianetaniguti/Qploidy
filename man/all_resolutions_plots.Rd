@@ -17,59 +17,78 @@ all_resolutions_plots(
 )
 }
 \arguments{
-\item{data_standardized}{An object of class `qploidy_standardization` containing standardized data for ploidy analysis.}
+\item{data_standardized}{An object of class `qploidy_standardization`
+containing standardized data for ploidy analysis.}
 
 \item{sample}{A character string specifying the sample name to be analyzed.}
 
-\item{ploidy}{A numeric value indicating the expected ploidy of the sample. This parameter is required.}
+\item{ploidy}{A numeric value indicating the expected ploidy of the sample.
+This parameter is required.}
 
-\item{centromeres}{A named vector with centromere positions (in base pairs) for each chromosome. The names must match the chromosome IDs in the dataset. This is used for chromosome-arm level resolution.}
+\item{centromeres}{A named vector with centromere positions (in base pairs)
+for each chromosome. The names must match the chromosome IDs in the dataset.
+This is used for chromosome-arm level resolution.}
 
-\item{types_chromosome}{A character vector defining the plot types for chromosome-level resolution. Options include:
-- "het": Plots heterozygous locus counts.
-- "BAF": Plots B-allele frequency (BAF).
-- "zscore": Plots z-scores.
-- "BAF_hist": Plots BAF histograms for each chromosome.
-- "ratio": Plots raw ratios for each chromosome.
-Default is c("Ratio_hist", "BAF_hist", "zscore").}
+\item{types_chromosome}{A character vector defining the plot types for
+chromosome-level resolution. Options include:
+  - "het": Plots heterozygous locus counts.
+  - "BAF": Plots B-allele frequency (BAF).
+  - "zscore": Plots z-scores.
+  - "BAF_hist": Plots BAF histograms for each chromosome.
+  - "ratio": Plots raw ratios for each chromosome.
+  Default is c("Ratio_hist", "BAF_hist", "zscore").}
 
-\item{types_chromosome_arm}{A character vector defining the plot types for chromosome-arm level resolution. Options include:
-- "het": Plots heterozygous locus counts.
-- "BAF": Plots B-allele frequency (BAF).
-- "zscore": Plots z-scores.
-- "BAF_hist": Plots BAF histograms for each chromosome arm.
-- "ratio": Plots raw ratios for each chromosome arm.
-Default is c("Ratio_hist", "BAF_hist", "zscore").}
+\item{types_chromosome_arm}{A character vector defining the plot types for
+chromosome-arm level resolution. Options include:
+  - "het": Plots heterozygous locus counts.
+  - "BAF": Plots B-allele frequency (BAF).
+  - "zscore": Plots z-scores.
+  - "BAF_hist": Plots BAF histograms for each chromosome arm.
+  - "ratio": Plots raw ratios for each chromosome arm.
+  Default is c("Ratio_hist", "BAF_hist", "zscore").}
 
-\item{types_sample}{A character vector defining the plot types for sample-level resolution. Options include:
-- "Ratio_hist_overall": Plots a histogram of raw ratios for the entire genome.
-- "BAF_hist_overall": Plots a BAF histogram for the entire genome.
-Default is c("Ratio_hist_overall", "BAF_hist_overall").}
+\item{types_sample}{A character vector defining the plot types for
+sample-level resolution. Options include:
+  - "Ratio_hist_overall": Plots a histogram of raw ratios for the entire
+  genome.
+  - "BAF_hist_overall": Plots a BAF histogram for the entire genome.
+  Default is c("Ratio_hist_overall", "BAF_hist_overall").}
 
-\item{file_name}{A character string defining the output file path and name prefix for the saved plots. The function appends resolution-specific suffixes to this prefix. If NULL, plots are not saved to files.}
+\item{file_name}{A character string defining the output file path and name
+prefix for the saved plots. The function appends resolution-specific
+suffixes to this prefix. If NULL, plots are not saved to files.}
 
-\item{chr}{A vector specifying the chromosomes to include in the analysis. If NULL, all chromosomes are included.}
+\item{chr}{A vector specifying the chromosomes to include in the analysis.
+If NULL, all chromosomes are included.}
 }
 \value{
 A list containing the generated plots for each resolution:
 - `chromosome`: Plot for chromosome-level resolution.
-- `chromosome_arm`: Plot for chromosome-arm level resolution (if centromeres are provided).
+- `chromosome_arm`: Plot for chromosome-arm level resolution (if centromeres
+are provided).
 - `sample`: Plot for sample-level resolution.
 }
 \description{
-This function generates and saves plots for visual inspection of ploidy at different resolutions: chromosome, chromosome-arm, and sample levels. It is designed for parallelization purposes and supports customization of centromere positions and chromosome selection.
+This function generates and saves plots for visual inspection of ploidy at
+different resolutions: chromosome, chromosome-arm, and sample levels. It is
+designed for parallelization purposes and supports customization of
+centromere positions and chromosome selection.
 }
 \details{
 The function generates three types of plots:
 
-- **Chromosome-level resolution**: Plots raw ratio, BAF histograms, z-scores, heterozygous locus counts, and BAF for each chromosome.
-- **Chromosome-arm level resolution**: Similar to chromosome-level but splits data by chromosome arms using centromere positions.
-- **Sample-level resolution**: Combines all markers in the sample to generate overall raw ratio and BAF histograms.
+- **Chromosome-level resolution**: Plots raw ratio, BAF histograms,
+z-scores, heterozygous locus counts, and BAF for each chromosome.
+- **Chromosome-arm level resolution**: Similar to chromosome-level but
+splits data by chromosome arms using centromere positions.
+- **Sample-level resolution**: Combines all markers in the sample to
+generate overall raw ratio and BAF histograms.
 
 The plots are saved as PNG files with the following suffixes:
 - `_res:chromosome.png`
 - `_res:chromosome_arm.png`
 - `_res:sample.png`
 
-If `file_name` is NULL, the plots are not saved to files but are returned in the output list.
+If `file_name` is NULL, the plots are not saved to files but are returned in
+the output list.
 }

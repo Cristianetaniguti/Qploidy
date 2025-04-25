@@ -16,16 +16,27 @@ area_estimate_ploidy(
 \arguments{
 \item{qploidy_standardization}{Object of class qploidy_standardization.}
 
-\item{samples}{If "all", all samples contained in the qploidy_standardization object will be evaluated. If a vector with sample names is provided, only those will be evaluated.}
+\item{samples}{If "all", all samples contained in the qploidy_standardization 
+object will be evaluated. If a vector with sample names is provided, only 
+those will be evaluated.}
 
-\item{level}{Character identifying the level of the analysis. Must be one of "chromosome", "sample", or "chromosome-arm". If `chromosome-arm`, the analysis will be performed by chromosome arm (only if `centromeres` argument is defined).}
+\item{level}{Character identifying the level of the analysis. Must be one of 
+"chromosome", "sample", or "chromosome-arm". If `chromosome-arm`, the 
+analysis will be performed by chromosome arm (only if `centromeres` argument 
+is defined).}
 
-\item{ploidies}{Vector of ploidy levels to test. This parameter must be defined.}
+\item{ploidies}{Vector of ploidy levels to test. This parameter must be 
+defined.}
 
 \item{area}{Area around the expected peak to be considered. Default is 0.75.}
 
-\item{centromeres}{Vector with centromere genomic positions in bp. The vector should be named with the chromosome IDs. This information will only be used if `chromosome-arm` level is defined.}
+\item{centromeres}{Vector with centromere genomic positions in bp. The vector 
+should be named with the chromosome IDs. This information will only be used 
+if `chromosome-arm` level is defined.}
 }
 \description{
-This function estimates ploidy using the area method. It evaluates the number of copies by chromosome, sample, or chromosome arm. Note that this function does not have optimal performance, and visual inspection of the plots is required to confirm the estimated ploidy.
+This function estimates ploidy using the area method. It evaluates the 
+number of copies by chromosome, sample, or chromosome arm. Note that this 
+function does not have optimal performance, and visual inspection of the 
+plots is required to confirm the estimated ploidy.
 }

@@ -30,7 +30,8 @@ plot_qploidy_standardization(
 
 \item{sample}{Character string indicating the sample ID to plot.}
 
-\item{chr}{Character or numeric vector specifying the chromosomes to plot. Default is NULL (plots all chromosomes).}
+\item{chr}{Character or numeric vector specifying the chromosomes to plot.
+Default is NULL (plots all chromosomes).}
 
 \item{type}{Character vector defining the plot types. Options include:
 - "all": Generates all available plot types.
@@ -39,33 +40,45 @@ plot_qploidy_standardization(
 - "zscore": Plots z-scores for each chromosome.
 - "BAF_hist": Plots BAF histograms for each chromosome.
 - "BAF_hist_overall": Plots a BAF histogram for the entire genome.
-- "Ratio_hist_overall": Plots a histogram of raw ratios for the entire genome.
+- "Ratio_hist_overall": Plots a histogram of raw ratios for the entire
+genome.
 - "ratio": Plots raw ratios for each chromosome.
 Default is "all".}
 
-\item{area_single}{Numeric value defining the area around the expected peak to be considered. Default is 0.75.}
+\item{area_single}{Numeric value defining the area around the expected peak
+to be considered. Default is 0.75.}
 
 \item{ploidy}{Integer specifying the expected ploidy. Default is 4.}
 
-\item{dot.size}{Numeric value for the size of the dots in the plots. Default is 1.}
+\item{dot.size}{Numeric value for the size of the dots in the plots. Default
+is 1.}
 
-\item{font_size}{Numeric value for the font size of plot labels. Default is 12.}
+\item{font_size}{Numeric value for the font size of plot labels. Default is
+12.}
 
-\item{add_estimated_peaks}{Logical. If TRUE, adds lines for estimated peaks. Default is FALSE.}
+\item{add_estimated_peaks}{Logical. If TRUE, adds lines for estimated peaks.
+Default is FALSE.}
 
-\item{add_expected_peaks}{Logical. If TRUE, adds lines for expected peaks. Default is FALSE.}
+\item{add_expected_peaks}{Logical. If TRUE, adds lines for expected peaks.
+Default is FALSE.}
 
-\item{centromeres}{Named vector defining centromere positions for each chromosome. Names must match chromosome IDs in `x`.}
+\item{centromeres}{Named vector defining centromere positions for each
+chromosome. Names must match chromosome IDs in `x`.}
 
-\item{add_centromeres}{Logical. If TRUE, adds vertical lines at centromere positions. Default is FALSE.}
+\item{add_centromeres}{Logical. If TRUE, adds vertical lines at centromere
+positions. Default is FALSE.}
 
-\item{colors}{Logical. If TRUE, adds area colors to the plots. Default is FALSE.}
+\item{colors}{Logical. If TRUE, adds area colors to the plots. Default is
+FALSE.}
 
-\item{window_size}{Numeric value defining the genomic position window for heterozygous locus counts. Default is 2000000.}
+\item{window_size}{Numeric value defining the genomic position window for
+heterozygous locus counts. Default is 2000000.}
 
-\item{het_interval}{Numeric value defining the interval to consider as heterozygous. Default is 0.1.}
+\item{het_interval}{Numeric value defining the interval to consider as
+heterozygous. Default is 0.1.}
 
-\item{rm_homozygous}{Logical. If TRUE, removes homozygous calls from BAF histogram plots. Default is FALSE.}
+\item{rm_homozygous}{Logical. If TRUE, removes homozygous calls from BAF
+histogram plots. Default is FALSE.}
 
 \item{...}{Additional plot parameters.}
 }
@@ -73,17 +86,26 @@ Default is "all".}
 A ggarrange object containing the requested plots.
 }
 \description{
-This function generates various plots for visualizing the results of Qploidy standardization. It supports multiple plot types, including BAF, z-score, and histograms.
+This function generates various plots for visualizing the results of Qploidy
+standardization. It supports multiple plot types, including BAF, z-score,
+and histograms.
 }
 \details{
 The function supports the following plot types:
 
 - **all**: Generates all available plot types.
-- **het**: Plots the proportion of heterozygous loci across genomic windows, useful for identifying regions with high or low heterozygosity.
-- **BAF**: Plots the B-allele frequency (BAF) for each chromosome, showing the distribution of allele frequencies.
-- **zscore**: Plots z-scores for each chromosome, which can help identify outliers or regions with unusual data distributions.
-- **BAF_hist**: Plots histograms of BAF values for each chromosome, providing a summary of allele frequency distributions.
-- **BAF_hist_overall**: Plots a single histogram of BAF values for the entire genome, summarizing allele frequency distributions genome-wide.
-- **Ratio_hist_overall**: Plots a histogram of raw ratios for the entire genome, useful for visualizing overall ratio distributions.
-- **ratio**: Plots raw ratios for each chromosome, showing the distribution of observed ratios.
+- **het**: Plots the proportion of heterozygous loci across genomic windows,
+useful for identifying regions with high or low heterozygosity.
+- **BAF**: Plots the B-allele frequency (BAF) for each chromosome, showing
+the distribution of allele frequencies.
+- **zscore**: Plots z-scores for each chromosome, which can help identify
+outliers or regions with unusual data distributions.
+- **BAF_hist**: Plots histograms of BAF values for each chromosome,
+providing a summary of allele frequency distributions.
+- **BAF_hist_overall**: Plots a single histogram of BAF values for the
+entire genome, summarizing allele frequency distributions genome-wide.
+- **Ratio_hist_overall**: Plots a histogram of raw ratios for the entire
+genome, useful for visualizing overall ratio distributions.
+- **ratio**: Plots raw ratios for each chromosome, showing the distribution
+of observed ratios.
 }

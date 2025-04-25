@@ -15,5 +15,6 @@ get_R_theta(cleaned_summary, atan = FALSE)
 A list containing R and theta values.
 }
 \description{
-This function calculates R and theta values from a cleaned summary file. It optionally performs standard normalization by plate and markers.
+This function calculates R and theta values from a cleaned summary file. 
+It optionally performs standard normalization by plate and markers.
 }

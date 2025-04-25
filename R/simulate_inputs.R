@@ -1,30 +1,41 @@
-#' Simulate a VCF file with GT, DP, and AD format fields for 2 chromosomes and 50 samples
+#' Simulate a VCF file with GT, DP, and AD format fields for 2 chromosomes
 #'
 #' @param file_path The path where the simulated VCF file will be saved.
 #' @param seed The seed for random number generation to ensure reproducibility.
+#' @param n_tetraploid Number of tetraploid samples. Default is 35.
+#' @param n_diploid Number of diploid samples. Default is 5.
+#' @param n_triploid Number of triploid samples. Default is 10.
+#' @param n_markers Number of markers to simulate. Default is 100.
 #' @return None. The function writes the simulated VCF content to the specified file.
-#' 
-#' @export 
+#'
 #' @importFrom stats rbinom
-simulate_vcf <- function(file_path, seed) {
+#' 
+#' @export
+simulate_vcf <- function(
+    file_path, seed,
+    n_tetraploid = 35,
+    n_diploid = 5,
+    n_triploid = 10,
+    n_markers = 100) {
+
   set.seed(seed) # For reproducibility
 
   # Define chromosomes and markers
   chromosomes <- c("chr1", "chr2")
   chr_lengths <- c(50e6, 50e6) # 50Mb each
-  n_markers <- 100
+  n_samples <- sum(n_tetraploid, n_diploid, n_triploid)
 
   # Define samples and ploidy
   samples <- c(
-    paste0("Tetraploid", 1:35),
-    paste0("Diploid", 1:5),
-    paste0("Triploid", 1:10)
+    paste0("Tetraploid", seq_len(n_tetraploid)),
+    paste0("Diploid", seq_len(n_diploid)),
+    paste0("Triploid", seq_len(n_triploid))
   )
-  ploidies <- c(rep(4, 35), rep(2, 5), rep(3, 10))
+  ploidies <- c(rep(4, n_tetraploid), rep(2, n_diploid), rep(3, n_triploid))
 
   # Generate markers for each chromosome
-  vcf_content <- "##fileformat=VCFv4.2\n##source=SimulatedVCF\n##INFO=<ID=DP,Number=1,Type=Integer,Description=\"Total Depth\">\n##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n##FORMAT=<ID=DP,Number=1,Type=Integer,Description=\"Read Depth\">\n##FORMAT=<ID=AD,Number=R,Type=Integer,Description=\"Allele Depths\">\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t" 
-  vcf_content <- paste0(vcf_content, paste(samples, collapse="\t"))
+  vcf_content <- "##fileformat=VCFv4.2\n##source=SimulatedVCF\n##INFO=<ID=DP,Number=1,Type=Integer,Description=\"Total Depth\">\n##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n##FORMAT=<ID=DP,Number=1,Type=Integer,Description=\"Read Depth\">\n##FORMAT=<ID=AD,Number=R,Type=Integer,Description=\"Allele Depths\">\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t"
+  vcf_content <- paste0(vcf_content, paste(samples, collapse = "\t"))
 
   for (chr in chromosomes) {
     positions <- sort(sample(1:chr_lengths[1], n_markers))
@@ -38,16 +49,18 @@ simulate_vcf <- function(file_path, seed) {
       # Generate genotype data for each sample
       genotypes <- sapply(ploidies, function(ploidy) {
         gt <- paste0(sort(sample(0:1, ploidy, replace = TRUE)), collapse = "/")
-        ref_count <- sum(rbinom(ploidy, size = 50, prob = stringr::str_count(gt, "0") / ploidy))
-        alt_count <- sum(rbinom(ploidy, size = 50, prob = stringr::str_count(gt, "1") / ploidy))
+        ref_count <- sum(rbinom(ploidy, size = n_samples, prob = stringr::str_count(gt, "0") / ploidy))
+        alt_count <- sum(rbinom(ploidy, size = n_samples, prob = stringr::str_count(gt, "1") / ploidy))
         dp <- ref_count + alt_count
         ad <- paste(ref_count, alt_count, sep = ",")
-        paste(gt, dp, ad, sep=":")
+        paste(gt, dp, ad, sep = ":")
       })
 
-      vcf_content <- paste0(vcf_content, "\n", chr, "\t", positions[i], "\tchr",chr,"_mk", i,"\t", ref, "\t", alt, "\t", 
-                            qual, "\t", filter, "\t", info, "\tGT:DP:AD\t", 
-                            paste(genotypes, collapse="\t"))
+      vcf_content <- paste0(
+        vcf_content, "\n", chr, "\t", positions[i], "\t", chr, "_mk", i, "\t", ref, "\t", alt, "\t",
+        qual, "\t", filter, "\t", info, "\tGT:DP:AD\t",
+        paste(genotypes, collapse = "\t")
+      )
     }
   }
 
@@ -63,7 +76,7 @@ simulate_vcf <- function(file_path, seed) {
 #' @param n_samples Number of samples to simulate. Default is 10.
 #' @param seed The seed for random number generation to ensure reproducibility.
 #' @return None. The function writes the simulated summary content to the specified file.
-#' 
+#'
 #' @export
 #' @importFrom utils write.table
 simulate_axiom_summary <- function(file_path, n_probes = 100, n_samples = 10, seed) {
@@ -127,16 +140,15 @@ simulate_axiom_summary <- function(file_path, n_probes = 100, n_samples = 10, se
 #' @param seed The seed for random number generation to ensure reproducibility. Default is 123.
 #' @return None. The function writes the simulated Illumina file to the specified path.
 #' @details The simulated data includes random values for GC Score, Theta, X, Y, X Raw, Y Raw, and Log R Ratio. The header section provides metadata about the file, including the number of SNPs and samples.
-#' 
+#'
 #' @export
 simulate_illumina_file <- function(
-  filepath,
-  num_snps = 10,
-  num_samples = 1,
-  sample_id_prefix = "SAMP",
-  mk_id = "MK-",
-  seed = 123
-) {
+    filepath,
+    num_snps = 10,
+    num_samples = 1,
+    sample_id_prefix = "SAMP",
+    mk_id = "MK-",
+    seed = 123) {
   set.seed(seed)
 
   # --- Create header ---
@@ -229,7 +241,7 @@ simulate_standardization_input <- function(n_markers = 10,
       geno = sample(0:ploidy, 1),
       # Simulate allele signal as interpolation between "pure" profiles
       X = round(rnorm(1, mean = 280 - geno * ((280 - 20) / ploidy), sd = 10)),
-      Y = round(rnorm(1, mean = 20 + geno * ((280 - 20) / ploidy),  sd = 10)),
+      Y = round(rnorm(1, mean = 20 + geno * ((280 - 20) / ploidy), sd = 10)),
       R = X + Y,
       ratio = round(Y / R, 4),
       prob = round(runif(1, 0.85, 1.00), 2)

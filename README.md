@@ -4,6 +4,8 @@
 [![R-CMD-check](https://github.com/Cristianetaniguti/Qploidy/workflows/R-CMD-check/badge.svg)](https://github.com/Cristianetaniguti/Qploidy/actions)
 ![](https://img.shields.io/badge/RRID-SCR_026724-yellow.svg)
 [![codecov](https://codecov.io/gh/Cristianetaniguti/Qploidy/graph/badge.svg?token=DQBM227JSY)](https://codecov.io/gh/Cristianetaniguti/Qploidy)
+[![CRAN version](https://www.r-pkg.org/badges/version/Qploidy)](https://CRAN.R-project.org/package=Qploidy)
+[![CRAN downloads](https://cranlogs.r-pkg.org/badges/grand-total/Qploidy)](https://CRAN.R-project.org/package=Qploidy)
 
 <!-- badges: end -->
 

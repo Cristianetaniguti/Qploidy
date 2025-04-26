@@ -1,5 +1,5 @@
 Package: Qploidy
-Title: Qploidy
+Title: Estimation of Ploidy and Detection of Aneuploidy Using Genotyping Data
 Version: 1.0.1
 Authors@R: c(person(given='Cristiane', 
                     family='Taniguti', 
@@ -16,10 +16,11 @@ Authors@R: c(person(given='Cristiane',
                     family = "Riera-Lizarazu",
                     role = c("ctb"))
              )
-Description: Provides functions for estimating ploidy and detecting aneuploidy in individuals using allele 
-             intensities or counts data from high-throughput genotyping platforms, such as SNP arrays and 
-             sequencing-based technologies. Includes tools for standardizing signal intensities, computing 
-             B-allele frequencies (BAF) and z-scores, and identifying patterns of copy number variation.
+Description: Provides functions for estimating ploidy levels and detecting aneuploidy in individuals using 
+             allele intensities or allele count data from high-throughput genotyping platforms, including 
+             SNP arrays and sequencing-based technologies. Implements an extended version of the PennCNV 
+             signal standardization method by Wang et al. (2007) <doi:10.1101/gr.6861907> for higher ploidy 
+             levels. Computes B-allele frequencies (BAF), z-scores, and identifies copy number variation patterns.
 License: AGPL (>= 3)
 Depends: R (>= 3.6.0)
 Imports: 

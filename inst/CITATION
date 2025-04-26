@@ -1,0 +1,20 @@
+citHeader("To cite Qploidy in publications, please use:")
+
+bibentry(
+  bibtype = "Article",
+  title = "Exploring Chromosomal Variations in Garden Roses: Insights from High-density SNP Array Data and a New Tool, Qploidy",
+  author = c(
+    person("C.H.", "Taniguti"),
+    person("J.", "Lau"),
+    person("T.", "Hochhaus"),
+    person("D.C.", "Arias Lopez"),
+    person("S.C.", "Hokanson"),
+    person("D.C.", "Zlesak"),
+    person("D.H.", "Byrne"),
+    person("P.E.", "Klein"),
+    person("O.", "Riera-Lizarazu")
+  ),
+  year = 2025,
+  journal = "The Plant Genome",
+  note = "Accepted for publication; in production"
+)

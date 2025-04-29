@@ -11,6 +11,12 @@ get_baf_par(par_all_item, ploidy = 2)
 
 \item{ploidy}{integer defining ploidy}
 }
+\value{
+A list of numeric vectors, where each vector contains the BAF values
+        for a corresponding row in the input `par_all_item` matrices. Each BAF
+        vector has values ranging from 0 to 1, representing the standardized
+        allelic ratios for the respective samples or markers.
+}
 \description{
 To create baf in parallel
 }

@@ -155,7 +155,14 @@ find_header_line <- function(summary_file, word = "probeset_id",
 #' @param ind_names Optional. A file with two columns: Plate_name (sample IDs 
 #' in the summary file) and Sample_Name (desired sample names).
 #' @param atan Logical. If TRUE, calculates theta using atan2.
-#' @return A data frame formatted for Qploidy analysis.
+#' @return A data frame formatted for Qploidy analysis, containing the following columns:
+#'   - `MarkerName`: Marker identifiers.
+#'   - `SampleName`: Sample identifiers (if `ind_names` is provided, these will be updated accordingly).
+#'   - `X`: Reference allele intensity (calculated if applicable).
+#'   - `Y`: Alternative allele intensity (calculated if applicable).
+#'   - `R`: Total signal intensity (calculated if applicable).
+#'   - `ratio`: Allelic ratio (theta, calculated if applicable).
+#'   - Additional columns may be included depending on the input data and processing steps.
 #' @export
 #' @importFrom tidyr pivot_longer
 #' @importFrom tidyr pivot_wider
@@ -216,7 +223,10 @@ clean_summary <- function(summary_df){
 #'
 #' @param cleaned_summary A summary object from the clean_summary function.
 #' @param atan Logical. If TRUE, calculates theta using atan2.
-#' @return A list containing R and theta values.
+#' @return A list containing the following elements:
+#'   - `R_all`: A data frame where each row corresponds to a marker, and columns represent total signal intensity (R) values for each sample.
+#'   - `theta_all`: A data frame where each row corresponds to a marker, and columns represent allelic ratio (theta) values for each sample.
+#'   - Both data frames include a `MarkerName` column as the first column, which contains marker identifiers.
 #' @export
 #' @importFrom dplyr mutate
 get_R_theta <- function(cleaned_summary, atan = FALSE){
@@ -241,10 +251,31 @@ get_R_theta <- function(cleaned_summary, atan = FALSE){
   return(list(R_all=R_all, theta_all = theta_all))
 }
 
-#' Convert Summary file to fitpoly format
+#' Convert Summary Data to FitPoly-Compatible Format
 #'
-#' @param R_all data.frame with R values
-#' @param theta_all data.frame with theta values
+#' This function processes R (total signal intensity) and theta (allelic ratio) values
+#' to generate a data frame compatible with the FitPoly tool. It calculates X and Y
+#' values (reference and alternative allele intensities, respectively) and combines
+#' them with R and theta into a long-format data frame.
+#'
+#' @param R_all A data frame containing total signal intensity (R) values. The first
+#' column should be `MarkerName`, and subsequent columns should represent samples.
+#' @param theta_all A data frame containing allelic ratio (theta) values. The first
+#' column should be `MarkerName`, and subsequent columns should represent samples.
+#'
+#' @return A data frame in long format with the following columns:
+#'   - `MarkerName`: Marker identifiers.
+#'   - `SampleName`: Sample identifiers.
+#'   - `X`: Reference allele intensity.
+#'   - `Y`: Alternative allele intensity.
+#'   - `R`: Total signal intensity.
+#'   - `ratio`: Allelic ratio (theta).
+#'
+#' @details The function calculates X and Y values as follows:
+#'   - `X = R * (1 - theta)`
+#'   - `Y = R * theta`
+#' The resulting data frame is in a long format, where each row corresponds to a
+#' specific marker-sample combination.
 #'
 #' @importFrom tidyr pivot_longer
 #' @export

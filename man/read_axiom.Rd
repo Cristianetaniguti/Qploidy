@@ -15,7 +15,14 @@ in the summary file) and Sample_Name (desired sample names).}
 \item{atan}{Logical. If TRUE, calculates theta using atan2.}
 }
 \value{
-A data frame formatted for Qploidy analysis.
+A data frame formatted for Qploidy analysis, containing the following columns:
+  - `MarkerName`: Marker identifiers.
+  - `SampleName`: Sample identifiers (if `ind_names` is provided, these will be updated accordingly).
+  - `X`: Reference allele intensity (calculated if applicable).
+  - `Y`: Alternative allele intensity (calculated if applicable).
+  - `R`: Total signal intensity (calculated if applicable).
+  - `ratio`: Allelic ratio (theta, calculated if applicable).
+  - Additional columns may be included depending on the input data and processing steps.
 }
 \description{
 This function processes an Axiom array summary file and converts it into a 

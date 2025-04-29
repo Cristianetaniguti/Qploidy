@@ -18,7 +18,7 @@ Authors@R: c(person(given='Cristiane',
              )
 Description: Provides functions for estimating ploidy levels and detecting aneuploidy in individuals using 
              allele intensities or allele count data from high-throughput genotyping platforms, including 
-             SNP arrays and sequencing-based technologies. Implements an extended version of the PennCNV 
+             single nucleotide polymorphism (SNP) arrays and sequencing-based technologies. Implements an extended version of the 'PennCNV' 
              signal standardization method by Wang et al. (2007) <doi:10.1101/gr.6861907> for higher ploidy 
              levels. Computes B-allele frequencies (BAF), z-scores, and identifies copy number variation patterns.
 License: AGPL (>= 3)

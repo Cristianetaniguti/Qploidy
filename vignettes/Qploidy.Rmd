@@ -47,10 +47,14 @@ The methodology will not be effective under the following circumstances:
 
 # Installation
 
-To install the `Qploidy` package, you can use the following command:
+To install the `Qploidy` package, you can use the following commands:
 
 ```{r, eval=FALSE}
-# install.packages("devtools")
+# Install the latest stable version from CRAN
+install.packages("Qploidy")
+
+# Install the development version from GitHub
+#install.packages("devtools")
 devtools::install_github("cristianetaniguti/Qploidy")
 ```
 

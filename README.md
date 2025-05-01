@@ -38,6 +38,10 @@ The methodology will not be effective under the following circumstances:
 ## Installation
 
 ``` r
+# Install the latest stable version from CRAN
+install.packages("Qploidy")
+
+# Install the development version from GitHubß
 #install.packages("devtools")
 devtools::install_github("cristianetaniguti/Qploidy")
 ```

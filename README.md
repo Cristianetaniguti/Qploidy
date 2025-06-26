@@ -41,7 +41,7 @@ The methodology will not be effective under the following circumstances:
 # Install the latest stable version from CRAN
 install.packages("Qploidy")
 
-# Install the development version from GitHubß
+# Install the development version from GitHub
 #install.packages("devtools")
 devtools::install_github("cristianetaniguti/Qploidy")
 ```
@@ -60,7 +60,7 @@ If you find a bug or want an enhancement, please submit an issue [here](https://
 
 ## How to cite
 
-Taniguti, C.H; Lau, J.; Hochhaus, T.; Arias Lopez, D. C.; Hokanson, S.C.; Zlesak, D. C.; Byrne, D. H.; Klein, P.E. and Riera-Lizarazu, O. Exploring Chromosomal Variations in Garden Roses: Insights from High-density SNP Array Data and a New Tool, Qploidy. Submitted.
+Taniguti, C. H., Lau, J., Hochhaus, T., Arias, D. C. L., Hokanson, S. C., Zlesak, D. C., Byrne, D. H., Klein, P. E., & Riera-Lizarazu, O. (2025). Exploring chromosomal variations in garden roses: Insights from high-density SNP array data and a new tool, Qploidy. The Plant Genome, e70044. https://doi.org/10.1002/tpg2.70044
 
 ## Acknowledgments
 

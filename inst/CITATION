@@ -1,20 +1,25 @@
 citHeader("To cite Qploidy in publications, please use:")
 
 bibentry(
-  bibtype = "Article",
-  title = "Exploring Chromosomal Variations in Garden Roses: Insights from High-density SNP Array Data and a New Tool, Qploidy",
-  author = c(
-    person("C.H.", "Taniguti"),
-    person("J.", "Lau"),
-    person("T.", "Hochhaus"),
-    person("D.C.", "Arias Lopez"),
-    person("S.C.", "Hokanson"),
-    person("D.C.", "Zlesak"),
-    person("D.H.", "Byrne"),
-    person("P.E.", "Klein"),
-    person("O.", "Riera-Lizarazu")
-  ),
-  year = 2025,
-  journal = "The Plant Genome",
-  note = "Accepted for publication; in production"
-)
+    bibtype = "Article",
+    author  = c(
+      person("Cristiane H.", "Taniguti"),
+      person("Jeekin",     "Lau"),
+      person("Tessa",      "Hochhaus"),
+      person("Diana C.",   "Lopez Arias"),
+      person("Stan C.",    "Hokanson"),
+      person("David C.",   "Zlesak"),
+      person("David H.",   "Byrne"),
+      person("Patricia E.","Klein"),
+      person("Oscar",      "Riera-Lizarazu")
+    ),
+    title   = "Exploring chromosomal variations in garden roses: Insights from high-density SNP array data and a new tool, Qploidy",
+    journal = "The Plant Genome",
+    year    = "2025",
+    volume  = "18",
+    number  = "2",
+    doi     = "10.1002/tpg2.70044",
+    url     = "https://acsess.onlinelibrary.wiley.com/doi/10.1002/tpg2.70044",
+    note    = "ISSN: 1940-3372"
+  )
+

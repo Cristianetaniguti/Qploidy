@@ -16,7 +16,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 This vignette describes how to use `Qploidy`, an R package designed for ploidy
 and aneuploidy estimation using genotyping platform data. For a detailed
-explanation of the `Qploidy` methodology, please refer to its [publication]().
+explanation of the `Qploidy` methodology, please refer to its publication.
 
 ### When does the `Qploidy` methodology work?
 
@@ -47,10 +47,14 @@ The methodology will not be effective under the following circumstances:
 
 # Installation
 
-To install the `Qploidy` package, you can use the following command:
+To install the `Qploidy` package, you can use the following commands:
 
 ```{r, eval=FALSE}
-# install.packages("devtools")
+# Install the latest stable version from CRAN
+install.packages("Qploidy")
+
+# Install the development version from GitHub
+#install.packages("devtools")
 devtools::install_github("cristianetaniguti/Qploidy")
 ```
 
@@ -60,7 +64,6 @@ In this vignette, we demonstrate the workflow using a simulated VCF file contain
 50 samples and 500 genetic markers, allowing for a concise and computationally 
 efficient example. We also present results derived from a real-world rose Axiom array 
 dataset, which includes 524 garden rose cultivars and a total of 137,786 genetic markers.
-For additional context and methodological details, please refer to this [this publication]().
 
 ## Target sequencing VCF file
 
@@ -214,7 +217,7 @@ To proceed, you need to determine the dosage for all reference samples. If you h
 this yet, you can use any suitable dosage caller.  
 
 - For **array data**, we recommend using the 
-[`fitPoly`](https://cran.r-project.org/web/packages/fitPoly/index.html) package.  
+[`fitPoly`]( https://CRAN.R-project.org/package=fitPoly) package.  
 - For **sequencing data**, we suggest using the 
 [`updog`](https://github.com/dcgerard/updog) or 
 [`polyRAD`](https://github.com/lvclark/polyRAD) packages.  

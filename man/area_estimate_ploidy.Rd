@@ -34,6 +34,21 @@ defined.}
 should be named with the chromosome IDs. This information will only be used 
 if `chromosome-arm` level is defined.}
 }
+\value{
+A list of class `qploidy_area_ploidy_estimation` containing:
+\itemize{
+  \item \code{ploidy}: Estimated ploidy by area method.
+  \item \code{prop_inside_area}: Proportion of dots inside selected area.
+  \item \code{diff_first_second}: Difference between first and second place in area method.
+  \item \code{sd_inside_area}: Standard deviation inside area.
+  \item \code{highest_correlation_modes}: Highest correlation.
+  \item \code{modes_inside_area}: Modes inside areas.
+  \item \code{tested}: Tested ploidies.
+  \item \code{ploidy.sep}: Separated ploidy results.
+  \item \code{chr}: Unique chromosomes in the dataset.
+  \item \code{n.inbred}: Number of highly inbred samples.
+}
+}
 \description{
 This function estimates ploidy using the area method. It evaluates the 
 number of copies by chromosome, sample, or chromosome arm. Note that this 

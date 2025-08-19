@@ -2,15 +2,36 @@
 % Please edit documentation in R/prepare.R
 \name{summary_to_fitpoly}
 \alias{summary_to_fitpoly}
-\title{Convert Summary file to fitpoly format}
+\title{Convert Summary Data to FitPoly-Compatible Format}
 \usage{
 summary_to_fitpoly(R_all, theta_all)
 }
 \arguments{
-\item{R_all}{data.frame with R values}
+\item{R_all}{A data frame containing total signal intensity (R) values. The first
+column should be `MarkerName`, and subsequent columns should represent samples.}
 
-\item{theta_all}{data.frame with theta values}
+\item{theta_all}{A data frame containing allelic ratio (theta) values. The first
+column should be `MarkerName`, and subsequent columns should represent samples.}
+}
+\value{
+A data frame in long format with the following columns:
+  - `MarkerName`: Marker identifiers.
+  - `SampleName`: Sample identifiers.
+  - `X`: Reference allele intensity.
+  - `Y`: Alternative allele intensity.
+  - `R`: Total signal intensity.
+  - `ratio`: Allelic ratio (theta).
 }
 \description{
-Convert Summary file to fitpoly format
+This function processes R (total signal intensity) and theta (allelic ratio) values
+to generate a data frame compatible with the FitPoly tool. It calculates X and Y
+values (reference and alternative allele intensities, respectively) and combines
+them with R and theta into a long-format data frame.
+}
+\details{
+The function calculates X and Y values as follows:
+  - `X = R * (1 - theta)`
+  - `Y = R * theta`
+The resulting data frame is in a long format, where each row corresponds to a
+specific marker-sample combination.
 }

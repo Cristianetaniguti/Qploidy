@@ -12,7 +12,10 @@ get_R_theta(cleaned_summary, atan = FALSE)
 \item{atan}{Logical. If TRUE, calculates theta using atan2.}
 }
 \value{
-A list containing R and theta values.
+A list containing the following elements:
+  - `R_all`: A data frame where each row corresponds to a marker, and columns represent total signal intensity (R) values for each sample.
+  - `theta_all`: A data frame where each row corresponds to a marker, and columns represent allelic ratio (theta) values for each sample.
+  - Both data frames include a `MarkerName` column as the first column, which contains marker identifiers.
 }
 \description{
 This function calculates R and theta values from a cleaned summary file. 

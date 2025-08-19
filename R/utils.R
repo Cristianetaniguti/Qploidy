@@ -8,11 +8,6 @@ globalVariables(c("rnom", "X", "Y", "runif", "prob"))
 #'
 #' @return A list where each element corresponds to a row of the Pascal triangle, up to the specified ploidy value.
 #'
-#' @examples
-#' pascalTriangle(2) # Returns the first three rows of the Pascal triangle
-#' pascalTriangle(3) # Returns the first four rows of the Pascal triangle
-#'
-#' @export
 pascalTriangle <- function(h) {
   lapply(0:h, function(i) choose(i, 0:i))
 }
@@ -27,9 +22,6 @@ pascalTriangle <- function(h) {
 #'
 #' @return A single value representing the mode of the input vector.
 #'
-#' @examples
-#' mode(c(1, 2, 2, 3, 4)) # Returns 2
-#' mode(c("apple", "banana", "apple")) # Returns "apple"
 #'
 mode <- function(x) {
   ux <- unique(x)
@@ -47,9 +39,6 @@ mode <- function(x) {
 #' @param h A numeric vector (or scalar) of allele bias values.
 #'
 #' @return A numeric vector of adjusted probabilities of the reference read.
-#'
-#' @examples
-#' xi_fun(p = c(0, 0.5, 1), eps = 0.01, h = 0.8)
 #'
 #' @author David Gerard
 #' @keywords internal
@@ -138,24 +127,6 @@ vcf_sanity_check <- function(
   )
   checks <- setNames(rep(NA, length(checks_names)), checks_names)
 
-  # Messages in case of failure
-  messages <- data.frame(
-    "VCF_header" = c("VCF header is missing. Please check the file format.", "VCF header is present."),
-    "VCF_columns" = c("Required VCF columns are missing. Please check the file format.", "Required VCF columns are present."),
-    "max_markers" = c("More than 10,000 markers found. Consider subsampling or running in HPC.", "Less than maximum number of markers found."),
-    "GT" = c("Genotype information is not available in the VCF file.", "Genotype information is available in the VCF file."),
-    "allele_counts" = c("Allele counts are not available in the VCF file.", "Allele counts are available in the VCF file."),
-    "samples" = c("Sample information is not available in the VCF file.", "Sample information is available in the VCF file."),
-    "chrom_info" = c("Chromosome information is not available in the VCF file.", "Chromosome information is available in the VCF file."),
-    "pos_info" = c("Position information is not available in the VCF file.", "Position information is available in the VCF file."),
-    "ref_alt" = c("REF/ALT fields contain invalid nucleotide codes.", "REF/ALT fields are valid."),
-    "multiallelics" = c("Multiallelic sites not found in the VCF file.", "Multiallelic sites found in the VCF file."),
-    "phased_GT" = c("Phased genotypes (|) are not present in the VCF file.", "Phased genotypes (|) are present in the VCF file."),
-    "duplicated_samples" = c( "No duplicated sample IDs found.","Duplicated sample IDs found."),
-    "duplicated_markers" = c( "No duplicated marker IDs found.","Duplicated marker IDs found."),
-    "mixed_ploidies" = c("Mixed ploidies detected.", "No mixed ploidies detected.")
-  )
-  rownames(messages) <- c("false", "true")
 
   # Container for duplicated IDs
   duplicates <- list(
@@ -305,11 +276,11 @@ vcf_sanity_check <- function(
       ploidy_max <- max(ploidy_values, na.rm = TRUE)
       if (verbose) cat("Highest ploidy detected from GT field:", ploidy_max, "\n")
     }
-    if(length(ploidy_values) > 1) {
-      checks['mixed_ploidies'] <- TRUE
+    if (length(ploidy_values) > 1) {
+      checks["mixed_ploidies"] <- TRUE
       if (verbose) cat("Mixed ploidies\n")
     } else {
-      checks['mixed_ploidies'] <- FALSE
+      checks["mixed_ploidies"] <- FALSE
     }
   }
 
@@ -342,7 +313,76 @@ vcf_sanity_check <- function(
   multiallelic_flags <- grepl(",", sapply(sample_lines, function(line) strsplit(line, "\t")[[1]][5]))
   checks["multiallelics"] <- any(multiallelic_flags)
 
+  # --- Compile messages ---
+
+  # Messages in case of failure
+  messages <- data.frame(
+    "VCF_header" = c(
+      "VCF header is missing. Please check the file format.",
+      "VCF header is present."
+    ),
+    "VCF_columns" = c(
+      "Required VCF columns are missing. Please check the file format.",
+      "Required VCF columns are present."
+    ),
+    "max_markers" = c(
+      "More than 10,000 markers found. Consider subsampling or running in HPC.",
+      "Less than maximum number of markers found."
+    ),
+    "GT" = c(
+      "Genotype information is not available in the VCF file.",
+      "Genotype information is available in the VCF file."
+    ),
+    "allele_counts" = c(
+      "Allele counts are not available in the VCF file.",
+      "Allele counts are available in the VCF file."
+    ),
+    "samples" = c(
+      "Sample information is not available in the VCF file.",
+      "Sample information is available in the VCF file."
+    ),
+    "chrom_info" = c(
+      "Chromosome information is not available in the VCF file.",
+      "Chromosome information is available in the VCF file."
+    ),
+    "pos_info" = c(
+      "Position information is not available in the VCF file.",
+      "Position information is available in the VCF file."
+    ),
+    "ref_alt" = c(
+      "REF/ALT fields contain invalid nucleotide codes.",
+      "REF/ALT fields are valid."
+    ),
+    "multiallelics" = c(
+      "Multiallelic sites not found in the VCF file.",
+      "Multiallelic sites found in the VCF file."
+    ),
+    "phased_GT" = c(
+      "Phased genotypes (|) are not present in the VCF file.",
+      "Phased genotypes (|) are present in the VCF file."
+    ),
+    "duplicated_samples" = c(
+      "No duplicated sample IDs found.",
+      paste("Duplicated sample IDs found: ", paste(duplicates$duplicated_samples, collapse = ", "))
+    ),
+    "duplicated_markers" = c(
+      "No duplicated marker IDs found.",
+      paste("Duplicated marker IDs found: ", paste(duplicates$duplicated_markers, collapse = ", "))
+    ),
+    "mixed_ploidies" = c(
+      "Mixed ploidies detected.",
+      "No mixed ploidies detected."
+    )
+  )
+  rownames(messages) <- c("false", "true")
+
   # --- Done ---
   if (verbose) cat("Sanity check complete.\n")
-  return(list(checks = checks, messages = messages, duplicates = duplicates, ploidy_max = ploidy_max))
+  return(structure(
+    list(
+      checks = checks, messages = messages,
+      duplicates = duplicates, ploidy_max = ploidy_max
+    ),
+    class = "vcf_sanity_check"
+  ))
 }

@@ -30,3 +30,6 @@ and removed if their adjusted p-value is below the defined `alpha` threshold.
 
 This function was originally developed by **Kaio Olympio** and incorporated into the Qploidy workflow.
 }
+\author{
+Kaio Olympio
+}

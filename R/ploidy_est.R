@@ -26,6 +26,20 @@ globalVariables(c("color", "xmax", "xmin", "value", "name",
 #' should be named with the chromosome IDs. This information will only be used 
 #' if `chromosome-arm` level is defined.
 #'
+#' @return A list of class `qploidy_area_ploidy_estimation` containing:
+#' \itemize{
+#'   \item \code{ploidy}: Estimated ploidy by area method.
+#'   \item \code{prop_inside_area}: Proportion of dots inside selected area.
+#'   \item \code{diff_first_second}: Difference between first and second place in area method.
+#'   \item \code{sd_inside_area}: Standard deviation inside area.
+#'   \item \code{highest_correlation_modes}: Highest correlation.
+#'   \item \code{modes_inside_area}: Modes inside areas.
+#'   \item \code{tested}: Tested ploidies.
+#'   \item \code{ploidy.sep}: Separated ploidy results.
+#'   \item \code{chr}: Unique chromosomes in the dataset.
+#'   \item \code{n.inbred}: Number of highly inbred samples.
+#' }
+#'
 #' @import tidyr
 #' @import dplyr
 #'
@@ -265,6 +279,13 @@ area_estimate_ploidy <- function(qploidy_standardization = NULL,
 #' @param filter_diff filter by difference on area proportion between first and 
 #' second place
 #'
+#' @return An updated object of class `qploidy_area_ploidy_estimation` with the following modifications:
+#' 
+#' - `ploidy`: A matrix where chromosome-arm level results are merged into chromosome-level format. 
+#'    If `filter_diff` is provided, ploidy values with differences below the threshold are set to `NA`.
+#' 
+#' The structure of the returned object remains consistent with the input, but with updated ploidy information.
+#'
 #' @export
 merge_arms_format <- function(x, filter_diff = NULL){
 
@@ -299,7 +320,9 @@ merge_arms_format <- function(x, filter_diff = NULL){
 #' @param ... print parameters
 #'
 #' @method print qploidy_area_ploidy_estimation
-#'
+#' 
+#' @return No return value, called for side effects.
+#' 
 #' @export
 print.qploidy_area_ploidy_estimation <- function(x, ...){
 
@@ -331,6 +354,10 @@ print.qploidy_area_ploidy_estimation <- function(x, ...){
 #' indexes for aneuploids
 #'
 #' @param ploidy_df ploidy table (chromosome in columns and individuals in rows)
+#'
+#' @return A logical vector where each element corresponds to an individual in the 
+#'         input ploidy table. The value is `TRUE` if the individual is identified 
+#'         as potentially aneuploid, and `FALSE` otherwise.
 #'
 #' @export
 get_aneuploids  <- function(ploidy_df){

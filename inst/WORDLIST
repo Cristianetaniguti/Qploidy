@@ -1,6 +1,7 @@
 AO
 AgriSeq
 Allelic
+Aneuploidy
 BAF
 BAFs
 Basye
@@ -11,6 +12,7 @@ CMD
 CNV
 Chr
 DArTag
+FitPoly
 GBS
 GC
 GTseq
@@ -45,11 +47,13 @@ SCRI
 SampleName
 Testthat
 Thermo
+Updog
 VCF
 Waltham
 Zlesak
 al
 allelic
+aneuploid
 aneuploids
 aneuploidy
 atan
@@ -59,6 +63,7 @@ centromere
 centromeres
 chrom
 codecov
+doi
 et
 euploid
 fileformat
@@ -76,8 +81,10 @@ multiallelic
 multiallelics
 multidog
 parallelization
+ploidies
 ploidy
 png
+polymorphism
 pos
 probeset
 qploidy
@@ -87,4 +94,5 @@ tetraploids
 triploid
 triploids
 updog
+vroom
 zscore

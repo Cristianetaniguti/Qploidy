@@ -2,17 +2,35 @@
 % Please edit documentation in R/standardization.R
 \name{updog_centers}
 \alias{updog_centers}
-\title{Get centers for standardization using updog estimated bias}
+\title{Estimate Centers for Standardization Using Updog Bias}
 \usage{
 updog_centers(multidog_obj, threshold.n.clusters = 2, rm.mks)
 }
 \arguments{
-\item{multidog_obj}{object of class multidog (from updog)}
+\item{multidog_obj}{An object of class `multidog` (from the `updog` package),
+containing information about SNPs, ploidy, sequencing error rates, and bias.}
 
-\item{threshold.n.clusters}{minimum number of dosage clusters (heterozygous classes) to account with the marker for standardization}
+\item{threshold.n.clusters}{An integer specifying the minimum number of dosage
+clusters (heterozygous classes) required for a marker to be retained for
+standardization. Default is `2`.}
 
-\item{rm.mks}{vector for logical indicating which markers should be removed, names of the vector are names of the markers}
+\item{rm.mks}{A logical vector indicating which markers should be removed.
+The names of the vector correspond to the marker names.}
+}
+\value{
+A named list where each element corresponds to a marker and contains:
+  - `rm`: An integer flag indicating whether the marker is retained (`0`) or removed (`1`).
+  - `centers_theta`: A numeric vector of cluster centers (sorted in descending order).
+  - `MarkerName`: The name of the marker.
+  - `n.clusters`: The number of clusters identified for the marker.
 }
 \description{
-Get centers for standardization using updog estimated bias
+This function calculates the centers for standardization based on the estimated
+bias from the `updog` package. It identifies genotype dosage clusters and determines
+whether markers should be retained or removed based on the number of clusters.
+}
+\details{
+The function uses the `xi_fun` to calculate the cluster centers for each marker
+based on the ploidy, sequencing error rate, and bias. Markers with fewer clusters than
+the specified threshold are flagged for removal.
 }

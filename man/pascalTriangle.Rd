@@ -2,13 +2,16 @@
 % Please edit documentation in R/utils.R
 \name{pascalTriangle}
 \alias{pascalTriangle}
-\title{Pascal triangle to define the expected peaks for each ploidy}
+\title{Pascal Triangle for Expected Peaks Calculation}
 \usage{
 pascalTriangle(h)
 }
 \arguments{
-\item{h}{ploidy value}
+\item{h}{An integer representing the ploidy value.}
+}
+\value{
+A list where each element corresponds to a row of the Pascal triangle, up to the specified ploidy value.
 }
 \description{
-Pascal triangle to define the expected peaks for each ploidy
+This function generates the Pascal triangle for a given ploidy value. The Pascal triangle is used to define the expected peaks for each ploidy level, which can be useful in various genetic analyses.
 }

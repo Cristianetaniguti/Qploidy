@@ -11,6 +11,9 @@
 
 \item{...}{print parameters}
 }
+\value{
+No return value, called for side effects.
+}
 \description{
 print qploidy_area_ploidy_estimation object
 }

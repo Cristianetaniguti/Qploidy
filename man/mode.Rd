@@ -17,8 +17,3 @@ This function returns the most frequent (modal) value in a vector.
 If there are multiple values with the same highest frequency,
 it returns the first one encountered.
 }
-\examples{
-mode(c(1, 2, 2, 3, 4)) # Returns 2
-mode(c("apple", "banana", "apple")) # Returns "apple"
-
-}

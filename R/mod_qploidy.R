@@ -61,7 +61,7 @@ mod_qploidy_ui <- function(id){
                                                    numericInput(ns("ref_ploidy"), "Reference Samples Ploidy*", min = 1, value = NULL)),
                                   conditionalPanel(condition = "input.known_ploidy == 'FALSE'",
                                                    ns=ns,
-                                                   numericInput(ns("ref_ploidy"), "Most Common Ploidy*", min = 1, value = NULL)),
+                                                   numericInput(ns("common_ploidy"), "Most Common Ploidy*", min = 1, value = NULL)),
                                   div(style="text-align: left; margin-top: 10px;",
                                       actionButton(ns("advanced_options"),
                                                    label = HTML(paste(icon("cog", style = "color: #007bff;"), "Advanced Options")),
@@ -74,7 +74,8 @@ mod_qploidy_ui <- function(id){
                  div(style="display:inline-block; float:right",dropdownButton(
                    HTML("<b>Input files</b>"),
                    p(downloadButton(ns('download_vcf'),""), "VCF Example File"),
-                   p(downloadButton(ns('download_pheno'),""), "Trait Example File"), hr(),
+                   p(downloadButton(ns('download_axiom'),""), "Axiom Summary Example File"), hr(),
+                   p(downloadButton(ns('download_fitpoly'),""), "fitpoly Result Example File"), hr(),
                    p(HTML("<b>Parameters description:</b>"), actionButton(ns("goQploidypar"), icon("arrow-up-right-from-square", verify_fa = FALSE) )), hr(),
                    p(HTML("<b>Results description:</b>"), actionButton(ns("goQploidygraph"), icon("arrow-up-right-from-square", verify_fa = FALSE) )), hr(),
                    p(HTML("<b>How to cite:</b>"), actionButton(ns("goQploidycite"), icon("arrow-up-right-from-square", verify_fa = FALSE) )), hr(),
@@ -90,52 +91,24 @@ mod_qploidy_ui <- function(id){
       column(width = 6,
              box(
                title = "Plots", status = "info", solidHeader = FALSE, width = 12,
-               bs4Dash::tabsetPanel(
-                 tabPanel("BIC Plot", plotOutput(ns("bic_plot"), height = "500px")),
-                 tabPanel("Manhattan Plot", plotOutput(ns("manhattan_plot"), height = "500px")),
-                 tabPanel("QQ Plot", plotOutput(ns("qq_plot"), height = "500px")),
-                 tabPanel("BIC Table", DTOutput(ns("bic_table")),style = "overflow-y: auto; height: 500px"),
-                 tabPanel("QTL - significant markers", DTOutput(ns("all_qtl")),style = "overflow-y: auto; height: 500px"),
-                 tabPanel("Filter QTL by LD window",
-                          br(),
-                          box(
-                            title = "LD plot",solidHeader = FALSE, width = 12, br(),
-                            sliderInput(ns("bp_window_after"), label = "Adjust base pair window here to filter QTLs", min = 0,
-                                        max = 100, value = 5, step = 1)
-                          ),
-                          box(
-                            title = "Filtered QTL", solidHeader = FALSE, width = 12
-                          )
-                 ),
-                 tabPanel("Multiple QTL model",
-                          br(),
-                          pickerInput(
-                            inputId = ns("sele_models"),
-                            label = "Select model",
-                            choices = "will be updated",
-                            options = list(
-                              `actions-box` = TRUE),
-                            multiple = FALSE
-                          ), hr(),
-                          pickerInput(
-                            inputId = ns("sele_qtl"),
-                            label = "Select QTL",
-                            choices = "will be updated",
-                            options = list(
-                              `actions-box` = TRUE),
-                            multiple = TRUE
-                          ), hr(),
-                          style = "overflow-y: auto; height: 500px")
-               )
+               plotOutput(ns("bic_plot"), height = "500px")
              )
       ),
       column(width = 3,
              box(title = "Status", width = 12, collapsible = TRUE, status = "info",
-                 valueBoxOutput(ns("n.markers.start"), width=12),
+                 valueBoxOutput(ns("markers_status"), width=12),
 
                  progressBar(id = ns("pb_qploidy"), value = 0, status = "info", display_pct = TRUE, striped = TRUE, title = " ")
              ),
              box(title = "Plot Controls", status = "warning", solidHeader = TRUE, collapsible = TRUE, width = 12,
+                 virtualSelectInput(
+                   inputId = ns("sample"),
+                   label = "Select Sample*:",
+                   choices = NULL,
+                   showValueAsTags = TRUE,
+                   search = TRUE,
+                   multiple = FALSE
+                 ),
                  virtualSelectInput(
                    inputId = ns("plots"),
                    label = "Select Plot(s)*:",
@@ -286,10 +259,14 @@ mod_qploidy_server <- function(input, output, session, parent_session){
   observeEvent(input$advanced_options, {
     showModal(modalDialog(
       title = "Advanced Options",
-      numericInput(ns("miss"), "Remove SNPs with >= % missing data", min = 1, value = 90),
+      numericInput(ns("miss"), "Remove SNPs with >= % missing data", min = 1, max = 100,value = 90),
       numericInput(ns("prob"), "Remove genotypes with <= probability", min = 0, value = 0.8),
       numericInput(ns("n.clusters"), "Remove genotypes with <= # of dosage clusters",
-                   min = 2, value = as.numeric(input$ref_ploidy) + 1),
+                   min = 2, value = {
+                     ploidy <- c(input$ref_ploidy, input$common_ploidy)
+                     ploidy <- ploidy[-is.na(ploidy)]
+                     as.numeric(ploidy) + 1
+                     }),
       footer = tagList(
         modalButton("Close"),
         actionButton(ns("save_advanced_options"), "Save")
@@ -300,9 +277,7 @@ mod_qploidy_server <- function(input, output, session, parent_session){
   n.markers.start <- geno.prob.rm <- miss.rm <- clusters.rm <- no.geno.info.rm <- n.markers.end <- reactiveVal(0)
 
   #SNP counts value box
-  output$n.markers.start <- renderValueBox({
-    valueBox(n.markers.start(), "Markers in uploaded file", icon = icon("dna"), color = "info")
-
+  output$markers_status <- renderValueBox({
     valueBox(
       value = tagList(
         div(style="font-size:1.2em; line-height:1.1;", span("Total markers: "), formatC(n.markers.start(), big.mark=",")),
@@ -321,7 +296,138 @@ mod_qploidy_server <- function(input, output, session, parent_session){
   })
 
   ## Process inputs
+  data_standardized <- eventReactive(input$run_stand, {
+    req(input$input_file)
+    req(input$file_type)
 
+    # Reset progress bar
+    updateProgressBar(session = session, id = "pb_qploidy", value = 0, total = 100)
+
+    # Read input file based on type
+    if (input$file_type == "VCF") {
+      # Add VCF format checks
+
+      input_data <- qploidy_read_vcf(input$input_file$datapath)
+
+    } else if (input$file_type == "Axiom Array") {
+      # Add axiom array summary file format checks
+
+      input_data <- read_axiom(input$input_file$datapath)
+
+    } else if(input$file_type == "Illumina Array") {
+      # Add Illumina array summary file format checks
+
+      input_data <- read_illumina_array(input$input_file$datapath)
+
+    } else if (input$file_type == "Qploidy Standardized Dataset") {
+      # Add Qploidy standardized dataset format checks
+      input_data <- "skip"
+      data_standardized <- read_qploidy_standardization(input$input_file$datapath)
+    }
+
+    # Update progress bar
+    updateProgressBar(session = session, id = "pb_qploidy", value = 20)
+
+    if(input$file_type != "Qploidy Standardized Dataset"){
+
+      if(input$file_type == "VCF"){
+        genos <- qploidy_read_vcf(input$input_file$datapath, geno = TRUE)
+        genos.pos <- qploidy_read_vcf(input$input_file$datapath, geno.pos = TRUE)
+
+        if(input$known_ploidy){
+          reference_samples <- read.csv(input$reference_samples$datapath, header = TRUE, stringsAsFactors = FALSE)$Sample_ID
+          genos <- genos[which(genos$SampleName %in% reference_samples), ]
+        }
+
+      } else {
+        if(input$known_ploidy)
+          fitpoly_scores <- read.table(input$geno_ref$datapath, header = TRUE, sep = "\t", stringsAsFactors = FALSE)
+        else
+          fitpoly_scores <- read.table(input$geno_all$datapath, header = TRUE, sep = "\t", stringsAsFactors = FALSE)
+
+        genos <- data.frame(
+          MarkerName = fitpoly_scores$MarkerName,
+          SampleName = fitpoly_scores$SampleName,
+          geno = fitpoly_scores$maxgeno,
+          prob = fitpoly_scores$maxP
+        )
+
+        genos.pos_file <- read.table(input$marker_pos, header = T)
+
+        genos.pos <- data.frame(
+          MarkerName = genos.pos_file$probes,
+          Chromosome = genos.pos_file$chr,
+          Position = genos.pos_file$pos
+        )
+      }
+
+      # Verify if informed ploidy is the same in file
+      ploidy <- c(input$ref_ploidy, input$common_ploidy)
+      ploidy <- ploidy[-is.na(ploidy)]
+      print(ploidy)
+      if(max(genos$geno) != ploidy){
+        shinyalert(
+          title = "Ploidy Mismatch",
+          text = "Genotype on File doesn't match Ploidy informed",
+          size = "s",
+          closeOnEsc = TRUE,
+          closeOnClickOutside = FALSE,
+          html = TRUE,
+          type = "error",
+          showConfirmButton = TRUE,
+          confirmButtonText = "OK",
+          confirmButtonCol = "#004192",
+          showCancelButton = FALSE,
+          animation = TRUE
+        )
+      }
+
+      # Updated progress bar
+      updateProgressBar(session = session, id = "pb_qploidy", value = 40)
+
+      # Create reactive value for temp path output file
+      temp_path <- tempfile(fileext = ".tsv.gz")
+
+      stand_file <- reactiveVal(temp_path)
+
+      data_standardized <- standardize(
+        data = input_data,
+        genos = genos,
+        geno.pos = genos.pos,
+        ploidy.standardization = ploidy,
+        threshold.geno.prob = if(is.null(input$prob)) 0.8 else input$prob,
+        threshold.missing.geno = if(is.null(input$miss)) 0.9 else input$miss/100,
+        threshold.n.clusters = if(is.null(input$n.clusters)) ploidy + 1 else input$n.clusters,
+        n.cores = input$cores,
+        out_filename = temp_path,
+        verbose = FALSE
+      )
+    }
+    # Update progress bar
+    updateProgressBar(session = session, id = "pb_qploidy", value = 100)
+
+    data_standardized
+  })
+
+  output$markers_status <- renderValueBox({
+    req(data_standardized())
+
+    valueBox(
+      value = tagList(
+        div(style="font-size:1.2em; line-height:1.1;", span("Total markers: "), formatC(data_standardized()$filters[1], big.mark=",")),
+        div(style="font-size:0.95em; opacity:0.9;", "Markers removed due:"),
+        div(style="font-size:0.95em; opacity:0.9;", span("Low geno prob: "), strong(data_standardized()$filters[2])),
+        div(style="font-size:0.95em; opacity:0.9;", span("High missing data: "), strong(data_standardized()$filters[3])),
+        div(style="font-size:0.95em; opacity:0.9;", span("Low # of dosage clusters: "), strong(data_standardized()$filters[4])),
+        div(style="font-size:0.95em; opacity:0.9;", span("Missing genomic position: "), strong(data_standardized()$filters[5])),
+        div(style="font-size:1.2em; line-height:1.1;", span("Remaining markers: "), strong(data_standardized()$filters[6]))
+      ),
+      subtitle = "",
+      icon = icon("dna"),
+      color = if(data_standardized()$filters[6] != 0)
+        if (data_standardized()$filters[6]/data_standardized()$filters[1] > 0.25) "success" else "danger"
+    )
+  })
 
 
 }

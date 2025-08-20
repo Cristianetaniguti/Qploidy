@@ -12,3 +12,7 @@
 * Vignette with functional simulated example
 * Testthat tests included
 * CRAN submission
+
+# Qploidy 1.1.0
+
+* Beta version of Qploidy + BIGapp interface

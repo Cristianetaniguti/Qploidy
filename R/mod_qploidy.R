@@ -10,6 +10,7 @@
 #' @importFrom shinyWidgets virtualSelectInput
 #' @importFrom DT DTOutput
 #' @importFrom bs4Dash valueBoxOutput
+#' @importFrom shinydisconnect disconnectMessage
 #'
 mod_qploidy_ui <- function(id){
   ns <- NS(id)
@@ -233,6 +234,8 @@ mod_qploidy_ui <- function(id){
 #' @importFrom bs4Dash updatebs4TabItems updateBox
 #' @importFrom shiny updateTabsetPanel
 #' @import dplyr
+#' @importFrom shinyalert shinyalert
+#'
 #' @noRd
 mod_qploidy_server <- function(input, output, session, parent_session){
 

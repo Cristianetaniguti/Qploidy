@@ -16,6 +16,7 @@ app_ui <- function(request) {
       skin = "black",
       bs4DashNavbar(
         title = tagList(
+          tags$img(src = 'www/Qploidy_logo.png', height = '40', width = '35'),
           tags$img(src = 'www/BIG_R_logo.png', height = '40', width = '50'),
         ),
         rightUi = tags$li(
@@ -76,10 +77,12 @@ app_ui <- function(request) {
           )
         ),
         left = div(
-          style = "display: flex; align-items: center; height: 100%;",  # Center the version text vertically
-          "v1.3.0 development")
+          style = "display: flex; align-items: center; height: 100%;",
+          sprintf("v%s", as.character(utils::packageVersion("Qploidy")))
+        )
       ),
       dashboardBody(
+        disconnectMessage(), #Adds generic error message for any error if not already accounted for
         tags$style(
           HTML(
             ".main-footer {

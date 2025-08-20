@@ -17,23 +17,24 @@ mod_Home_ui <- function(id){
       fluidRow(
         column(width = 4,
                box(
-                 title = "Breeding Insight Genomics App", status = "info", solidHeader = FALSE, width = 12, collapsible = FALSE,
+                 title = "Qploidy + BIGapp", status = "info", solidHeader = FALSE, width = 12, collapsible = FALSE,
                  HTML(
-                   "<p>The BIGapp is a user-friendly tool for processing low to mid-density genotyping data for diploid and polyploid species. This R shiny app provides a web-based user friendly way for users to analyze genomic data without needing to use command-line tools.
-              Additional analysis will be added, with the initial focus on a core set of features for supporting breeding decisions.</p>
+                   "<p><b>About Qploidy.</b> Qploidy package provides a standardization method for allele counts or intensities that allows ploidy and aneuploidy estimation. It was first developed by Cristiane (Cris) Taniguti while working with Oscar Riera-Lizarazu’s group at Texas A&amp;M University. After Cris moved to Breeding Insight (BI), Qploidy’s maintenance and new features have continued under BI—this interface is a direct result of that ongoing effort. Qploidy is now integrated into BIGapp.</p>
 
-              <p><b>Supported Analyses</b></p>
-              Initial supported analyses includes the mature genomics/bioinformatics pipelines developed within Breeding Insight:
-              <ul>
-                <li>Genotype Processing</li>
-                <li>Summary Metrics</li>
-                <li>Population Structure</li>
-                <li>GWAS</li>
-                <li>Genomic Selection</li>
-              </ul>"
+     <p><b>About BIGapp</b> BIGapp is a user-friendly R Shiny application that streamlines low- to mid-density genotyping workflows for diploid and polyploid species. It provides a web-based interface so users can analyze genomic data without command-line tools. New analyses will be added over time, with an initial focus on features that support breeding decisions.</p>
+
+     <p><b>Supported Analyses</b></p>
+     <p>Initial supported analyses draw from mature genomics/bioinformatics pipelines developed within Breeding Insight:</p>
+     <ul>
+       <li>Genotype Processing (incl. Qploidy standardization)</li>
+       <li>Summary Metrics</li>
+       <li>Population Structure</li>
+       <li>GWAS</li>
+       <li>Genomic Selection</li>
+       <li>Ploidy Estimation</li>
+     </ul>"
                  ),
                  style = "overflow-y: auto; height: 500px"
-
                )
         ),
         column(width = 4,
@@ -78,6 +79,19 @@ mod_Home_ui <- function(id){
                    subtitle = "Contact Us",
                    icon = icon("envelope"),
                    color = "danger",
+                   gradient = TRUE,
+                   width = 11
+                 ),
+                 style = "text-decoration: none; color: inherit;"  # Optional: removes underline and retains original color
+               ),
+               a(
+                 href = "file:///Users/cht47/Documents/github/Qploidy/doc/Qploidy.html",  # Replace with your desired URL
+                 target = "_blank",  # Optional: opens the link in a new tab
+                 valueBox(
+                   value = NULL,
+                   subtitle = "Qploidy Tutorial",
+                   icon = icon("compass"),
+                   color = "info",
                    gradient = TRUE,
                    width = 11
                  ),

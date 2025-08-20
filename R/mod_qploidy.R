@@ -68,7 +68,7 @@ mod_qploidy_ui <- function(id){
                                                    style = "background-color: transparent; border: none; color: #007bff; font-size: smaller; text-decoration: underline; padding: 0;"
                                       )
                                   ),
-                 ),
+                 ),br(),
                  actionButton(ns("run_stand"), "Run Analysis"),
 
                  div(style="display:inline-block; float:right",dropdownButton(
@@ -86,132 +86,154 @@ mod_qploidy_ui <- function(id){
                    icon = icon("info"), width = "300px",
                    tooltip = tooltipOptions(title = "Click to see info!")
                  ))
-             )
-      ),
-      column(width = 6,
-             box(
-               title = "Plots", status = "info", solidHeader = FALSE, width = 12,
-               plotOutput(ns("bic_plot"), height = "500px")
-             )
-      ),
-      column(width = 3,
+             ),
              box(title = "Status", width = 12, collapsible = TRUE, status = "info",
                  valueBoxOutput(ns("markers_status"), width=12),
-
                  progressBar(id = ns("pb_qploidy"), value = 0, status = "info", display_pct = TRUE, striped = TRUE, title = " ")
+
              ),
-             box(title = "Plot Controls", status = "warning", solidHeader = TRUE, collapsible = TRUE, width = 12,
-                 virtualSelectInput(
-                   inputId = ns("sample"),
-                   label = "Select Sample*:",
-                   choices = NULL,
-                   showValueAsTags = TRUE,
-                   search = TRUE,
-                   multiple = FALSE
-                 ),
-                 virtualSelectInput(
-                   inputId = ns("plots"),
-                   label = "Select Plot(s)*:",
-                   choices = c("All",
-                               "Heterozygosity",
-                               "Standardized Ratio (BAF) Scatterplot",
-                               "Sum of Allele Counts/Intensities Zscore",
-                               "Standardized Ratio (BAF) Histogram",
-                               "Non-standardized Ratio Scatterplot",
-                               "Non-standardized Ratio Histogram"),
-                   showValueAsTags = TRUE,
-                   search = TRUE,
-                   multiple = TRUE
-                 ),
-                 virtualSelectInput(
-                   inputId = ns("sele_chr"),
-                   label = "Select Chromosome(s)*:",
-                   choices = NULL,
-                   showValueAsTags = TRUE,
-                   search = TRUE,
-                   multiple = TRUE
-                 ),
-
-                 radioButtons(
-                   inputId = ns("add_estimated_peaks"),
-                   label = "Add Estimated Peaks:",
-                   choiceNames  = c("True", "False"),
-                   choiceValues = list(TRUE, FALSE),
-                   selected = FALSE,
-                   inline = TRUE
-                 ),
-
-                 radioButtons(
-                   inputId = ns("add_expected_peaks"),
-                   label = "Add Expected Peaks:",
-                   choiceNames  = c("True", "False"),
-                   choiceValues = list(TRUE, FALSE),
-                   selected = FALSE,
-                   inline = TRUE
-                 ),
-
-                 conditionalPanel(condition = "input.add_expected_peaks == 'TRUE'",
-                                  ns = ns,
-                                  numericInput(ns('ploidy'), label = 'Ploidy', value = 2),
-                 ),
-
-                 radioButtons(
-                   inputId = ns("add_centromeres"),
-                   label = "Add Centromere Position:",
-                   choiceNames  = c("True", "False"),
-                   choiceValues = list(TRUE, FALSE),
-                   selected = FALSE,
-                   inline = TRUE
-                 ),
-
-                 conditionalPanel(condition = "input.add_centromeres == 'TRUE'",
-                                  ns = ns,
-                                  fileInput(ns("centromeres_file"),
-                                            "Centromere positions file (CSV format with columns: Chromosome, Centromere Start Position)", accept = ".csv")
-                 ),
-
-                 radioButtons(
-                   inputId = ns("rm_homozygous"),
-                   label = "Remove Homozygous Peaks:",
-                   choiceNames  = c("True", "False"),
-                   choiceValues = list(TRUE, FALSE),
-                   selected = FALSE,
-                   inline = TRUE
-                 ),
-
-                 numericInput(ns('dot.size'), label = 'Dot size', value = 0.05),
-                 numericInput(ns('font'), label = 'Font size', value = 2),
-
-                 div(style="display:inline-block; float:left",dropdownButton(
-                   tags$h3("Save Image"),
-                   selectInput(inputId = ns('image_type'), label = 'File Type', choices = c("jpeg","tiff","png","svg"), selected = "jpeg"),
-                   sliderInput(inputId = ns('image_res'), label = 'Resolution', value = 300, min = 50, max = 1000, step=50),
-                   sliderInput(inputId = ns('image_width'), label = 'Width', value = 9, min = 1, max = 20, step=0.5),
-                   sliderInput(inputId = ns('image_height'), label = 'Height', value = 5, min = 1, max = 20, step = 0.5),
+      ),
+      column(width = 9,
+             box(
+               title = "Plots", status = "info", solidHeader = FALSE, width = 12,
+               box(title = "Plot Controls", status = "info", solidHeader = FALSE, collapsible = TRUE, width = 12,
                    fluidRow(
-                     downloadButton(ns("download_figure"), "Save Image"),
-                     downloadButton(ns("download_file"), "Save Files"),
-                     downloadButton(ns("download_stand"), "Save Standardized Data")),
-                   circle = FALSE,
-                   status = "danger",
-                   icon = icon("floppy-disk"), width = "300px", label = "Save",
-                   tooltip = tooltipOptions(title = "Click to see inputs!")
-                 ))
+                     column(width = 6,
+                            virtualSelectInput(
+                              inputId = ns("sample"),
+                              label = "Select Sample*:",
+                              choices = NULL,
+                              showValueAsTags = TRUE,
+                              search = TRUE,
+                              multiple = FALSE
+                            ),
+                            virtualSelectInput(
+                              inputId = ns("plots"),
+                              label = "Select Plot(s)*:",
+                              choices = c("Heterozygosity" = "het",
+                                          "Standardized Ratio (BAF) Scatterplot" = "BAF",
+                                          "Sum of Allele Counts/Intensities Zscore" = "zscore",
+                                          "Standardized Ratio (BAF) Histogram" = "BAF_hist",
+                                          "Non-standardized Ratio Scatterplot" = "ratio",
+                                          "Non-standardized Ratio Histogram" = "Ratio_hist_overall"),
+                              showValueAsTags = TRUE,
+                              search = TRUE,
+                              multiple = TRUE
+                            ),
+                            virtualSelectInput(
+                              inputId = ns("sele_chr"),
+                              label = "Select Chromosome(s)*:",
+                              choices = NULL,
+                              showValueAsTags = TRUE,
+                              search = TRUE,
+                              multiple = TRUE
+                            ),
+
+                            radioButtons(
+                              inputId = ns("add_estimated_peaks"),
+                              label = "Add Estimated Peaks:",
+                              choiceNames  = c("True", "False"),
+                              choiceValues = list(TRUE, FALSE),
+                              selected = FALSE,
+                              inline = TRUE
+                            ),
+
+                            radioButtons(
+                              inputId = ns("add_expected_peaks"),
+                              label = "Add Expected Peaks:",
+                              choiceNames  = c("True", "False"),
+                              choiceValues = list(TRUE, FALSE),
+                              selected = FALSE,
+                              inline = TRUE
+                            ),
+
+                            conditionalPanel(condition = "input.add_expected_peaks == 'TRUE'",
+                                             ns = ns,
+                                             numericInput(ns('ploidy'), label = 'Ploidy', value = 2),
+                            )
+                     ),
+                     column(width = 6,
+                            radioButtons(
+                              inputId = ns("add_centromeres"),
+                              label = "Add Centromere Position:",
+                              choiceNames  = c("True", "False"),
+                              choiceValues = list(TRUE, FALSE),
+                              selected = FALSE,
+                              inline = TRUE
+                            ),
+
+                            conditionalPanel(condition = "input.add_centromeres == 'TRUE'",
+                                             ns = ns,
+                                             fileInput(ns("centromeres_file"),
+                                                       "Centromere positions file (CSV format with columns: Chromosome, Centromere Start Position)", accept = ".csv")
+                            ),
+
+                            radioButtons(
+                              inputId = ns("rm_homozygous"),
+                              label = "Remove Homozygous Peaks:",
+                              choiceNames  = c("True", "False"),
+                              choiceValues = list(TRUE, FALSE),
+                              selected = FALSE,
+                              inline = TRUE
+                            ),
+
+                            numericInput(ns('dot.size'), label = 'Dot size', value = 0.05),
+                            numericInput(ns('font'), label = 'Font size', value = 2),
+                            actionButton(ns("build_plot"), "Build plot"),
+
+                     )
+                   )
+               ), hr(),
+
+               plotOutput(ns("plot"), height = "500px"),
+
+               div(style="display:inline-block; float:left",dropdownButton(
+                 tags$h3("Save Image"),
+                 selectInput(inputId = ns('image_type'), label = 'File Type', choices = c("jpeg","tiff","png","svg"), selected = "jpeg"),
+                 sliderInput(inputId = ns('image_res'), label = 'Resolution', value = 300, min = 50, max = 1000, step=50),
+                 sliderInput(inputId = ns('image_width'), label = 'Width', value = 9, min = 1, max = 20, step=0.5),
+                 sliderInput(inputId = ns('image_height'), label = 'Height', value = 5, min = 1, max = 20, step = 0.5),
+                 fluidRow(
+                   downloadButton(ns("download_figure"), "Save Image"), br(),
+                   downloadButton(ns("download_stand"), "Save Standardized Data")),
+                 circle = FALSE,
+                 status = "danger",
+                 icon = icon("floppy-disk"), width = "300px", label = "Save",
+                 tooltip = tooltipOptions(title = "Click to see inputs!")
+               ))
+             ),
+             box(
+               title = "Ploidy Estimation", status = "info", solidHeader = FALSE, width = 12,
+               "Check the plots above before obtaining the estimated ploidies for all samples.",
+               "If the plots look good, adjust the following paramenters and click the 'Estimate Ploidies' button below to run the estimation.", br(),
+               hr(),
+               textInput(ns("ploidy_range"), "Ploidies to be tested", placeholder = "2,3,4", value = "2,3,4"),
+               selectInput(ns('res_lvl'),
+                           label = 'Select Resolution Level',
+                           choices = c("Sample" = "sample",
+                                       "Chromosome" = "chromosome",
+                                       "Chromosome-arm" = "chromosome-arm"),
+                           selected = "Chromosome"),
+               conditionalPanel(condition = "input.res_lvl == 'chromosome-arm'",
+                                ns = ns,
+                                fileInput(ns("centromeres_file2"),
+                                          "Centromere positions file (CSV format with columns: Chromosome, Centromere Start Position)", accept = ".csv")
+               ),
+               br(),
+               actionButton(ns("est_ploidy"), "Estimate Ploidies"), hr(), br(),
+               DTOutput(ns("ploidy_table")),br(),
+               downloadButton(ns("download_ploidy_table"), "Download Ploidy Table")
              )
       )
     )
   )
 }
 
-#' gwas Server Functions
+#' qploidy Server Functions
 #'
 #' @importFrom DT renderDT
-#' @importFrom vcfR read.vcfR
-#' @importFrom Matrix nearPD
-#' @importFrom stats BIC as.formula lm logLik median model.matrix na.omit prcomp qbeta quantile runif sd setNames
 #' @importFrom bs4Dash updatebs4TabItems updateBox
 #' @importFrom shiny updateTabsetPanel
-#' @importFrom plotly ggplotly
 #' @import dplyr
 #' @noRd
 mod_qploidy_server <- function(input, output, session, parent_session){
@@ -225,7 +247,7 @@ mod_qploidy_server <- function(input, output, session, parent_session){
                       selected = "help")
 
     # select specific tab
-    updateTabsetPanel(session = parent_session, inputId = "GWAS_tabset",
+    updateTabsetPanel(session = parent_session, inputId = "Qploidy_tabset",
                       selected = "Qploidy_par")
     # expand specific box
     updateBox(id = "Qploidy_box", action = "toggle", session = parent_session)
@@ -266,7 +288,7 @@ mod_qploidy_server <- function(input, output, session, parent_session){
                      ploidy <- c(input$ref_ploidy, input$common_ploidy)
                      ploidy <- ploidy[-is.na(ploidy)]
                      as.numeric(ploidy) + 1
-                     }),
+                   }),
       footer = tagList(
         modalButton("Close"),
         actionButton(ns("save_advanced_options"), "Save")
@@ -294,6 +316,8 @@ mod_qploidy_server <- function(input, output, session, parent_session){
         if (n.markers.end()/n.markers.start() < 0.25) "darkgreen" else "darkred"
     )
   })
+
+  stand_file <- reactiveVal(NULL)
 
   ## Process inputs
   data_standardized <- eventReactive(input$run_stand, {
@@ -364,7 +388,7 @@ mod_qploidy_server <- function(input, output, session, parent_session){
       # Verify if informed ploidy is the same in file
       ploidy <- c(input$ref_ploidy, input$common_ploidy)
       ploidy <- ploidy[-is.na(ploidy)]
-      print(ploidy)
+
       if(max(genos$geno) != ploidy){
         shinyalert(
           title = "Ploidy Mismatch",
@@ -385,10 +409,9 @@ mod_qploidy_server <- function(input, output, session, parent_session){
       # Updated progress bar
       updateProgressBar(session = session, id = "pb_qploidy", value = 40)
 
-      # Create reactive value for temp path output file
-      temp_path <- tempfile(fileext = ".tsv.gz")
 
-      stand_file <- reactiveVal(temp_path)
+      # Create reactive value for temp path output file
+      tmp <- tempfile(fileext = ".tsv.gz")
 
       data_standardized <- standardize(
         data = input_data,
@@ -399,10 +422,15 @@ mod_qploidy_server <- function(input, output, session, parent_session){
         threshold.missing.geno = if(is.null(input$miss)) 0.9 else input$miss/100,
         threshold.n.clusters = if(is.null(input$n.clusters)) ploidy + 1 else input$n.clusters,
         n.cores = input$cores,
-        out_filename = temp_path,
+        out_filename = tmp,
         verbose = FALSE
       )
+      stand_file(tmp)   # remember the path we wrote
+
+    } else {
+      data_standardized <- read_qploidy_standardization(input$input_file$datapath)
     }
+
     # Update progress bar
     updateProgressBar(session = session, id = "pb_qploidy", value = 100)
 
@@ -429,6 +457,153 @@ mod_qploidy_server <- function(input, output, session, parent_session){
     )
   })
 
+
+  observe({
+    req(data_standardized())
+    samples <- unique(data_standardized()$data$SampleName)
+    updateVirtualSelect(
+      session = session,
+      inputId = "sample",
+      choices = samples,
+      selected = samples[1]
+    )
+
+    chrs <- unique(data_standardized()$data$Chr)
+    updateVirtualSelect(
+      session = session,
+      inputId = "sele_chr",
+      choices = chrs,
+      selected = if(length(chrs) <= 5) chrs else chrs[1:5]
+    )
+  })
+
+  ploidies <- eventReactive(input$est_ploidy, {
+    req(data_standardized())
+
+    if(!is.null(input$centromeres_file2$datapath)){
+      centromeres <- read.csv(input$centromeres_file2$datapath, header = TRUE, stringsAsFactors = FALSE)
+      centromeres_vec <- centromeres[,2]
+      names(centromeres_vec) <- centromeres[,1]
+    } else {
+      centromeres_vec <- NULL
+    }
+
+    ploidies <- as.numeric(unlist(strsplit(input$ploidy_range, ",")))
+    estimated_ploidies <- area_estimate_ploidy(
+      qploidy_standardization = data_standardized(),
+      samples = "all",
+      level = input$res_lvl,
+      ploidies = ploidies,
+      centromeres = if(!is.null(centromeres_vec)) centromeres_vec
+    )
+  })
+
+  output$ploidy_table <- renderDT({
+    req(ploidies())
+    ploidies()$ploidy
+  }, options = list(pageLength = 10, scrollX = TRUE))
+
+  output$download_ploidy_table <- downloadHandler(
+    filename = function() {
+      paste0("ploidy_estimation_", Sys.Date(), ".tsv")
+    },
+    content = function(file) {
+      req(ploidies())
+      write.table(ploidies()$ploidy, file, sep = "\t", row.names = FALSE, quote = FALSE)
+    }
+  )
+
+  built_plot <- eventReactive(input$build_plot, {
+    req(data_standardized())
+    req(input$sample)
+    req(input$plots)
+    req(input$sele_chr)
+
+    # Update progress bar
+    updateProgressBar(session = session, id = "pb_qploidy", value = 0, total = 100)
+
+    chrs <- unique(data_standardized()$data$Chr)
+    chrs_idx <- which(chrs %in% input$sele_chr)
+
+    if(!is.null(input$centromeres_file$datapath)){
+      centromeres <- read.csv(input$centromeres_file$datapath, header = TRUE, stringsAsFactors = FALSE)
+      centromeres_vec <- centromeres[,2]
+      names(centromeres_vec) <- centromeres[,1]
+    } else {
+      centromeres_vec <- NULL
+    }
+
+    updateProgressBar(session = session, id = "pb_qploidy", value = 50)
+
+    p <- plot_qploidy_standardization(
+      x = data_standardized(),
+      sample = input$sample,
+      type = input$plots,
+      chr = chrs_idx,
+      ploidy = input$ploidy,
+      add_expected_peaks = as.logical(input$add_expected_peaks),
+      add_estimated_peaks = as.logical(input$add_estimated_peaks),
+      rm_homozygous = as.logical(input$rm_homozygous),
+      add_centromeres = as.logical(input$add_centromeres),
+      centromeres = centromeres_vec
+    )
+
+
+    # Update progress bar
+    updateProgressBar(session = session, id = "pb_qploidy", value = 100)
+    p
+  })
+
+  output$plot <- renderPlot({
+    built_plot()
+  })
+
+  output$download_stand <- downloadHandler(
+    filename = function() paste0("qploidy_standardized_data_", Sys.Date(), ".tsv.gz"),
+    content  = function(file) {
+      req(data_standardized())                                  # ensure it ran
+      src <- stand_file()
+      validate(need(!is.null(src) && file.exists(src), "File not generated yet."))
+      ok <- file.copy(from = src, to = file, overwrite = TRUE)
+      validate(need(ok, "Failed to copy the standardized file."))
+    }
+  )
+
+  output$download_figure <- downloadHandler(
+    filename = function() {
+      ext <- switch(input$image_type,
+                    "jpeg" = "jpg",
+                    "png"  = "png",
+                    "tiff" = "tiff",
+                    "svg"  = "svg")  # assume UI sends one of these
+      paste0("Qploidy-", Sys.Date(), ".", ext)
+    },
+    content = function(file) {
+      # open the right device
+      switch(input$image_type,
+             "jpeg" = jpeg(file,
+                           width  = as.numeric(input$image_width),
+                           height = as.numeric(input$image_height),
+                           units  = "in", res = as.numeric(input$image_res)),
+             "png"  = png(file,
+                          width  = as.numeric(input$image_width),
+                          height = as.numeric(input$image_height),
+                          units  = "in", res = as.numeric(input$image_res)),
+             "tiff" = tiff(file,
+                           width  = as.numeric(input$image_width),
+                           height = as.numeric(input$image_height),
+                           units  = "in", res = as.numeric(input$image_res)),
+             "svg"  = svg(file,
+                          width  = as.numeric(input$image_width),
+                          height = as.numeric(input$image_height))
+      )
+      on.exit(dev.off(), add = TRUE)
+
+      # draw!
+      p <- built_plot()         # ggplot object (or similar)
+      print(p)                  # crucial for ggplot2
+    }
+  )
 
 }
 

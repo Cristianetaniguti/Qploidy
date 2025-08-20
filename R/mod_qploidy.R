@@ -8,8 +8,6 @@
 #'
 #' @importFrom shiny NS tagList
 #' @importFrom shinyWidgets virtualSelectInput
-#' @import shinydisconnect
-#' @importFrom future availableCores
 #' @importFrom DT DTOutput
 #' @importFrom bs4Dash valueBoxOutput
 #'
@@ -42,7 +40,7 @@ mod_qploidy_ui <- function(id){
                  conditionalPanel(condition = "input.file_type != 'Qploidy Standardized Dataset'",
                                   ns=ns,
                                   radioButtons(ns("known_ploidy"),
-                                               label = "Do you have ≥60 samples with the same, known ploidy?",
+                                               label = "Do you have >=60 samples with the same, known ploidy?",
                                                choices = list("Yes"= "TRUE", "No" = "FALSE"),
                                                selected = "TRUE"),
                                   conditionalPanel(condition = "input.file_type == 'VCF' && input.known_ploidy == 'TRUE'",
@@ -55,7 +53,7 @@ mod_qploidy_ui <- function(id){
                                                    ns = ns,
                                                    fileInput(ns("geno_all"), "Provide fitpoly result _scores file for all samples*")
                                   ),
-                                  sliderInput(ns("cores"), "Number of CPU Cores*", min = 1, max = (availableCores() - 1), value = 1, step = 1),
+                                  numericInput(ns("cores"), "Number of CPU Cores*", min = 1, value = 1),
                                   conditionalPanel(condition = "input.known_ploidy == 'TRUE'",
                                                    ns=ns,
                                                    numericInput(ns("ref_ploidy"), "Reference Samples Ploidy*", min = 1, value = NULL)),

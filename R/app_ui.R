@@ -4,7 +4,6 @@
 #'     DO NOT REMOVE.
 #' @import shiny
 #' @importFrom bs4Dash bs4Badge bs4DashSidebar bs4DashNavbar bs4DashPage sidebarMenu menuItem menuSubItem dashboardBody tabItems tabItem box dashboardFooter
-#' @importFrom shinydisconnect disconnectMessage
 #' @import shinyWidgets
 #'
 #' @noRd
@@ -34,12 +33,6 @@ app_ui <- function(request) {
               href = "#",
               "Session Info",
               onclick = "Shiny.setInputValue('session_info_button', Math.random())"
-            ),
-            tags$a(
-              class = "dropdown-item",
-              href = "#",
-              "Check for Updates",
-              onclick = "Shiny.setInputValue('updates_info_button', Math.random())"
             )
           )
         )
@@ -87,7 +80,6 @@ app_ui <- function(request) {
           "v1.3.0 development")
       ),
       dashboardBody(
-        disconnectMessage(), #Adds generic error message for any error if not already accounted for
         tags$style(
           HTML(
             ".main-footer {

@@ -28,7 +28,13 @@ Imports:
     ggpubr,
     multtest,
     vcfR,
-    stringr
+    stringr,
+    shiny,
+    DT,
+    bs4Dash,
+    config,
+    golem,
+    shinyWidgets
 Encoding: UTF-8
 URL: https://github.com/Cristianetaniguti/Qploidy
 BugReports: https://github.com/Cristianetaniguti/Qploidy/issues

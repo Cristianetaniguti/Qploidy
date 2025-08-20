@@ -1,0 +1,8 @@
+---
+title: "Qploidy_res"
+output: html_document
+---
+
+* Ploidy csv file
+
+* Qploidy data

@@ -1,0 +1,17 @@
+---
+title: "Qploidy_cite"
+output: html_document
+---
+
+- Qploidy
+
+Taniguti, C. H., Lau, J., Hochhaus, T., Arias, D. C. L., Hokanson, S. C., Zlesak, D. C., Byrne, D. H., Klein, P. E., & Riera-Lizarazu, O. (2025). Exploring chromosomal variations in garden roses: Insights from high-density SNP array data and a new tool, Qploidy. The Plant Genome, e70044. https://doi.org/10.1002/tpg2.70044
+
+If you accessed this app throught BIGapp, also cite:
+
+- BIGapp
+
+Sandercock A.M., Peel M.D., Taniguti C.H., Chinchilla-Vargas J., Chen S., Sapkota M., Lin M., Zhao D., Ackerman A.J., Basnet B.R., Beil C.T., Sheehan M.J. (2025). BIGapp: A User-Friendly Genomic Tool Kit Identified Quantitative Trait Loci for Creeping Rootedness in Alfalfa (Medicago sativa L.)., The Plant Genome. doi:https://doi.org/10.1002/tpg2.70067
+
+
+

@@ -1,0 +1,12 @@
+---
+title: "Qploidy_par"
+output: html_document
+---
+
+* VCF
+
+* Illumina array
+
+* Axiom array
+
+* fitpoly file

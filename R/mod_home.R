@@ -19,7 +19,7 @@ mod_Home_ui <- function(id){
                box(
                  title = "Qploidy + BIGapp", status = "info", solidHeader = FALSE, width = 12, collapsible = FALSE,
                  HTML(
-                   "<p><b>About Qploidy.</b> Qploidy package provides a standardization method for allele counts or intensities that allows ploidy and aneuploidy estimation. It was first developed by Cristiane (Cris) Taniguti while working with Oscar Riera-Lizarazu’s group at Texas A&amp;M University. After Cris moved to Breeding Insight (BI), Qploidy’s maintenance and new features have continued under BI—this interface is a direct result of that ongoing effort. Qploidy is now integrated into BIGapp.</p>
+                   "<p><b>About Qploidy.</b> Qploidy package provides a standardization method for allele counts or intensities that allows ploidy and aneuploidy estimation. It was first developed by Cristiane (Cris) Taniguti while working with Oscar Riera-Lizarazu’s group at Texas AM University. After Cris moved to Breeding Insight (BI), Qploidy’s maintenance and new features have continued under BI—this interface is a direct result of that ongoing effort. Qploidy is now integrated into BIGapp.</p>
 
      <p><b>About BIGapp</b> BIGapp is a user-friendly R Shiny application that streamlines low- to mid-density genotyping workflows for diploid and polyploid species. It provides a web-based interface so users can analyze genomic data without command-line tools. New analyses will be added over time, with an initial focus on features that support breeding decisions.</p>
 

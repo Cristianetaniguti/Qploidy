@@ -16,3 +16,6 @@
 # Qploidy 1.1.0
 
 * Beta version of Qploidy + BIGapp interface
+* Fix Bioconductor dependency call
+* Fix %>% call
+

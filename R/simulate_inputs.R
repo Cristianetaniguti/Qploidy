@@ -9,7 +9,7 @@
 #' @return None. The function writes the simulated VCF content to the specified file.
 #'
 #' @importFrom stats rbinom
-#' 
+#'
 #' @export
 simulate_vcf <- function(
     file_path, seed,
@@ -222,6 +222,7 @@ simulate_illumina_file <- function(
 #' }
 #'
 #' @importFrom stats cor rnorm runif
+#' @importFrom magrittr %>%
 #'
 #' @export
 simulate_standardization_input <- function(n_markers = 10,

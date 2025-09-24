@@ -15,6 +15,12 @@
 mod_qploidy_ui <- function(id){
   ns <- NS(id)
   tagList(
+    tags$head(tags$script(HTML("
+    Shiny.addCustomMessageHandler('scroll-top', function(_) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  "))),
+    tags$style(HTML("#to_top { position: fixed; right: 20px; bottom: 20px; z-index: 9999; }")),
     # Add qploidy content here
     fluidRow(
       disconnectMessage(
@@ -33,7 +39,7 @@ mod_qploidy_ui <- function(id){
                              label = 'Select File Format',
                              choices = c("VCF","Axiom Array", "Illumina Array", "Qploidy Standardized Dataset"),
                              selected = "VCF"),
-                 fileInput(ns("input_file"), "Choose File*", accept = c(".csv",".vcf",".gz")),
+                 fileInput(ns("input_file"), "Choose File*", accept = c(".csv",".vcf",".gz", ".txt",".tsv")),
                  conditionalPanel(condition = "input.file_type == 'Axiom Array' || input.file_type == 'Illumina Array'",
                                   ns = ns,
                                   fileInput(ns("marker_pos"), "Input Marker Position file")
@@ -114,7 +120,8 @@ mod_qploidy_ui <- function(id){
                                           "Sum of Allele Counts/Intensities Zscore" = "zscore",
                                           "Standardized Ratio (BAF) Histogram" = "BAF_hist",
                                           "Non-standardized Ratio Scatterplot" = "ratio",
-                                          "Non-standardized Ratio Histogram" = "Ratio_hist_overall"),
+                                          "Sample-level Non-standardized Ratio Histogram" = "Ratio_hist_overall",
+                                          "Sample-level Standardized Ratio (BAF) Histogram" = "BAF_hist_overall"),
                               showValueAsTags = TRUE,
                               search = TRUE,
                               multiple = TRUE
@@ -184,7 +191,7 @@ mod_qploidy_ui <- function(id){
                    )
                ), hr(),
 
-               plotOutput(ns("plot"), height = "500px"),
+               uiOutput(ns("plot_ui")),
 
                div(style="display:inline-block; float:left",dropdownButton(
                  tags$h3("Save Image"),
@@ -230,7 +237,7 @@ mod_qploidy_ui <- function(id){
 
 #' qploidy Server Functions
 #'
-#' @importFrom DT renderDT
+#' @importFrom DT renderDT datatable
 #' @importFrom bs4Dash updatebs4TabItems updateBox
 #' @importFrom shiny updateTabsetPanel
 #' @import dplyr
@@ -322,11 +329,10 @@ mod_qploidy_server <- function(input, output, session, parent_session){
 
   ## Process inputs
   data_standardized <- eventReactive(input$run_stand, {
-    req(input$input_file)
     req(input$file_type)
 
     # Reset progress bar
-    updateProgressBar(session = session, id = "pb_qploidy", value = 0, total = 100)
+    updateProgressBar(session = session, id = "pb_qploidy", value = 5, total = 100)
 
     # Read input file based on type
     if (input$file_type == "VCF") {
@@ -390,7 +396,8 @@ mod_qploidy_server <- function(input, output, session, parent_session){
       ploidy <- c(input$ref_ploidy, input$common_ploidy)
       ploidy <- ploidy[-is.na(ploidy)]
 
-      if(max(genos$geno) != ploidy){
+      if(max(genos$geno, na.rm = TRUE) != ploidy){
+        print("aqui")
         shinyalert(
           title = "Ploidy Mismatch",
           text = "Genotype on File doesn't match Ploidy informed",
@@ -405,6 +412,7 @@ mod_qploidy_server <- function(input, output, session, parent_session){
           showCancelButton = FALSE,
           animation = TRUE
         )
+        return()
       }
 
       # Updated progress bar
@@ -501,8 +509,29 @@ mod_qploidy_server <- function(input, output, session, parent_session){
 
   output$ploidy_table <- renderDT({
     req(ploidies())
-    ploidies()$ploidy
-  }, options = list(pageLength = 10, scrollX = TRUE))
+    datatable(ploidies()$ploidy,
+              selection = "single",
+              options = list(pageLength = 10, scrollX = TRUE))
+  })
+
+  picked_samples <- eventReactive(input$ploidy_table_rows_selected, {
+    req(ploidies())
+    s <- input$ploidy_table_rows_selected
+    req(length(s) == 1)
+    print(s)
+    rownames(ploidies()$ploidy)[input$ploidy_table_rows_selected]
+  })
+
+  observeEvent(picked_samples(),{
+    print(picked_samples())
+    updateVirtualSelect(
+      session = session,
+      inputId = "sample",
+      selected = picked_samples()
+    )
+
+    session$sendCustomMessage("scroll-top", TRUE)
+  })
 
   output$download_ploidy_table <- downloadHandler(
     filename = function() {
@@ -557,6 +586,12 @@ mod_qploidy_server <- function(input, output, session, parent_session){
 
   output$plot <- renderPlot({
     built_plot()
+  }, res = 96)
+
+  output$plot_ui <- renderUI({
+    n <- max(1L, length(input$plots))        # treat 0 as 1
+    base_h <- 350                             # px per plot “unit”
+    plotOutput(session$ns("plot"), height = paste0(base_h * n, "px"))
   })
 
   output$download_stand <- downloadHandler(

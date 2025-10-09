@@ -30,7 +30,8 @@ globalVariables(c("Chr", "baf", "z", "ratio", "median", "window", "prop_het"))
 #'
 #' @import ggplot2
 #' @importFrom dplyr filter
-#' @importFrom dplyr %>%
+#' @importFrom magrittr "%>%"
+#'
 #' @export
 plot_baf <- function(data_sample,
                      area_single,
@@ -169,6 +170,8 @@ plot_baf <- function(data_sample,
 #'
 #' @import ggplot2
 #' @importFrom dplyr filter
+#' @importFrom magrittr "%>%"
+#'
 #' @export
 plot_baf_hist <- function(data_sample,
                           area_single,
@@ -446,6 +449,7 @@ plot_baf_hist <- function(data_sample,
 #' @importFrom ggpubr ggarrange annotate_figure text_grob
 #' @import ggplot2
 #' @importFrom dplyr filter group_by summarise
+#' @importFrom magrittr "%>%"
 #' @importFrom tidyr pivot_wider
 #' @export
 plot_qploidy_standardization <- function(x,
@@ -480,7 +484,7 @@ plot_qploidy_standardization <- function(x,
   if (is.null(chr)) {
     chr <- sort(unique(data_sample$Chr))
   } else if (is.numeric(chr)) {
-    chr <- sort(unique(data_sample$Chr))[chr]
+    chr <- unique(data_sample$Chr)[chr] # BUGfix - in case the values are not sorted at the data
   }
 
   if(!all(chr %in% unique(data_sample$Chr))) {
@@ -835,3 +839,323 @@ all_resolutions_plots <- function(
   names(p_list) <- c("chromosome", "chromosome_arm", "sample")
   return(p_list)
 }
+
+#' Plot X–Y scatter with ploidy dosage guide lines and optional sample highlighting
+#'
+#' @description
+#' Creates a dot plot of allele counts `X` (A-allele) vs `Y` (B-allele) and overlays
+#' expected dosage guide lines for a given ploidy. You can either color all samples
+#' (`sample = "all"`) or highlight a single sample while rendering the others in gray.
+#' Samples that have no plotted points (e.g., due to non-finite `X`/`Y`) are
+#' automatically omitted from the legend.
+#'
+#' @details
+#' The function:
+#' * Drops rows where `X` or `Y` are non-finite before plotting and builds the legend
+#'   from the remaining points.
+#' * When `sample = "all"`, colors points by `SampleName` (requires a `SampleName` column).
+#' * When `sample` is a specific name, only that sample is colored with
+#'   `highlight_color`; all others use `other_color`. If the requested sample has
+#'   no plotted points, it is omitted from the legend.
+#' * Draws dosage guide lines for dosages `d = 0, …, ploidy`:
+#'   `d = 0` → horizontal line `Y = 0`; `d = ploidy` → vertical line `X = 0`;
+#'   intermediate dosages are lines through the origin with slope
+#'   \eqn{(d/ploidy) / (1 - d/ploidy)}.
+#' * Uses a fixed aspect ratio (`coord_fixed`) so that one unit on the x- and y-axes
+#'   has the same length.
+#'
+#' @param df A `data.frame` containing at least columns `X` and `Y`. If
+#'   `sample = "all"` or a specific sample is to be highlighted, `df` should also
+#'   contain a `SampleName` column.
+#' @param ploidy Integer (≥ 2). Ploidy used to compute and draw dosage guide lines.
+#' @param sample Character. Either `"all"` to color all samples by `SampleName`,
+#'   or the name of a single sample to highlight. Default: `"all"`.
+#' @param highlight_color Color used for the highlighted sample when
+#'   `sample != "all"`. Default: `"tomato"`.
+#' @param other_color Color used for non-highlighted samples when
+#'   `sample != "all"`. Default: `"grey75"`.
+#'
+#' @return A **ggplot** object.
+#'
+#'
+#' @seealso [plot_baf_with_ploidy_guides()] for plotting standardized BAF-based coordinates.
+#'
+#' @import ggplot2
+#' @export
+plot_xy_with_ploidy_guides <- function(df, ploidy = 2,
+                                       sample = NULL,
+                                       highlight_color = "tomato",
+                                       other_color = "grey75") {
+  stopifnot(all(c("X","Y") %in% names(df)))
+  if (!"SampleName" %in% names(df) && identical(sample, "all")) {
+    stop("Column 'SampleName' is required when sample='all'.")
+  }
+
+  # Keep only rows that will actually plot
+  df$.__ok__ <- is.finite(df$X) & is.finite(df$Y)
+  df_plot <- df[df$.__ok__, , drop = FALSE]
+  if (nrow(df_plot) == 0) stop("No points to plot after removing NAs in coordinates.")
+
+  # Ensure SampleName is a factor with only observed levels
+  if ("SampleName" %in% names(df_plot)) {
+    if (is.factor(df_plot$SampleName)) {
+      df_plot$SampleName <- droplevels(df_plot$SampleName)
+    } else {
+      df_plot$SampleName <- factor(df_plot$SampleName)
+    }
+  }
+
+  max_x <- max(df_plot$X, na.rm = TRUE)
+  max_y <- max(df_plot$Y, na.rm = TRUE)
+
+  # Build guide definitions
+  dosage <- 0:ploidy
+  ratio  <- dosage / ploidy
+  slope  <- ratio / (1 - ratio)                 # Inf when ratio == 1
+  type   <- ifelse(dosage == 0, "h",
+                   ifelse(dosage == ploidy, "v", "abline"))
+  guides <- data.frame(dosage, ratio, slope, type)
+
+  # Base plot (legend reflects only samples present in df_plot)
+  if(is.null(sample)){
+    p <- ggplot(df_plot, aes(X, Y)) +
+      geom_point(alpha = 0.85, size = 2, na.rm = TRUE) +
+      guides(color = guide_legend(override.aes = list(alpha = 1)))
+  } else if (identical(sample, "all")) {
+    p <- ggplot(df_plot, aes(X, Y)) +
+      geom_point(aes(color = SampleName), alpha = 0.85, size = 2, na.rm = TRUE) +
+      scale_color_discrete(drop = TRUE) +
+      guides(color = guide_legend(override.aes = list(alpha = 1)))
+  } else {
+    if (!"SampleName" %in% names(df_plot)) stop("Column 'SampleName' not found.")
+    has_highlight <- any(df_plot$SampleName == sample, na.rm = TRUE)
+    if (has_highlight) {
+      df_plot$.__hl__ <- factor(ifelse(df_plot$SampleName == sample, "highlight", "other"),
+                                levels = c("highlight","other"))
+      brks <- "highlight"; labs <- sample
+    } else {
+      df_plot$.__hl__ <- factor("other", levels = c("highlight","other"))
+      brks <- NULL; labs <- NULL
+      warning(sprintf("Sample '%s' has no plotted points. Legend will omit it.", sample))
+    }
+
+    p <- ggplot(df_plot, aes(X, Y)) +
+      geom_point(aes(color = .__hl__), alpha = 0.85, size = 2, na.rm = TRUE) +
+      scale_color_manual(values = c(highlight = highlight_color, other = other_color),
+                         breaks = brks, labels = labs, drop = TRUE) +
+      guides(color = guide_legend(title = NULL, override.aes = list(alpha = 1)))
+  }
+
+  lim <- max(max_x, max_y)            # same range on both axes
+  pad <- 0.05 * lim                   # small headroom for corner labels
+
+  p <- p +
+    scale_x_continuous(limits = c(0, lim + pad), expand = c(0, 0)) +
+    scale_y_continuous(limits = c(0, lim + pad), expand = c(0, 0)) +
+    coord_equal(clip = "off") +       # same as coord_fixed(ratio = 1)
+    labs(x = "X (reads for allele A)",
+         y = "Y (reads for allele B)") +
+    theme_minimal(base_size = 12) +
+    theme(aspect.ratio = 1,           # make the panel square
+          plot.margin = margin(12, 24, 12, 24))
+
+  # Intermediate dosages (lines through origin)
+  ab <- subset(guides, type == "abline")
+  if (nrow(ab)) {
+    p <- p + geom_abline(data = ab, aes(slope = slope, intercept = 0),
+                         linetype = "dashed", alpha = 0.6)
+
+    lab_x <- pmin(max_x * 0.85, ifelse(ab$slope > 0, max_y * 0.85 / ab$slope, max_x * 0.85))
+    lab_y <- ab$slope * lab_x
+    p <- p + annotate(
+      "text",
+      x = lab_x, y = lab_y,
+      label = paste0("d=", ab$dosage, " (", round(ab$ratio, 2), ")"),
+      hjust = 1, vjust = -0.2, size = 3
+    )
+  }
+
+  # d = 0 (Y=0) and d = ploidy (X=0)
+  if (any(guides$type == "h")) {
+    p <- p + geom_hline(yintercept = 0, linetype = "dashed", alpha = 0.6) +
+      annotate("text", x = max_x * 0.95, y = 0, label = "d=0 (0)", vjust = -0.6, size = 3)
+  }
+  if (any(guides$type == "v")) {
+    p <- p + geom_vline(xintercept = 0, linetype = "dashed", alpha = 0.6) +
+      annotate("text", x = 0, y = max_y * 0.95, label = paste0("d=", ploidy, " (1)"),
+               hjust = -0.1, vjust = 1.1, angle = 90, size = 3)
+  }
+
+  p
+}
+
+#' Plot BAF-derived X–Y scatter with ploidy dosage guides (optional sample highlighting)
+#'
+#' @description
+#' Reconstructs Cartesian coordinates from standardized B-allele frequency (BAF) and
+#' read depth `R` as \eqn{X = (1 - \mathrm{BAF}) \cdot R} and \eqn{Y = \mathrm{BAF} \cdot R},
+#' then draws a scatter plot with expected dosage guide lines for a given ploidy.
+#' You can color all samples by `SampleName` or highlight a single sample and render
+#' the rest in gray. Samples with no plottable points (non-finite coordinates) are
+#' automatically omitted from the legend.
+#'
+#' @details
+#' * Coordinates are computed from BAF and depth: \eqn{X=(1-\mathrm{BAF})R}, \eqn{Y=\mathrm{BAF}R}.
+#' * If `fallback_to_ratio = TRUE` and `baf` is `NA`, values from `ratio` are used.
+#'   The effective BAF is clamped into \[0, 1\].
+#' * When `normalize_depth = TRUE`, all points are projected to the same radius
+#'   (depth) given by `radius` (or `stats::median(R)` if `radius` is `NULL`), which
+#'   emphasizes dosage bands rather than depth variation. When `FALSE`, each point
+#'   uses its own `R`.
+#' * Dosage guide lines are drawn for \eqn{d \in \{0,\dots,\mathrm{ploidy}\}}:
+#'   `d = 0` → horizontal line `Y = 0`; `d = ploidy` → vertical line `X = 0`;
+#'   intermediate dosages are lines through the origin with slope
+#'   \eqn{(d/\mathrm{ploidy}) / (1 - d/\mathrm{ploidy})}.
+#' * The legend is built from actually plotted rows only; if a requested `sample`
+#'   has no plottable points, it is omitted from the legend.
+#' * Uses a fixed aspect ratio (`coord_fixed`) so x and y units are comparable.
+#'
+#' @param df A `data.frame` with required columns:
+#'   - `baf` (numeric in \[0,1\]): standardized B-allele frequency.
+#'   - `R` (numeric): total read depth.
+#'   - `SampleName` (character/factor): sample label used for coloring.
+#'   Optional column `ratio` may be present and used when `fallback_to_ratio = TRUE`.
+#' @param ploidy Integer (≥ 2). Ploidy used to compute dosage guide lines.
+#' @param fallback_to_ratio Logical. If `TRUE`, fill `NA` values in `baf` with
+#'   corresponding values from `ratio` (when available). Default: `FALSE`.
+#' @param normalize_depth Logical. If `TRUE`, place all points on a common radius
+#'   (see `radius`); if `FALSE`, use each point's `R`. Default: `TRUE`.
+#' @param radius Numeric scalar radius to use when `normalize_depth = TRUE`.
+#'   If `NULL`, uses `stats::median(df$R, na.rm = TRUE)`. Ignored when
+#'   `normalize_depth = FALSE`. Default: `NULL`.
+#' @param sample Character. Either `"all"` to color all samples by `SampleName`,
+#'   or the name of a single sample to highlight. Default: `"all"`.
+#' @param highlight_color Color for the highlighted sample when `sample != "all"`.
+#'   Default: `"tomato"`.
+#' @param other_color Color for non-highlighted samples when `sample != "all"`.
+#'   Default: `"grey75"`.
+#'
+#' @return A **ggplot** object.
+#'
+#'
+#' @seealso [plot_xy_with_ploidy_guides()] for plotting raw `X`/`Y` counts with guides.
+#'
+#' @import ggplot2
+#' @importFrom stats median
+#' @export
+plot_baf_with_ploidy_guides <- function(df,
+                                        ploidy = 2,
+                                        fallback_to_ratio = FALSE,
+                                        normalize_depth = TRUE,
+                                        radius = NULL,
+                                        sample = NULL,
+                                        highlight_color = "tomato",
+                                        other_color = "grey75") {
+  stopifnot("R" %in% names(df))
+  if (!"baf" %in% names(df)) stop("Column 'baf' not found.")
+  if (!"SampleName" %in% names(df)) stop("Column 'SampleName' not found (needed for coloring).")
+
+  # Effective BAF
+  baf_eff <- df$baf
+  if (fallback_to_ratio && "ratio" %in% names(df)) {
+    baf_eff[is.na(baf_eff)] <- df$ratio[is.na(baf_eff)]
+  }
+  baf_eff <- pmin(pmax(baf_eff, 0), 1)
+
+  # Depth to use
+  if (normalize_depth) {
+    if (is.null(radius)) radius <- stats::median(df$R, na.rm = TRUE)
+    Ruse <- rep(radius, nrow(df))
+  } else {
+    Ruse <- df$R
+  }
+
+  # Coordinates from BAF and depth
+  df$Xb <- (1 - baf_eff) * Ruse
+  df$Yb <- baf_eff * Ruse
+
+  # Keep only points that will actually plot
+  df$.__ok__ <- is.finite(df$Xb) & is.finite(df$Yb)
+  df_plot <- df[df$.__ok__, , drop = FALSE]
+  if (nrow(df_plot) == 0) stop("No points to plot after removing NAs in coordinates.")
+
+  # Guides
+  dosage <- 0:ploidy
+  ratio  <- dosage / ploidy
+  slope  <- ratio / (1 - ratio)
+  type   <- ifelse(dosage == 0, "h", ifelse(dosage == ploidy, "v", "abline"))
+  guides <- data.frame(dosage, ratio, slope, type)
+
+  max_x <- max(df_plot$Xb, na.rm = TRUE)
+  max_y <- max(df_plot$Yb, na.rm = TRUE)
+
+  # Coloring
+  if(is.null(sample)){
+    p <- ggplot(df_plot, aes(Xb, Yb)) +
+      geom_point(alpha = 0.85, size = 2, na.rm = TRUE) +
+      guides(color = guide_legend(override.aes = list(alpha = 1)))
+  } else   if (identical(sample, "all")) {
+    p <- ggplot(df_plot, aes(Xb, Yb)) +
+      geom_point(aes(color = SampleName), alpha = 0.85, size = 2, na.rm = TRUE) +
+      scale_color_discrete(drop = TRUE) +
+      guides(color = guide_legend(override.aes = list(alpha = 1)))
+  } else {
+    has_highlight <- any(df_plot$SampleName == sample, na.rm = TRUE)
+    if (has_highlight) {
+      df_plot$.__hl__ <- factor(ifelse(df_plot$SampleName == sample, "highlight", "other"),
+                                levels = c("highlight","other"))
+      brks <- "highlight"; labs <- sample
+    } else {
+      df_plot$.__hl__ <- factor("other", levels = c("highlight","other"))
+      brks <- NULL; labs <- NULL
+    }
+    p <- ggplot(df_plot, aes(Xb, Yb)) +
+      geom_point(aes(color = .__hl__), alpha = 0.85, size = 2, na.rm = TRUE) +
+      scale_color_manual(values = c(highlight = highlight_color, other = other_color),
+                         breaks = brks, labels = labs, drop = TRUE) +
+      guides(color = guide_legend(title = NULL, override.aes = list(alpha = 1)))
+  }
+
+
+  lim <- max(max_x, max_y)            # same range on both axes
+  pad <- 0.05 * lim                   # small headroom for corner labels
+  # Rest of the plot
+  p <- p +
+    scale_x_continuous(limits = c(0, lim + pad), expand = c(0, 0)) +
+    scale_y_continuous(limits = c(0, lim + pad), expand = c(0, 0)) +
+    coord_equal(clip = "off") +       # same as coord_fixed(ratio = 1)
+    labs(
+      x = "X = (1 - BAF) * R",
+      y = "Y = BAF * R"
+    ) +
+    theme_minimal(base_size = 12) +
+    theme(aspect.ratio = 1,           # make the panel square
+          plot.margin = margin(12, 24, 12, 24))
+
+  # Intermediate dosage guides
+  ab <- subset(guides, type == "abline" & is.finite(slope))
+  if (nrow(ab)) {
+    p <- p + geom_abline(data = ab, aes(slope = slope, intercept = 0),
+                         linetype = "dashed", alpha = 0.6)
+    lab_x <- pmin(max_x * 0.85, ifelse(ab$slope > 0, max_y * 0.85 / ab$slope, max_x * 0.85))
+    lab_y <- ab$slope * lab_x
+    p <- p + annotate("text", x = lab_x, y = lab_y,
+                      label = paste0("d=", ab$dosage, " (", round(ab$ratio, 2), ")"),
+                      hjust = 1, vjust = -0.2, size = 3)
+  }
+
+  # d = 0 and d = ploidy
+  if (any(guides$type == "h")) {
+    p <- p + geom_hline(yintercept = 0, linetype = "dashed", alpha = 0.6) +
+      annotate("text", x = max_x * 0.95, y = 0, label = "d=0 (0)", vjust = -0.6, size = 3)
+  }
+  if (any(guides$type == "v")) {
+    p <- p + geom_vline(xintercept = 0, linetype = "dashed", alpha = 0.6) +
+      annotate("text", x = 0, y = max_y * 0.95, label = paste0("d=", ploidy, " (1)"),
+               hjust = -0.1, vjust = 1.1, angle = 90, size = 3)
+  }
+
+  p
+}
+
+

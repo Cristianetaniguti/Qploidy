@@ -2,7 +2,11 @@
 knitr::opts_chunk$set(echo = TRUE)
 
 ## ----eval=FALSE---------------------------------------------------------------
-# # install.packages("devtools")
+# # Install the latest stable version from CRAN
+# install.packages("Qploidy")
+# 
+# # Install the development version from GitHub
+# #install.packages("devtools")
 # devtools::install_github("cristianetaniguti/Qploidy")
 
 ## -----------------------------------------------------------------------------

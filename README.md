@@ -46,6 +46,13 @@ install.packages("Qploidy")
 devtools::install_github("cristianetaniguti/Qploidy")
 ```
 
+## Access Shiny interface
+
+``` r
+library(Qploidy)
+run_app()
+```
+
 ## Documentation
 
 * [`Qploidy` tutorial](https://cristianetaniguti.github.io/Qploidy/Qploidy.html) for directions on how to run
@@ -64,5 +71,10 @@ Taniguti, C. H., Lau, J., Hochhaus, T., Arias, D. C. L., Hokanson, S. C., Zlesak
 
 ## Acknowledgments
 
+### Version 1.0.0
+
 This work is funded in part by the Robert E. Basye Endowment in Rose Genetics, Dept. of Horticultural Sciences, Texas A&M University, and USDA’s National Institute of Food and Agriculture (NIFA), Specialty Crop Research Initiative (SCRI) projects: ‘‘Tools for Genomics-Assisted Breeding in Polyploids: Development of a Community Resource’’ (Award No. 2020-51181-32156); and ‘‘Developing Sustainable Rose Landscapes via Rose Rosette Disease Education, Socioeconomic Assessments, and Breeding RRD-Resistant Roses with Stable Black Spot Resistance’’ (Award No. 2022-51181-38330).
 
+### Versions > 1.0.0
+
+Supported by [Breeding Insight](https://www.breedinginsight.org/).

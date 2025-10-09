@@ -9,7 +9,7 @@ find_header_line(summary_file, word = "probeset_id", max_lines = 6000)
 \arguments{
 \item{summary_file}{The path to the file to be scanned.}
 
-\item{word}{The keyword to search for in the first column. Default is 
+\item{word}{The keyword to search for in the first column. Default is
 "probeset_id".}
 
 \item{max_lines}{The maximum number of lines to scan. Default is 6000.}
@@ -18,7 +18,7 @@ find_header_line(summary_file, word = "probeset_id", max_lines = 6000)
 The line number where the keyword is found.
 }
 \description{
-This function scans a file to locate the first line containing a specific 
-keyword, such as 'probeset_id'. It is useful for identifying the starting 
+This function scans a file to locate the first line containing a specific
+keyword, such as 'probeset_id'. It is useful for identifying the starting
 point of data in files with headers or metadata.
 }

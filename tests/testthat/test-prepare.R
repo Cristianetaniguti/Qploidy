@@ -9,7 +9,7 @@ test_that("qploidy_read_vcf handles VCF input correctly", {
   simulate_vcf(temp, seed = 1213)
 
   checks <- vcf_sanity_check(temp)
-  expect_true(all(checks$checks[-c(10,11,12,13)]))
+  expect_true(all(checks$checks[-c(12,13,14,15)]))
 
   result <- qploidy_read_vcf(temp, geno = FALSE, geno.pos = FALSE)
   expect_s3_class(result, "data.frame")

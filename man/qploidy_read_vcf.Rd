@@ -9,18 +9,18 @@ qploidy_read_vcf(vcf_file, geno = FALSE, geno.pos = FALSE)
 \arguments{
 \item{vcf_file}{Path to the VCF file.}
 
-\item{geno}{Logical. If TRUE, the output columns will include MarkerName, 
-SampleName, geno, and prob. If FALSE, the output will include MarkerName, 
+\item{geno}{Logical. If TRUE, the output columns will include MarkerName,
+SampleName, geno, and prob. If FALSE, the output will include MarkerName,
 SampleName, X, Y, R, and ratio.}
 
-\item{geno.pos}{Logical. If TRUE, the output will include MarkerName, 
+\item{geno.pos}{Logical. If TRUE, the output will include MarkerName,
 Chromosome, and Position columns.}
 }
 \value{
 A data frame containing the processed VCF data.
 }
 \description{
-This function converts a VCF file into a format compatible with Qploidy 
-analysis. It extracts genotype and allele depth information and formats 
+This function converts a VCF file into a format compatible with Qploidy
+analysis. It extracts genotype and allele depth information and formats
 it into a data frame.
 }

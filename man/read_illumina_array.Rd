@@ -13,7 +13,7 @@ read_illumina_array(...)
 A data frame containing the processed Illumina array data.
 }
 \description{
-This function reads Illumina array files and processes them into a format 
-suitable for Qploidy analysis. It adds a suffix to sample IDs if multiple 
+This function reads Illumina array files and processes them into a format
+suitable for Qploidy analysis. It adds a suffix to sample IDs if multiple
 files are provided.
 }

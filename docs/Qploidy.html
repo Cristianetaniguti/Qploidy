@@ -915,7 +915,7 @@ margin-left: 0 !important;
 <p>This vignette describes how to use <code>Qploidy</code>, an R package
 designed for ploidy and aneuploidy estimation using genotyping platform
 data. For a detailed explanation of the <code>Qploidy</code>
-methodology, please refer to its <a href>publication</a>.</p>
+methodology, please refer to its publication.</p>
 <div id="when-does-the-qploidy-methodology-work" class="section level3">
 <h3>When does the <code>Qploidy</code> methodology work?</h3>
 <p>The <code>Qploidy</code> approach is effective under the following
@@ -953,9 +953,13 @@ individuals).</p>
 <div id="installation" class="section level1">
 <h1>Installation</h1>
 <p>To install the <code>Qploidy</code> package, you can use the
-following command:</p>
-<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="co"># install.packages(&quot;devtools&quot;)</span></span>
-<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a>devtools<span class="sc">::</span><span class="fu">install_github</span>(<span class="st">&quot;cristianetaniguti/Qploidy&quot;</span>)</span></code></pre></div>
+following commands:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="co"># Install the latest stable version from CRAN</span></span>
+<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a><span class="fu">install.packages</span>(<span class="st">&quot;Qploidy&quot;</span>)</span>
+<span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a></span>
+<span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a><span class="co"># Install the development version from GitHub</span></span>
+<span id="cb1-5"><a href="#cb1-5" tabindex="-1"></a><span class="co">#install.packages(&quot;devtools&quot;)</span></span>
+<span id="cb1-6"><a href="#cb1-6" tabindex="-1"></a>devtools<span class="sc">::</span><span class="fu">install_github</span>(<span class="st">&quot;cristianetaniguti/Qploidy&quot;</span>)</span></code></pre></div>
 </div>
 <div id="input-files" class="section level1">
 <h1>Input files</h1>
@@ -963,8 +967,7 @@ following command:</p>
 file containing 50 samples and 500 genetic markers, allowing for a
 concise and computationally efficient example. We also present results
 derived from a real-world rose Axiom array dataset, which includes 524
-garden rose cultivars and a total of 137,786 genetic markers. For
-additional context and methodological details, please refer to this <a href>this publication</a>.</p>
+garden rose cultivars and a total of 137,786 genetic markers.</p>
 <div id="target-sequencing-vcf-file" class="section level2">
 <h2>Target sequencing VCF file</h2>
 <p>Let’s generate our simulated VCF file. This file contains 500 markers
@@ -1130,7 +1133,7 @@ during the first round of the <code>Qploidy</code> run:</p>
 samples. If you haven’t done this yet, you can use any suitable dosage
 caller.</p>
 <ul>
-<li>For <strong>array data</strong>, we recommend using the <a href="https://cran.r-project.org/web/packages/fitPoly/index.html"><code>fitPoly</code></a>
+<li>For <strong>array data</strong>, we recommend using the <a href="https://CRAN.R-project.org/package=fitPoly"><code>fitPoly</code></a>
 package.<br />
 </li>
 <li>For <strong>sequencing data</strong>, we suggest using the <a href="https://github.com/dcgerard/updog"><code>updog</code></a> or <a href="https://github.com/lvclark/polyRAD"><code>polyRAD</code></a>
@@ -1370,7 +1373,7 @@ these information in a separate file as the following example.</p>
 ## Generating z scores...
 ## Z scores ready!
 ## Merging results into qploidy_standardization object...
-## Writting Qploidy app input file:/var/folders/0v/yvmmxrp55jxdjsky45t_cmt40000gp/T//Rtmpi15GPE/file42c54d9e36ce.tsv.gzDone!</code></pre>
+## Writting Qploidy app input file:/var/folders/0v/yvmmxrp55jxdjsky45t_cmt40000gp/T//RtmpNjiqhG/fileb29c10f8fb0.tsv.gzDone!</code></pre>
 <pre><code>## This is on object of class &#39;ploidy_standardization&#39;
 ## --------------------------------------------------------------------
 ## Parameters
@@ -1795,7 +1798,7 @@ samples in a loop:</p>
 <span id="cb94-16"><a href="#cb94-16" tabindex="-1"></a>}</span></code></pre></div>
 <p>By visualizing the plots, you can correct the results from
 <code>area_estimate_ploidy</code> and add resolution information for
-each sample. In our perfect simualted data, all samples correctly
+each sample. In our perfect simulated data, all samples correctly
 identified therefore we will just move forward with the analysis.</p>
 <div class="sourceCode" id="cb95"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb95-1"><a href="#cb95-1" tabindex="-1"></a>ploidy_corrected <span class="ot">&lt;-</span> estimated_ploidies_chromosome<span class="sc">$</span>ploidy</span></code></pre></div>
 </div>

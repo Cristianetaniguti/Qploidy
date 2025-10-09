@@ -104,7 +104,7 @@ test_that("standardize runs and returns expected object", {
   expect_equal(sum(result$data$baf, na.rm = TRUE), 27.3644 ,tolerance = 0.001)
 
 
-  temp <- tempfile()
+  temp <- tempfile(fileext = ".tsv")
   result <- standardize(
     data = fake_input$sample_data,
     genos = fake_input$geno_data,

@@ -18,6 +18,6 @@ A list containing the following elements:
   - Both data frames include a `MarkerName` column as the first column, which contains marker identifiers.
 }
 \description{
-This function calculates R and theta values from a cleaned summary file. 
+This function calculates R and theta values from a cleaned summary file.
 It optionally performs standard normalization by plate and markers.
 }

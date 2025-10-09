@@ -1,0 +1,133 @@
+---
+title: "Qploidy_par"
+output: html_document
+---
+
+# Supported Input Types for Qploidy
+
+## VCF
+
+Variant Call Format (VCF) files must contain genotype (GT) and allele depth (AD) fields. 
+Qploidy extracts marker, sample, allele counts, and computes ratios. The file should have a 
+standard VCF header, with sample columns and GT:AD values for each marker/sample.
+
+Example (first 6 rows):
+```vcf
+##fileformat=VCFv4.2
+##source=simulated
+#CHROM POS ID REF ALT QUAL FILTER INFO FORMAT Sample1 Sample2
+chr1 100 . A G . PASS . GT:AD 0/0:10,0 0/1:5,5
+chr1 200 . T C . PASS . GT:AD 0/1:7,3 1/1:0,10
+chr1 300 . G A . PASS . GT:AD 1/1:0,12 0/0:11,0
+chr1 400 . C T . PASS . GT:AD 0/0:8,0 0/1:4,6
+chr1 500 . A C . PASS . GT:AD 0/1:6,4 1/1:0,9
+```
+
+## Illumina Array
+Illumina array files (e.g., GSGT output) contain a header section and a [Data] section. 
+Qploidy uses the [Data] table, which should include columns such as `SNP Name`, `Sample ID`, 
+`GC Score`, `Theta`, `X`, `Y`, `X Raw`, `Y Raw`, and `Log R Ratio`. Only the [Data] section is 
+used for analysis. Each row represents a SNP/sample combination, with X and Y as normalized intensities.
+
+Example (first 7 rows):
+```tsv
+[Header]
+GSGT Version    2.0.5
+Processing Date 4/17/2023 9:31 AM
+Content         PotatoV3_20014212_A1.bpm
+Num SNPs        21226
+Total SNPs      21226
+Num Samples     243
+Total Samples   243
+[Data]
+SNP Name        Sample ID       GC Score        Theta   X       Y       X Raw   Y Raw   Log R Ratio
+CTRL-1  AORTX07781-2    0.6814  0.247   0.023   0.009   504     100     0.5211668
+CTRL-10 AORTX07781-2    0.9204  0.000   0.006   0.000   346     27      -1.021583
+CTRL-100        AORTX07781-2    0.1695  0.367   0.030   0.020   576     158     1.177404
+CTRL-101        AORTX07781-2    0.8655  0.222   0.026   0.010   538     102     0.3459635
+CTRL-103        AORTX07781-2    0.8932  0.000   0.019   0.000   465     18      0.7578704
+CTRL-104        AORTX07781-2    0.5146  0.175   0.041   0.012   675     114     1.016254
+CTRL-105        AORTX07781-2    0.8060  0.450   0.018   0.015   458     132     0.4305636
+```
+
+## Axiom Array
+
+Axiom summary files contain several header lines, followed by a table where each marker is represented 
+by two rows: one ending in `-A` (A allele) and one in `-B` (B allele). Columns are `probeset_id` and 
+sample IDs. Each cell contains the intensity value for that allele/sample. Qploidy expects this format 
+for conversion to long-format marker/sample tables.
+
+Example (first 6 rows):
+```tsv
+probeset_id	sample_ID1	sample_ID2	sample_ID3
+AX-86752740-A	1451.16125	1320.55213	1580.44210
+AX-86752740-B	1200.55213	1100.44210	1250.16125
+AX-12345678-A	1300.00000	1400.00000	1350.00000
+AX-12345678-B	1100.00000	1200.00000	1150.00000
+AX-87654321-A	1500.00000	1550.00000	1525.00000
+AX-87654321-B	1250.00000	1300.00000	1275.00000
+```
+
+## CSV/TSV Genotype Matrix (data)
+
+Long format table with columns: `MarkerName`, `SampleName`, `X`, `Y`, `R`, `ratio`.
+Each row is a marker/sample combination, with X and Y as normalized intensities, R as total intensity, 
+and ratio as allelic ratio.
+
+Example (first 6 rows):
+```tsv
+ MarkerName  SampleName  X  Y  R     ratio
+1   chr1_mk1 Tetraploid1  6 27 33 0.8181818
+2   chr1_mk1 Tetraploid2 36  0 36 0.0000000
+3   chr1_mk1 Tetraploid3 27  7 34 0.2058824
+4   chr1_mk1 Tetraploid4  0 36 36 1.0000000
+5   chr1_mk1 Tetraploid5 24  8 32 0.2500000
+6   chr1_mk1    Diploid1 13  8 21 0.3809524
+```
+
+## CSV/TSV Genotype Matrix (geno)
+
+Long format table with columns: `MarkerName`, `SampleName`, `geno`, `prob`. Each row is a marker/sample 
+combination, with `geno` as genotype call and `prob` as confidence/probability (can be NA).
+
+Example (first 6 rows):
+```tsv
+  MarkerName  SampleName geno prob
+1   chr1_mk1    Diploid1    1   NA
+2   chr1_mk1    Diploid2    1   NA
+3   chr1_mk1 Tetraploid1    3   NA
+4   chr1_mk1 Tetraploid2    0   NA
+5   chr1_mk1 Tetraploid3    1   NA
+6   chr1_mk1 Tetraploid4    4   NA
+```
+
+## CSV/TSV Marker Positions (geno.pos)
+
+Table with columns: `MarkerName`, `Chromosome`, `Position`. Each row is a marker, with chromosome and
+ base position.
+
+Example (first 6 rows):
+```tsv
+ MarkerName Chromosome Position
+1   chr1_mk1       chr1  1498011
+2   chr1_mk2       chr1  2548895
+3   chr1_mk3       chr1  4462582
+4   chr1_mk4       chr1  4832434
+5   chr1_mk5       chr1  5550245
+6   chr1_mk6       chr1  7873646
+```
+
+## fitpoly File
+
+Fitpoly output (_scores.dat) is a long format table with columns: `marker`, `MarkerName`, `SampleName`, 
+`ratio`, `P0`, `P1`, `P2`, `P3`, `P4`, `maxgeno`, `maxP`, `geno`. Each row is a marker/sample combination, 
+with genotype probabilities for each class, the most likely genotype, and its probability.
+
+Example (first 6 rows):
+```tsv
+marker  MarkerName      SampleName      ratio   P0      P1      P2      P3      P4      maxgeno maxP    geno
+1       AX-86752740     10049-R7P76     0.8610456158314 2.4070814263884e-165    8.85018152464261e-104   5.55270700473464e-56    3.42891056116936e-20    1       4       1       4
+1       AX-86752740     195_95  0.553435636348158       5.05870449016602e-39    1.02939795506368e-12    0.999884865450636       0.000115134548334842    2.20861772506317e-35    2           0.999884865450636       2
+1       AX-86752740     200_98_14       0.665553435669692       1.45062684854338e-71    1.19929721690338e-33    7.19932755628942e-10    0.999999999280061       6.3974699220722e-15         3       0.999999999280061       3
+1       AX-86752740     201_98_A        0.275586122366714       0.997114692166054       0.00288530783394556     1.40533349722102e-20    5.04162645565243e-57    8.44873987719023e-129       0       0.997114692166054       0
+1       AX-86752740     218_97_17       0.68427741897549        6.78529185255407e-78    5.79729809154772e-38    3.86799467535375e-12    0.999999999991422       4.70960869140837e-12

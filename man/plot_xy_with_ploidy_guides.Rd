@@ -7,7 +7,7 @@
 plot_xy_with_ploidy_guides(
   df,
   ploidy = 2,
-  sample = "all",
+  sample = NULL,
   highlight_color = "tomato",
   other_color = "grey75"
 )

@@ -37,7 +37,7 @@ mod_qploidy_ui <- function(id){
                  "* Required",
                  selectInput(ns('file_type'),
                              label = 'Select File Format',
-                             choices = c("VCF","Axiom Array", "Illumina Array", "Qploidy Standardized Dataset"),
+                             choices = c("VCF","Axiom Array", "Illumina Array", "Qploidy input formats","Qploidy Standardized Dataset"),
                              selected = "VCF"),
                  fileInput(ns("input_file"), "Choose File*", accept = c(".csv",".vcf",".gz", ".txt",".tsv")),
                  conditionalPanel(condition = "input.file_type == 'Axiom Array' || input.file_type == 'Illumina Array'",
@@ -100,7 +100,7 @@ mod_qploidy_ui <- function(id){
       ),
       column(width = 9,
              box(
-               title = "Plots", status = "info", solidHeader = FALSE, width = 12,
+               title = "Standardization Plots", status = "info", solidHeader = FALSE, width = 12,
                box(title = "Plot Controls", status = "info", solidHeader = FALSE, collapsible = TRUE, width = 12,
                    fluidRow(
                      column(width = 6,
@@ -209,7 +209,29 @@ mod_qploidy_ui <- function(id){
                ))
              ),
              box(
-               title = "Ploidy Estimation", status = "info", solidHeader = FALSE, width = 12,
+               title = "HMM CN Estimation", status = "info", solidHeader = FALSE, width = 12,
+               "The Hidden Markov Model multipoint approach will be based on the standardized values.",
+               "Therefore, make sure the plots look good before proceeding, adjust the following paramenters and click the 'Run HMM' button below to run the estimation.", br(),
+               hr(),
+               fluidRow(
+                 column(width = 6,
+                        textInput(ns("ploidy_range_hmm"), "Ploidies to be tested", placeholder = "2,3,4", value = "2,3,4"),
+                        numericInput(ns("exp_ploidy"), "Expected overall ploidy", min = 1, value = 2),
+                        actionButton(ns("est_ploidy_hmm"), "Run HMM")
+                 ),
+                 column(width = 6,
+                        numericInput(ns("snps_per_window"), "Number of SNPs per window", min = 5, value = 20),
+                        numericInput(ns("min_snps_per_window"), "Minimum number of SNPs per window", min = 1, value = 5),
+                        numericInput(ns("n_bins"), "Number of bins to split BAF", min = 5, value = 100)
+                 )
+               ),
+               br(), hr(),
+               plotOutput(ns("plot_hmm")), br(),
+               DTOutput(ns("ploidy_table_hmm")),br(),
+               downloadButton(ns("download_ploidy_table_mm"), "Download Ploidy Table")
+             ),
+             box(
+               title = "All Samples Ploidy Estimation", status = "info", solidHeader = FALSE, width = 12,
                "Check the plots above before obtaining the estimated ploidies for all samples.",
                "If the plots look good, adjust the following paramenters and click the 'Estimate Ploidies' button below to run the estimation.", br(),
                hr(),
@@ -226,7 +248,7 @@ mod_qploidy_ui <- function(id){
                                           "Centromere positions file (CSV format with columns: Chromosome, Centromere Start Position)", accept = ".csv")
                ),
                br(),
-               actionButton(ns("est_ploidy"), "Estimate Ploidies"), hr(), br(),
+               actionButton(ns("est_ploidy"), "Estimate Ploidies by Area"), hr(), br(),
                DTOutput(ns("ploidy_table")),br(),
                downloadButton(ns("download_ploidy_table"), "Download Ploidy Table")
              )
@@ -365,6 +387,8 @@ mod_qploidy_server <- function(input, output, session, parent_session){
         genos <- qploidy_read_vcf(input$input_file$datapath, geno = TRUE)
         genos.pos <- qploidy_read_vcf(input$input_file$datapath, geno.pos = TRUE)
 
+        if(all(is.na(genos.pos[,1]))) genos.pos$MarkerName <- paste0(genos.pos$Chromosome, "_", genos.pos$Position)
+
         if(input$known_ploidy){
           reference_samples <- read.csv(input$reference_samples$datapath, header = TRUE, stringsAsFactors = FALSE)$Sample_ID
           genos <- genos[which(genos$SampleName %in% reference_samples), ]
@@ -478,6 +502,10 @@ mod_qploidy_server <- function(input, output, session, parent_session){
     )
 
     chrs <- unique(data_standardized()$data$Chr)
+    if(any(is.na(chrs))) chrs <- chrs[-which(is.na(chrs))]
+    chrs <- sort(chrs)
+    names(chrs) <- chrs
+
     updateVirtualSelect(
       session = session,
       inputId = "sele_chr",
@@ -505,10 +533,13 @@ mod_qploidy_server <- function(input, output, session, parent_session){
       ploidies = ploidies,
       centromeres = if(!is.null(centromeres_vec)) centromeres_vec
     )
+    estimated_ploidies
   })
 
   output$ploidy_table <- renderDT({
     req(ploidies())
+    ploidy <- ploidies()$ploidy
+    ploidy[which(ploidies()$diff_first_second < 0.01)] <- NA
     datatable(ploidies()$ploidy,
               selection = "single",
               options = list(pageLength = 10, scrollX = TRUE))
@@ -592,6 +623,57 @@ mod_qploidy_server <- function(input, output, session, parent_session){
     n <- max(1L, length(input$plots))        # treat 0 as 1
     base_h <- 350                             # px per plot “unit”
     plotOutput(session$ns("plot"), height = paste0(base_h * n, "px"))
+  })
+
+  ## Add HMM
+  ploidies_hmm <- eventReactive(input$est_ploidy_hmm, {
+    req(data_standardized())
+    updateProgressBar(session = session, id = "pb_qploidy", value = 10)
+
+    ploidies <- as.numeric(unlist(strsplit(input$ploidy_range_hmm, ",")))
+
+    chrs <- unique(data_standardized()$data$Chr)
+    chrs_idx <- which(chrs %in% input$sele_chr)
+
+    esti <- hmm_estimate_CN(qploidy_standarize_result = data_standardized(),
+                            sample_id = input$sample,
+                            chr = chrs_idx,
+                            snps_per_window = input$snps_per_window,
+                            min_snps_per_window = input$min_snps_per_window,
+                            cn_grid = ploidies,
+                            M = input$n_bins,
+                            bw = 0.03,
+                            exp_ploidy = input$exp_ploidy,
+                            het_lims = c(0.01, 0.99),
+                            max_iter = 60,
+                            z_only = FALSE)
+
+    updateProgressBar(session = session, id = "pb_qploidy", value = 75)
+
+    esti
+  })
+
+  output$ploidy_table_hmm <- renderDT({
+    req(ploidies_hmm())
+    updateProgressBar(session = session, id = "pb_qploidy", value = 85)
+
+    datatable(
+      ploidies_hmm()[[1]],
+      options = list(
+        scrollX   = TRUE,   # <-- horizontal scrollbar
+        autoWidth = TRUE
+      ),
+      rownames = FALSE
+    )
+  })
+
+  output$plot_hmm <- renderPlot({
+    req(ploidies_hmm())
+
+    p <- plot_cn_track(hmm_CN = ploidies_hmm(), sample_id = input$sample, show_window_lines = TRUE)
+
+    updateProgressBar(session = session, id = "pb_qploidy", value = 100)
+    p
   })
 
   output$download_stand <- downloadHandler(

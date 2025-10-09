@@ -10,7 +10,7 @@ plot_baf_with_ploidy_guides(
   fallback_to_ratio = FALSE,
   normalize_depth = TRUE,
   radius = NULL,
-  sample = "all",
+  sample = NULL,
   highlight_color = "tomato",
   other_color = "grey75"
 )

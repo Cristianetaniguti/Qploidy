@@ -30,7 +30,7 @@ globalVariables(c("Chr", "baf", "z", "ratio", "median", "window", "prop_het"))
 #'
 #' @import ggplot2
 #' @importFrom dplyr filter
-#' @importFrom magrittr %>%
+#' @importFrom magrittr "%>%"
 #'
 #' @export
 plot_baf <- function(data_sample,
@@ -170,7 +170,7 @@ plot_baf <- function(data_sample,
 #'
 #' @import ggplot2
 #' @importFrom dplyr filter
-#' @importFrom magrittr %>%
+#' @importFrom magrittr "%>%"
 #'
 #' @export
 plot_baf_hist <- function(data_sample,
@@ -449,7 +449,7 @@ plot_baf_hist <- function(data_sample,
 #' @importFrom ggpubr ggarrange annotate_figure text_grob
 #' @import ggplot2
 #' @importFrom dplyr filter group_by summarise
-#' @importFrom magrittr %>%
+#' @importFrom magrittr "%>%"
 #' @importFrom tidyr pivot_wider
 #' @export
 plot_qploidy_standardization <- function(x,
@@ -484,7 +484,7 @@ plot_qploidy_standardization <- function(x,
   if (is.null(chr)) {
     chr <- sort(unique(data_sample$Chr))
   } else if (is.numeric(chr)) {
-    chr <- sort(unique(data_sample$Chr))[chr]
+    chr <- unique(data_sample$Chr)[chr] # BUGfix - in case the values are not sorted at the data
   }
 
   if(!all(chr %in% unique(data_sample$Chr))) {
@@ -883,7 +883,7 @@ all_resolutions_plots <- function(
 #' @import ggplot2
 #' @export
 plot_xy_with_ploidy_guides <- function(df, ploidy = 2,
-                                       sample = "all",
+                                       sample = NULL,
                                        highlight_color = "tomato",
                                        other_color = "grey75") {
   stopifnot(all(c("X","Y") %in% names(df)))
@@ -917,7 +917,11 @@ plot_xy_with_ploidy_guides <- function(df, ploidy = 2,
   guides <- data.frame(dosage, ratio, slope, type)
 
   # Base plot (legend reflects only samples present in df_plot)
-  if (identical(sample, "all")) {
+  if(is.null(sample)){
+    p <- ggplot(df_plot, aes(X, Y)) +
+      geom_point(alpha = 0.85, size = 2, na.rm = TRUE) +
+      guides(color = guide_legend(override.aes = list(alpha = 1)))
+  } else if (identical(sample, "all")) {
     p <- ggplot(df_plot, aes(X, Y)) +
       geom_point(aes(color = SampleName), alpha = 0.85, size = 2, na.rm = TRUE) +
       scale_color_discrete(drop = TRUE) +
@@ -942,15 +946,18 @@ plot_xy_with_ploidy_guides <- function(df, ploidy = 2,
       guides(color = guide_legend(title = NULL, override.aes = list(alpha = 1)))
   }
 
+  lim <- max(max_x, max_y)            # same range on both axes
+  pad <- 0.05 * lim                   # small headroom for corner labels
+
   p <- p +
-    coord_fixed() +
-    scale_x_continuous(limits = c(0, max_x), expand = expansion(mult = 0.02)) +
-    scale_y_continuous(limits = c(0, max_y), expand = expansion(mult = 0.02)) +
-    labs(
-      x = "X (reads for allele A)",
-      y = "Y (reads for allele B)"
-    ) +
-    theme_minimal(base_size = 12)
+    scale_x_continuous(limits = c(0, lim + pad), expand = c(0, 0)) +
+    scale_y_continuous(limits = c(0, lim + pad), expand = c(0, 0)) +
+    coord_equal(clip = "off") +       # same as coord_fixed(ratio = 1)
+    labs(x = "X (reads for allele A)",
+         y = "Y (reads for allele B)") +
+    theme_minimal(base_size = 12) +
+    theme(aspect.ratio = 1,           # make the panel square
+          plot.margin = margin(12, 24, 12, 24))
 
   # Intermediate dosages (lines through origin)
   ab <- subset(guides, type == "abline")
@@ -1041,7 +1048,7 @@ plot_baf_with_ploidy_guides <- function(df,
                                         fallback_to_ratio = FALSE,
                                         normalize_depth = TRUE,
                                         radius = NULL,
-                                        sample = "all",
+                                        sample = NULL,
                                         highlight_color = "tomato",
                                         other_color = "grey75") {
   stopifnot("R" %in% names(df))
@@ -1083,7 +1090,11 @@ plot_baf_with_ploidy_guides <- function(df,
   max_y <- max(df_plot$Yb, na.rm = TRUE)
 
   # Coloring
-  if (identical(sample, "all")) {
+  if(is.null(sample)){
+    p <- ggplot(df_plot, aes(Xb, Yb)) +
+      geom_point(alpha = 0.85, size = 2, na.rm = TRUE) +
+      guides(color = guide_legend(override.aes = list(alpha = 1)))
+  } else   if (identical(sample, "all")) {
     p <- ggplot(df_plot, aes(Xb, Yb)) +
       geom_point(aes(color = SampleName), alpha = 0.85, size = 2, na.rm = TRUE) +
       scale_color_discrete(drop = TRUE) +
@@ -1105,16 +1116,21 @@ plot_baf_with_ploidy_guides <- function(df,
       guides(color = guide_legend(title = NULL, override.aes = list(alpha = 1)))
   }
 
+
+  lim <- max(max_x, max_y)            # same range on both axes
+  pad <- 0.05 * lim                   # small headroom for corner labels
   # Rest of the plot
   p <- p +
-    coord_fixed() +
-    scale_x_continuous(limits = c(0, max_x), expand = expansion(mult = 0.02)) +
-    scale_y_continuous(limits = c(0, max_y), expand = expansion(mult = 0.02)) +
+    scale_x_continuous(limits = c(0, lim + pad), expand = c(0, 0)) +
+    scale_y_continuous(limits = c(0, lim + pad), expand = c(0, 0)) +
+    coord_equal(clip = "off") +       # same as coord_fixed(ratio = 1)
     labs(
       x = "X = (1 - BAF) * R",
       y = "Y = BAF * R"
     ) +
-    theme_minimal(base_size = 12)
+    theme_minimal(base_size = 12) +
+    theme(aspect.ratio = 1,           # make the panel square
+          plot.margin = margin(12, 24, 12, 24))
 
   # Intermediate dosage guides
   ab <- subset(guides, type == "abline" & is.finite(slope))

@@ -28,7 +28,7 @@ globalVariables(c("theta", "R", "geno", "Var1", "array.id",
 #'
 #' @import tidyr
 #' @import dplyr
-#' @importFrom magrittr %>%
+#' @importFrom magrittr "%>%"
 #'
 #' @export
 updog_centers <- function(multidog_obj, threshold.n.clusters=2, rm.mks){
@@ -174,7 +174,7 @@ get_baf_par <- function(par_all_item, ploidy=2){
 #'
 #' @import dplyr
 #' @import tidyr
-#' @importFrom magrittr %>%
+#' @importFrom magrittr "%>%"
 #'
 #' @export
 get_centers <- function(ratio_geno,
@@ -307,7 +307,7 @@ get_centers <- function(ratio_geno,
 #'
 #' @import dplyr
 #' @import tidyr
-#' @importFrom magrittr %>%
+#' @importFrom magrittr "%>%"
 #'
 #' @examples
 #' data <- data.frame(
@@ -571,7 +571,7 @@ standardize <- function(data = NULL,
 
     if(verbose) cat("Going to parallel mode...\n")
     clust <- makeCluster(n.cores, type = parallel.type)
-    clusterExport(clust, c("get_centers", "rm_outlier", "%>%"))
+    #clusterExport(clust, c("get_centers", "rm_outlier", "%>%"))
     clusters <- parLapply(clust, lst_standardization, get_centers,
                           ploidy= ploidy.standardization,
                           n.clusters.thr = threshold.n.clusters,
@@ -663,6 +663,8 @@ standardize <- function(data = NULL,
   qploidy_data <- full_join(data, data_standardization[,-3], c("MarkerName", "SampleName"))
   qploidy_data <- full_join(qploidy_data,baf_melt, c("MarkerName", "SampleName"))
   qploidy_data <- full_join(qploidy_data[,-c(8,9)], zscore, c("MarkerName", "SampleName"))
+
+  qploidy_data$Position <- as.numeric(qploidy_data$Position)
 
   result <- structure(list(info = c(threshold.missing.geno = threshold.missing.geno,
                                     threshold.geno.prob = threshold.geno.prob,
@@ -822,6 +824,8 @@ read_qploidy_standardization <- function(qploidy_standardization_file) {
   if (!("Pos" %in% nm) && ("Position" %in% nm)) {
     names(data)[nm == "Position"] <- "Position"
   }
+
+  data$Position <- as.numeric(data$Position)
 
   # Minimal required columns used by the module/UI
   required_cols <- c("SampleName", "Chr")

@@ -19,6 +19,9 @@ globalVariables(c("ind", "zscore", "chr", "write.csv"))
 #' @import vcfR
 #' @importFrom tidyr pivot_longer
 qploidy_read_vcf <- function(vcf_file, geno = FALSE, geno.pos = FALSE) {
+  # Ensure logical type for geno and geno.pos
+  geno <- as.logical(geno)
+  geno.pos <- as.logical(geno.pos)
 
   checks <- vcf_sanity_check(vcf_file)
 
@@ -62,21 +65,28 @@ qploidy_read_vcf <- function(vcf_file, geno = FALSE, geno.pos = FALSE) {
                                R = alt+ref,
                                ratio = alt/(ref+alt))
   } else if(geno){
-    GT <- extract.gt(vcf, "GT")
-    GT <- pivot_longer(data.frame(mks = rownames(GT), GT),
-                       cols = 2:(ncol(GT)+1))
+    GT_m <- extract.gt(vcf, "GT")
+    GT <- pivot_longer(data.frame(mks = rownames(GT_m), GT_m),
+                       cols = 2:(ncol(GT_m)+1))
     GT$value <- stringr::str_count(GT$value, "1")
     colnames(GT) <- c("MarkerName","SampleName","geno")
 
     prob <- extract.gt(vcf, "MPP")
 
-    if(is.na(all(prob))) {
+    # If MPP is missing or all NA, try GQ; if GQ is missing, set prob to NA
+    if (is.null(prob) || all(is.na(prob))) {
       GQ <- extract.gt(vcf, "GQ")
-      prob <- as.numeric(GQ)
-      prob <- 1 - 10^(-prob/10)
-      prob <- matrix(prob, nrow = nrow(GQ))
-      rownames(prob) <- rownames(GQ)
-      colnames(prob) <- colnames(GQ)
+      if (!is.null(GQ) && !all(is.na(GQ))) {
+        prob <- as.numeric(GQ)
+        prob <- 1 - 10^(-prob/10)
+        prob <- matrix(prob, nrow = nrow(GQ))
+        rownames(prob) <- rownames(GQ)
+        colnames(prob) <- colnames(GQ)
+      } else {
+        prob <- matrix(NA, nrow = nrow(GT_m), ncol = ncol(GT_m))
+        rownames(prob) <- rownames(GT_m)
+        colnames(prob) <- colnames(GT_m)
+      }
     }
 
     prob <- pivot_longer(data.frame(mks = rownames(prob), prob),

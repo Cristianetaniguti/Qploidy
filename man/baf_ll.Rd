@@ -7,26 +7,20 @@
 baf_ll(counts, templ, eps = 1e-08)
 }
 \arguments{
-\item{counts}{Integer vector of length \eqn{M} with BAF bin counts
-(e.g., from \code{hist(..., plot = FALSE)$counts}).}
+\item{counts}{Integer vector of length \code{M}. BAF bin counts (e.g., from \code{hist(..., plot = FALSE)$counts}).}
 
-\item{templ}{Numeric vector of length \eqn{M} with strictly positive
-probabilities that sum to 1 (e.g., output of \code{\link{baf_template}}).}
+\item{templ}{Numeric vector of length \code{M}. Strictly positive probabilities summing to 1 (e.g., output of \code{baf_template}).}
 
-\item{eps}{Small positive numeric added inside \code{log()} for extra
-numerical safety.}
+\item{eps}{Numeric. Small positive value added inside \code{log()} for extra numerical safety. Default is 1e-8.}
 }
 \value{
-A single numeric value: the log-likelihood \eqn{\sum_i n_i \log p_i}.
+Numeric scalar. The log-likelihood \eqn{\sum_i n_i \log p_i}.
 }
 \description{
-Computes a multinomial-style log-likelihood of observed BAF histogram counts
-against a template (probabilities over the same bins). Empty histograms
-contribute zero to the likelihood.
+Computes the multinomial-style log-likelihood of observed BAF histogram counts against a template (probabilities over the same bins). Only bins with nonzero counts contribute. If all counts are zero, returns 0.
 }
 \details{
-Only bins with \code{counts > 0} are used. If all counts are zero, returns 0.
-Ensure \code{templ} has no zeros (use \code{floor_eps} in \code{baf_template}).
+Only bins with \code{counts > 0} are used. If all counts are zero, returns 0. Ensure \code{templ} has no zeros (use \code{floor_eps} in \code{baf_template}).
 }
 \examples{
 templ <- baf_template(4, M = 21)

@@ -14,48 +14,37 @@ plot_cn_track(
   line_color = "grey60",
   line_alpha = 0.6,
   line_width = 0.3,
-  line_linetype = "dashed"
+  line_linetype = "dashed",
+  heights = c(1, 1.2)
 )
 }
 \arguments{
-\item{hmm_CN}{A data frame with one row per window containing at least the
-columns:
-\itemize{
-  \item \code{Sample}: sample identifier (character/factor)
-  \item \code{Chr}: chromosome/contig name
-  \item \code{Start}, \code{End}: genomic window bounds (numeric or integer)
-  \item \code{CN_call}: integer copy-number call for the window
-  \item \code{post_CN*}: posterior probabilities for each CN state, with
-    column names of the form \code{post_CN2}, \code{post_CN3}, … matching
-    the CN grid used during HMM inference
-}}
+\item{hmm_CN}{An object of class \code{hmm_CN} (output from \code{hmm_estimate_CN}), containing a \code{result} data frame with one row per window and columns: \code{Sample}, \code{Chr}, \code{Start}, \code{End}, \code{CN_call}, \code{post_CN*}, etc.}
 
-\item{sample_id}{Character scalar. Which sample from \code{hmm_CN$Sample} to
-display. Defaults to the first unique value in \code{hmm_CN$Sample}.}
+\item{sample_id}{Character scalar. Which sample from \code{hmm_CN$Sample} to display. Defaults to the first unique value in \code{hmm_CN$Sample}.}
 
-\item{cn_min, cn_max}{Numeric scalars giving the y-axis limits for CN. By
-default they span the minimum/maximum of \code{hmm_CN$CN_call}.}
+\item{cn_min, cn_max}{Numeric scalars. Y-axis limits for CN. Defaults span the min/max of \code{CN_call}.}
+
+\item{show_window_lines}{Logical. If TRUE, show dashed vertical lines at window boundaries.}
+
+\item{include_first_in_chr}{Logical. If TRUE, include the first window line in each chromosome.}
+
+\item{line_color, line_alpha, line_width, line_linetype}{Appearance settings for window boundary lines.}
+
+\item{heights}{Numeric vector of length 2. Relative heights of the top (z) and bottom (CN) panels.}
 }
 \value{
-A \code{ggplot} object. Print it to render, or add layers/scales as
-  needed.
+A \code{ggplot} object. Print to render, or add layers/scales as needed.
 }
 \description{
-Draws a genome track where each window is plotted as a horizontal segment at
-its called copy number (CN) and colored by the posterior probability of that
-call. Panels (facets) are split by chromosome.
+Plots a genome track for each window, showing the called copy number (CN) as a horizontal segment and coloring by the posterior probability of that call. Facets are split by chromosome. The top panel shows z-scores per window, colored by BAF weight; the bottom panel shows CN segments colored by posterior probability.
 }
 \details{
-The color mapped to each segment is the posterior probability corresponding to
-the called state in that window. Posterior columns are detected by the prefix
-\code{"post_CN"} and matched to \code{CN_call} values, so the function is
-agnostic to the specific CN grid (e.g., 2:6, 2:8).
+Posterior columns are detected by the prefix "post_CN" and matched to \code{CN_call} values, so the function is agnostic to the specific CN grid. If your column naming differs, rename them before calling this function.
 }
 \section{Expected columns}{
 
-The function assumes posterior columns named exactly \code{post_CN<k>} for
-each copy-number state \code{k}. If your column naming differs, rename them
-before calling this function.
+The function assumes posterior columns named exactly \code{post_CN<k>} for each copy-number state \code{k}. If your column naming differs, rename them before calling this function.
 }
 
 \examples{

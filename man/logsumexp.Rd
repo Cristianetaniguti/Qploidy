@@ -7,23 +7,15 @@
 logsumexp(x)
 }
 \arguments{
-\item{x}{A numeric vector.}
+\item{x}{Numeric vector. Values to exponentiate and sum.}
 }
 \value{
-A single numeric value: \code{log(sum(exp(x)))} computed stably.
+Numeric scalar. The stable computation of \code{log(sum(exp(x)))}.
 }
 \description{
-Computes \eqn{\log\left(\sum_i e^{x_i}\right)} in a numerically stable way
-by subtracting the maximum element before exponentiating.
+Computes the logarithm of the sum of exponentials, \eqn{\log\left(\sum_i e^{x_i}\right)}, in a numerically stable way by subtracting the maximum element before exponentiating. This avoids overflow/underflow for large or small values in \code{x}.
 }
 \details{
-Directly computing \code{log(sum(exp(x)))} can overflow when \code{x}
-contains large positive values. This function uses the identity
-\deqn{\log\sum_i e^{x_i} = m + \log\sum_i e^{x_i - m}, \quad m=\max_i x_i}
-to avoid overflow/underflow.
-}
-\examples{
-logsumexp(c(-1000, 0, 1))  # finite result
-
+This function uses the identity \eqn{\log\sum_i e^{x_i} = m + \log\sum_i e^{x_i - m}}, where \eqn{m=\max_i x_i}, to ensure numerical stability.
 }
 \keyword{internal}

@@ -7,67 +7,83 @@
 hmm_estimate_CN(
   qploidy_standarize_result,
   sample_id,
+  chr = NULL,
   snps_per_window = 500,
   min_snps_per_window = 100,
   cn_grid = 2:8,
   M = 121,
   bw = 0.03,
   max_iter = 60,
-  z_only = FALSE
+  het_lims = c(0, 1),
+  het_weight = 0.8,
+  z_range = 0.2,
+  transition_jump = 0.995,
+  exp_ploidy = NULL,
+  z_only = FALSE,
+  verbose = TRUE
 )
 }
 \arguments{
-\item{sample_id}{Character scalar. Sample identifier to analyze; rows are
-filtered as \code{df[[cols$sample]] == sample_id}.}
+\item{qploidy_standarize_result}{An object of class \code{qploidy_standardization} as returned by \code{standardize()}. Contains standardized SNP-level data for all samples and chromosomes.}
 
-\item{snps_per_window}{Integer. Number of SNPs per window when
-\code{cols$window} is \code{NULL}. Default \code{500}.}
+\item{sample_id}{Character scalar. Sample identifier to analyze; rows are filtered as \code{SampleName == sample_id}.}
 
-\item{min_snps_per_window}{Integer. Minimum SNPs required to keep a window
-(windows with fewer SNPs are dropped). Default \code{100}.}
+\item{chr}{Optional. Character or integer vector specifying chromosomes to include. If \code{NULL}, all chromosomes are used.}
+
+\item{snps_per_window}{Integer. Number of SNPs per window when windows are created. Default \code{500}.}
+
+\item{min_snps_per_window}{Integer. Minimum SNPs required to keep a window (windows with fewer SNPs are dropped). Default \code{100}.}
 
 \item{cn_grid}{Integer vector of copy-number states to consider (e.g., \code{2:8}).}
 
-\item{M}{Integer. Number of BAF histogram bins on \eqn{[0,1]}. Default \code{121}.}
+\item{M}{Integer. Number of BAF histogram bins on [0,1]. Default \code{121}.}
 
-\item{bw}{Numeric. Bandwidth (SD) of the Gaussian kernels used to generate
-the BAF comb templates. Default \code{0.03}.}
+\item{bw}{Numeric. Bandwidth (SD) of the Gaussian kernels used to generate the BAF comb templates. Default \code{0.03}.}
 
 \item{max_iter}{Integer. Maximum EM iterations. Default \code{60}.}
 
-\item{z_only}{Logical. If \code{TRUE}, fit the HMM using the z-emission only
-(useful for debugging). Default \code{FALSE}.}
+\item{het_lims}{Numeric vector of length 2. BAF limits to consider a SNP heterozygous. Default \code{c(0,1)}.}
 
-\item{df}{A SNP-level \code{data.frame} containing, at minimum, the columns
-named in \code{cols}. One row per variant/SNP.}
+\item{het_weight}{Numeric. Quantile used to scale BAF emission weight based on heterozygote count. Default \code{0.8}.}
 
-\item{cols}{A named list giving the column names in \code{df}:
-\describe{
-  \item{\code{chr}}{Chromosome/contig name (default \code{"Chr"}).}
-  \item{\code{pos}}{Genomic position (integer/numeric; default \code{"Position"}).}
-  \item{\code{sample}}{Sample column (default \code{"SampleName"}).}
-  \item{\code{baf}}{B-allele frequency in \eqn{[0,1]} (default \code{"baf"}).}
-  \item{\code{z}}{Depth/coverage signal (already GC/mappability corrected),
-        used as a Gaussian emission (default \code{"z"}).}
-  \item{\code{window}}{Optional window ID column. If \code{NULL} (default),
-        windows are created as equal-SNP bins within each chromosome.}
-}}
+\item{z_range}{Numeric. Padding added to min/max z for initial mean estimation. Default \code{0.2}.}
+
+\item{transition_jump}{Numeric. Diagonal value for transition matrix (probability to stay in same CN state). Default \code{0.995}.}
+
+\item{exp_ploidy}{Integer. Expected ploidy for initialization. If \code{NULL}, median of \code{cn_grid} is used.}
+
+\item{z_only}{Logical. If \code{TRUE}, fit the HMM using the z-emission only (ignores BAF). Default \code{FALSE}.}
+
+\item{verbose}{Logical. If \code{TRUE}, print progress messages. Default \code{TRUE}.}
 }
 \value{
-A \code{data.frame} with one row per window and columns:
-\itemize{
-  \item \code{Sample}, \code{Chr}, \code{WindowID}, \code{Start}, \code{End}
-  \item \code{n_snps}, \code{n_het} – counts per window
-  \item \code{z} – mean z per window
-  \item \code{w_baf} – weight applied to the BAF emission (0–1)
-  \item \code{CN_call} – Viterbi copy-number call (factor/integer)
-  \item \code{post_max} – posterior probability of the called state
-  \item \code{post_CN<k>} – posterior probability for each state in \code{cn_grid}
-}
-The returned object also carries an attribute \code{"params"} with a list of
-fitted HMM parameters: \code{cn_grid}, \code{mu} (z means), \code{sigma},
-\code{A} (transition matrix), \code{pi0} (initial probs), \code{bins} (\code{M}),
-\code{bw}, and the final \code{loglik}.
+An object of class \code{hmm_CN}, a list with two elements:
+  \describe{
+    \item{result}{A \code{data.frame} with one row per window and columns:
+      \itemize{
+        \item \code{Sample}, \code{Chr}, \code{WindowID}, \code{Start}, \code{End}
+        \item \code{n_snps}, \code{n_het} – counts per window
+        \item \code{z} – mean z per window
+        \item \code{w_baf} – weight applied to the BAF emission (0–1)
+        \item \code{CN_call} – Viterbi copy-number call (factor/integer)
+        \item \code{post_max} – posterior probability of the called state
+        \item \code{post_CN<k>} – posterior probability for each state in \code{cn_grid}
+      }
+    }
+    \item{params}{A list of fitted HMM parameters:
+      \itemize{
+        \item \code{cn_grid} – copy-number states
+        \item \code{mu} – estimated z means per state
+        \item \code{sigma} – estimated z standard deviation
+        \item \code{A} – transition matrix
+        \item \code{pi0} – initial state probabilities
+        \item \code{bins} – number of BAF bins (M)
+        \item \code{bw} – BAF template bandwidth
+        \item \code{loglik} – final log-likelihood
+      }
+    }
+  }
+The \code{result} data frame is suitable for downstream plotting or merging. The \code{params} attribute contains all HMM model parameters for reproducibility and inspection.
 }
 \description{
 Aggregates SNP-level data into windows, builds BAF histograms, and fits a
@@ -78,39 +94,30 @@ ready for plotting (e.g., with \code{\link{plot_cn_track}}) or merging across
 chromosomes/batches.
 }
 \details{
-\strong{Windowing.} If \code{cols$window} is not provided, windows are formed
-within each chromosome by grouping every \code{snps_per_window} consecutive
-SNPs. Windows with fewer than \code{min_snps_per_window} SNPs are removed.
+\strong{Windowing.} If \code{chr} is specified, only those chromosomes are analyzed. Windows are formed within each chromosome by grouping every \code{snps_per_window} consecutive SNPs. Windows with fewer than \code{min_snps_per_window} SNPs are removed.
 
-\strong{Emissions.} For state \code{c} (copy number), the z-emission is
-\eqn{\mathcal{N}(\mu_c, \sigma^2)}. The BAF emission is a multinomial
-log-likelihood comparing the observed BAF histogram to a state-specific
-template (a “comb” with peaks at \eqn{d/c}). Windows with few heterozygotes
-are down-weighted via \code{w_baf} (derived from \code{n_het}).
+\strong{Emissions.} For state \code{c} (copy number), the z-emission is \eqn{\mathcal{N}(\mu_c, \sigma^2)}. The BAF emission is a multinomial log-likelihood comparing the observed BAF histogram to a state-specific template (a “comb” with peaks at \eqn{d/c}). Windows with few heterozygotes are down-weighted via \code{w_baf} (derived from \code{n_het}).
 
-\strong{Numerical safety.} The implementation guards against non-finite
-emissions, enforces stochastic \code{A} rows, and lower-bounds \code{sigma}.
+\strong{Numerical safety.} The implementation guards against non-finite emissions, enforces stochastic \code{A} rows, and lower-bounds \code{sigma}.
 }
 \section{Required helpers}{
 
-This function calls \code{\link{baf_template}}, \code{\link{baf_ll}},
-\code{\link{logsumexp}}, and \code{\link{viterbi}} which must be available in
-your package/namespace.
+This function calls \code{\link{baf_template}}, \code{\link{baf_ll}}, \code{\link{logsumexp}}, and \code{\link{viterbi}} which must be available in your package/namespace.
 }
 
 \examples{
 \dontrun{
-# Suppose snp_df has columns: SampleName, Chr, Position, baf, z
-res <- polyploid_cn_hmm(
-  df = snp_df,
+# Suppose qploidy_standarize_result is from standardize(), 
+# with columns: SampleName, Chr, Position, baf, z
+res <- hmm_estimate_CN(
+  qploidy_standarize_result = qploidy_standarize_result,
   sample_id = "ASample",
-  cols = list(chr="Chr", pos="Position", sample="SampleName",
-              baf="baf", z="z", window=NULL),
+  chr = c("Chr1", "Chr2"),
   snps_per_window = 500,
   cn_grid = 2:6
 )
-head(res)
-attr(res, "params")
+head(res$result)
+res$params
 }
 
 }

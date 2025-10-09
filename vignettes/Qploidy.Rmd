@@ -871,17 +871,86 @@ New plots for roses real data after round 1 and 2 of standardization:
 ![Round 2](fig6.jpg)
 
 
+# HMM-based Copy Number Estimation and Visualization
+
+## HMM-based Copy Number Estimation
+
+`Qploidy` provides a powerful function, `hmm_estimate_CN`, for estimating copy number (CN) across the genome using a Hidden Markov Model (HMM) approach. This method combines standardized depth (z-score) and BAF (standardized ratio) information in windows to infer CN states for each region.
+
+**Function usage:**
+
+```{r, eval=FALSE}
+# Estimate copy number for a sample using HMM
+hmm_result <- hmm_estimate_CN(
+  qploidy_standarize_result = simu_data_standardized, # standardized object
+  sample_id = sample,                                 # sample name
+  chr = 1:2,                                          # chromosomes to analyze
+  snps_per_window = 20,                               # SNPs per window
+  min_snps_per_window = 5,                            # minimum SNPs per window
+  cn_grid = c(2, 3, 4, 5),                            # ploidies to test
+  M = 100,                                            # BAF bins
+  bw = 0.03,                                          # BAF template bandwidth
+  exp_ploidy = 4                                      # expected ploidy
+)
+head(hmm_result$result)
+```
+
+The output is a list with:
+- `result`: a data frame with CN calls, posterior probabilities, and window coordinates.
+- `params`: the fitted HMM parameters (means, transition matrix, etc.).
+
+See `?hmm_estimate_CN` for full details.
+
+## Visualizing Copy Number Results
+
+To visualize the HMM results, use the `plot_cn_track` function. This produces a genome-wide track for each window, showing the called CN and the confidence (posterior probability) for each call. The top panel shows z-scores, and the bottom panel shows CN segments colored by confidence.
+
+**Function usage:**
+
+```{r, eval=FALSE}
+# Plot CN track for a sample
+plot_cn_track(
+  hmm_CN = hmm_result,         # output from hmm_estimate_CN
+  sample_id = sample,          # sample name
+  show_window_lines = TRUE     # show window boundaries
+)
+```
+
+See `?plot_cn_track` for more options and details.
+
+# Try the Qploidy Shiny App!
+
+For an interactive experience, explore your data and run analyses using the Qploidy Shiny app. The app provides a user-friendly interface for data upload, parameter selection, visualization, and CN estimation.
+
+**To launch the app, simply run:**
+
+```{r, eval=FALSE}
+library(Qploidy)
+run_app()
+```
+
+The app can be used locally or deployed on a server for collaborative analysis. It includes all major features of the package, including standardization, HMM-based CN estimation, and interactive plotting.
+
+For more information, see the documentation and help files in the app, or visit the [Qploidy GitHub page](https://github.com/cristianetaniguti/Qploidy).
+
 # How to cite
 
-Taniguti, C.H; Lau, J.; Hochhaus, T.; Lopez Arias, D. C.; Hokanson, S.C.; Zlesak, D. C.; Byrne, D. H.; 
-Klein, P.E. and Riera-Lizarazu, O. Exploring Chromosomal Variations in Garden Roses: Insights from 
-High-density SNP Array Data and a New Tool, Qploidy. 2025. Submitted.
+Taniguti, C. H., Lau, J., Hochhaus, T., Arias, D. C. L., Hokanson, S. C., Zlesak, D. C., Byrne, D. H.,
+ Klein, P. E., & Riera-Lizarazu, O. (2025). Exploring chromosomal variations in garden roses: Insights 
+ from high-density SNP array data and a new tool, Qploidy. The Plant Genome, e70044. 
+ https://doi.org/10.1002/tpg2.70044
 
 # Acknowledgments
 
-This work is funded in part by the Robert E. Basye Endowment in Rose Genetics, Dept. of Horticultural 
-Sciences, Texas A&M University, and USDA’s National Institute of Food and Agriculture (NIFA), 
-Specialty Crop Research Initiative (SCRI) projects: ‘‘Tools for Genomics-Assisted Breeding in 
-Polyploids: Development of a Community Resource’’ (Award No. 2020-51181-32156); and ‘‘Developing 
-Sustainable Rose Landscapes via Rose Rosette Disease Education, Socioeconomic Assessments, and 
-Breeding RRD-Resistant Roses with Stable Black Spot Resistance’’ (Award No. 2022-51181-38330).
+### Version 1.0.0
+
+Funded in part by the Robert E. Basye Endowment in Rose Genetics, Dept. of Horticultural Sciences, 
+Texas A&M University, and USDA’s National Institute of Food and Agriculture (NIFA), Specialty Crop 
+Research Initiative (SCRI) projects: ‘‘Tools for Genomics-Assisted Breeding in Polyploids: Development 
+of a Community Resource’’ (Award No. 2020-51181-32156); and ‘‘Developing Sustainable Rose Landscapes via 
+Rose Rosette Disease Education, Socioeconomic Assessments, and Breeding RRD-Resistant Roses with Stable 
+Black Spot Resistance’’ (Award No. 2022-51181-38330).
+
+### Versions > 1.0.0
+
+Supported by [Breeding Insight](https://www.breedinginsight.org/).

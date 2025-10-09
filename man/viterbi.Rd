@@ -7,29 +7,20 @@
 viterbi(ll_em, logA, logpi0)
 }
 \arguments{
-\item{ll_em}{A \eqn{W \times K} numeric matrix of emission log-likelihoods,
-where \code{W} is the number of positions/windows and \code{K} is the
-number of states. Column order must match \code{logA}.}
+\item{ll_em}{Numeric matrix (W x K). Emission log-likelihoods, where \code{W} is the number of positions/windows and \code{K} is the number of states. Column order must match \code{logA}.}
 
-\item{logA}{A \eqn{K \times K} numeric matrix of log transition probabilities
-where \code{logA[i, j]} is \eqn{\log p(s_t=j \mid s_{t-1}=i)}. Each row
-should represent a valid \emph{log}-probability distribution.}
+\item{logA}{Numeric matrix (K x K). Log transition probabilities, where \code{logA[i, j]} is \eqn{\log p(s_t=j | s_{t-1}=i)}. Each row should represent a valid log-probability distribution.}
 
-\item{logpi0}{Numeric length-\code{K} vector of initial state log
-probabilities at position 1.}
+\item{logpi0}{Numeric vector of length \code{K}. Initial state log-probabilities at position 1.}
 }
 \value{
-An integer vector of length \code{W} with the 1-based indices of the
-  most likely states at each position (Viterbi path).
+Integer vector of length \code{W}. 1-based indices of the most likely states at each position (Viterbi path).
 }
 \description{
-Computes the most likely state sequence (Viterbi path) for a Hidden Markov
-Model given per-position emission log-likelihoods and log transition/prior
-probabilities.
+Computes the most likely state sequence (Viterbi path) for a Hidden Markov Model given per-position emission log-likelihoods and log transition/prior probabilities. Operates in log-space for numerical stability.
 }
 \details{
-This implementation operates in log-space for numerical stability. It stores
-backpointers to reconstruct the optimal path after dynamic programming.
+Stores backpointers to reconstruct the optimal path after dynamic programming. All calculations are performed in log-space for stability.
 }
 \examples{
 set.seed(1)

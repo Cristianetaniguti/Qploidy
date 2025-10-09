@@ -7,28 +7,22 @@
 baf_template(c, M = 101, bw = 0.03, floor_eps = 1e-08)
 }
 \arguments{
-\item{c}{Integer copy number (e.g., 2 for diploid, 4 for tetraploid).}
+\item{c}{Integer. Copy number (e.g., 2 for diploid, 4 for tetraploid).}
 
-\item{M}{Integer, number of histogram bins over \eqn{[0,1]}.}
+\item{M}{Integer. Number of histogram bins over [0,1]. Default is 101.}
 
-\item{bw}{Numeric, kernel bandwidth (standard deviation) of the Gaussians.}
+\item{bw}{Numeric. Kernel bandwidth (standard deviation) for the Gaussians. Default is 0.03.}
 
-\item{floor_eps}{Small positive numeric added to the template before
-renormalization to ensure strictly positive probabilities.}
+\item{floor_eps}{Numeric. Small positive value added to the template before renormalization to ensure strictly positive probabilities. Default is 1e-8.}
 }
 \value{
-A numeric vector of length \code{M} summing to 1: the BAF template
-  for copy number \code{c}.
+Numeric vector of length \code{M} summing to 1. The BAF template for copy number \code{c}.
 }
 \description{
-Constructs a discrete BAF density template on \eqn{[0,1]} for copy number
-\code{c}, by placing Gaussian kernels at genotype fractions \eqn{d/c},
-\eqn{d=0,\dots,c}. Reflection kernels keep mass within \eqn{[0,1]}.
+Constructs a discrete BAF density template on [0,1] for a given copy number \code{c}, by placing Gaussian kernels at genotype fractions \eqn{d/c} for \eqn{d=0,...,c}. Reflection kernels keep mass within [0,1]. Binomial weights are used for relative peak heights.
 }
 \details{
-Peaks are centered at \eqn{d/c}. Binomial weights \code{dbinom(0:c, c, 0.5)}
-provide a reasonable default relative mass across clusters. Boundary
-reflections (\eqn{\mu,-\mu,2-\mu}) prevent leakage outside \eqn{[0,1]}.
+Peaks are centered at \eqn{d/c}. Binomial weights \code{dbinom(0:c, c, 0.5)} provide relative mass across clusters. Boundary reflections (\eqn{\mu,-\mu,2-\mu}) prevent leakage outside [0,1].
 }
 \examples{
 t4 <- baf_template(4, M = 121, bw = 0.03)

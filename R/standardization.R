@@ -855,7 +855,7 @@ read_qploidy_standardization <- function(qploidy_standardization_file) {
 #' @import vroom
 #' @export
 write_qploidy_standardization <- function(qploidy_standardization_object, out_filename){
-  if(class(qploidy_standardization_object) != "qploidy_standardization") stop("The provided object is not of class 'qploidy_standardization'.")
+  if(!inherits(qploidy_standardization_object, "qploidy_standardization")) stop("The provided object is not of class 'qploidy_standardization'.")
 
   info = data.frame(t(qploidy_standardization_object$info))
   filters = data.frame(t(qploidy_standardization_object$filters))

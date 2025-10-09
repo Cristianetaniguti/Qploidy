@@ -44,6 +44,12 @@ mod_qploidy_ui <- function(id){
                                   ns = ns,
                                   fileInput(ns("marker_pos"), "Input Marker Position file")
                  ),
+                conditionalPanel(condition = "input.file_type == 'Qploidy input formats'",
+                                  ns = ns,
+                                  fileInput(ns("data"), "CSV or TSV containing the following columns: MarkerName, SampleName, X, Y, R, ratio"),
+                                  fileInput(ns("genos"), "CSV or TSV containing the following columns: MarkerName, SampleName, geno, prob"),
+                                  fileInput(ns("geno_pos"), "CSV or TSV containing the following columns: MarkerName, Chromosome, Position")
+                 ),
                  conditionalPanel(condition = "input.file_type != 'Qploidy Standardized Dataset'",
                                   ns=ns,
                                   radioButtons(ns("known_ploidy"),
@@ -270,6 +276,32 @@ mod_qploidy_server <- function(input, output, session, parent_session){
 
   ns <- session$ns
 
+  # Helper to check file input existence and non-empty
+  check_file_input <- function(x, name) {
+    if (is.null(x) || is.null(x$datapath) || !file.exists(x$datapath)) {
+      shinyalert(
+        title = paste(name, "Missing"),
+        text = paste("Please upload a valid", name, "file."),
+        type = "error"
+      )
+      return(FALSE)
+    }
+    TRUE
+  }
+
+  # Helper to check required columns in a data.frame
+  check_required_columns <- function(df, required, name) {
+    if (!all(required %in% colnames(df))) {
+      shinyalert(
+        title = paste(name, "Format Error"),
+        text = paste("The", name, "file must contain the following columns:", paste(required, collapse = ", ")),
+        type = "error"
+      )
+      return(FALSE)
+    }
+    TRUE
+  }
+
   # Help links
   observeEvent(input$goQploidypar, {
     # change to help tab
@@ -356,30 +388,53 @@ mod_qploidy_server <- function(input, output, session, parent_session){
     # Reset progress bar
     updateProgressBar(session = session, id = "pb_qploidy", value = 5, total = 100)
 
-    # Read input file based on type
-    if (input$file_type == "VCF") {
-      # Add VCF format checks
-
-      input_data <- qploidy_read_vcf(input$input_file$datapath)
-
-    } else if (input$file_type == "Axiom Array") {
-      # Add axiom array summary file format checks
-
-      input_data <- read_axiom(input$input_file$datapath)
-
-    } else if(input$file_type == "Illumina Array") {
-      # Add Illumina array summary file format checks
-
-      input_data <- read_illumina_array(input$input_file$datapath)
-
-    } else if (input$file_type == "Qploidy Standardized Dataset") {
-      # Add Qploidy standardized dataset format checks
-      input_data <- "skip"
-      data_standardized <- read_qploidy_standardization(input$input_file$datapath)
+    # File existence checks
+    if (!check_file_input(input$input_file, "Input")) return()
+    if (input$file_type == "Axiom Array" || input$file_type == "Illumina Array") {
+      if (!check_file_input(input$marker_pos, "Marker Position")) return()
+    }
+    if (input$file_type == "Qploidy input formats") {
+      if (!check_file_input(input$data, "Data")) return()
+      if (!check_file_input(input$genos, "Genotypes")) return()
+      if (!check_file_input(input$geno_pos, "Genotype Position")) return()
+    }
+    if (input$file_type != "Qploidy Standardized Dataset") {
+      if (input$file_type == "VCF" && input$known_ploidy) {
+        if (!check_file_input(input$reference_samples, "Reference Samples")) return()
+      }
+      if ((input$file_type == "Axiom Array" || input$file_type == "Illumina Array") && input$known_ploidy) {
+        if (!check_file_input(input$geno_ref, "fitpoly Reference Scores")) return()
+      }
+      if ((input$file_type == "Axiom Array" || input$file_type == "Illumina Array") && !input$known_ploidy) {
+        if (!check_file_input(input$geno_all, "fitpoly All Scores")) return()
+      }
     }
 
     # Update progress bar
     updateProgressBar(session = session, id = "pb_qploidy", value = 20)
+
+    # Read input file based on type
+    if (input$file_type == "VCF") {
+      input_data <- qploidy_read_vcf(input$input_file$datapath)
+    } else if (input$file_type == "Axiom Array") {
+      input_data <- read_axiom(input$input_file$datapath)
+    } else if(input$file_type == "Illumina Array") {
+      input_data <- read_illumina_array(input$input_file$datapath)
+    } else if (input$file_type == "Qploidy Standardized Dataset") {
+      input_data <- "skip"
+      data_standardized <- read_qploidy_standardization(input$input_file$datapath)
+    } else if (input$file_type == "Qploidy input formats") {
+      input_data <- read.csv(input$data$datapath, header = TRUE, sep = if(grepl(".tsv$", input$data$name)) "\t" else ",")
+      genos <- read.csv(input$genos$datapath, header = TRUE, sep = if(grepl(".tsv$", input$genos$name)) "\t" else ",")
+      geno.pos <- read.csv(input$geno_pos$datapath, header = TRUE, sep = if(grepl(".tsv$", input$geno_pos$name)) "\t" else ",")
+      # Check required columns
+      req_cols_data <- c("MarkerName", "SampleName", "X", "Y", "R", "ratio")
+      req_cols_genos <- c("MarkerName", "SampleName", "geno", "prob")
+      req_cols_geno_pos <- c("MarkerName", "Chromosome", "Position")
+      if (!check_required_columns(input_data, req_cols_data, "Data")) return()
+      if (!check_required_columns(genos, req_cols_genos, "Genotypes")) return()
+      if (!check_required_columns(geno.pos, req_cols_geno_pos, "Genotype Position")) return()
+    }
 
     if(input$file_type != "Qploidy Standardized Dataset"){
 
@@ -394,7 +449,7 @@ mod_qploidy_server <- function(input, output, session, parent_session){
           genos <- genos[which(genos$SampleName %in% reference_samples), ]
         }
 
-      } else {
+      } else if (input$file_type == "Axiom Array" || input$file_type == "Illumina Array") {
         if(input$known_ploidy)
           fitpoly_scores <- read.table(input$geno_ref$datapath, header = TRUE, sep = "\t", stringsAsFactors = FALSE)
         else
@@ -420,23 +475,24 @@ mod_qploidy_server <- function(input, output, session, parent_session){
       ploidy <- c(input$ref_ploidy, input$common_ploidy)
       ploidy <- ploidy[-is.na(ploidy)]
 
-      if(max(genos$geno, na.rm = TRUE) != ploidy){
-        print("aqui")
-        shinyalert(
-          title = "Ploidy Mismatch",
-          text = "Genotype on File doesn't match Ploidy informed",
-          size = "s",
-          closeOnEsc = TRUE,
-          closeOnClickOutside = FALSE,
-          html = TRUE,
-          type = "error",
-          showConfirmButton = TRUE,
-          confirmButtonText = "OK",
-          confirmButtonCol = "#004192",
-          showCancelButton = FALSE,
-          animation = TRUE
-        )
-        return()
+      if (length(ploidy) > 1) {
+        if (!all(max(genos$geno, na.rm = TRUE) %in% ploidy)) {
+          shinyalert(
+            title = "Ploidy Mismatch",
+            text = "Genotype on File doesn't match any informed Ploidy.",
+            type = "error"
+          )
+          return()
+        }
+      } else {
+        if (max(genos$geno, na.rm = TRUE) != ploidy) {
+          shinyalert(
+            title = "Ploidy Mismatch",
+            text = "Genotype on File doesn't match Ploidy informed",
+            type = "error"
+          )
+          return()
+        }
       }
 
       # Updated progress bar
@@ -472,21 +528,24 @@ mod_qploidy_server <- function(input, output, session, parent_session){
 
   output$markers_status <- renderValueBox({
     req(data_standardized())
-
+    total <- data_standardized()$filters[1]
+    remain <- data_standardized()$filters[6]
+    color <- "success"
+    if (is.null(total) || total == 0) color <- "danger"
+    else if (remain/total < 0.25) color <- "danger"
     valueBox(
       value = tagList(
-        div(style="font-size:1.2em; line-height:1.1;", span("Total markers: "), formatC(data_standardized()$filters[1], big.mark=",")),
+        div(style="font-size:1.2em; line-height:1.1;", span("Total markers: "), formatC(total, big.mark=",")),
         div(style="font-size:0.95em; opacity:0.9;", "Markers removed due:"),
         div(style="font-size:0.95em; opacity:0.9;", span("Low geno prob: "), strong(data_standardized()$filters[2])),
         div(style="font-size:0.95em; opacity:0.9;", span("High missing data: "), strong(data_standardized()$filters[3])),
         div(style="font-size:0.95em; opacity:0.9;", span("Low # of dosage clusters: "), strong(data_standardized()$filters[4])),
         div(style="font-size:0.95em; opacity:0.9;", span("Missing genomic position: "), strong(data_standardized()$filters[5])),
-        div(style="font-size:1.2em; line-height:1.1;", span("Remaining markers: "), strong(data_standardized()$filters[6]))
+        div(style="font-size:1.2em; line-height:1.1;", span("Remaining markers: "), strong(remain))
       ),
       subtitle = "",
       icon = icon("dna"),
-      color = if(data_standardized()$filters[6] != 0)
-        if (data_standardized()$filters[6]/data_standardized()$filters[1] > 0.25) "success" else "danger"
+      color = color
     )
   })
 
@@ -584,7 +643,7 @@ mod_qploidy_server <- function(input, output, session, parent_session){
     updateProgressBar(session = session, id = "pb_qploidy", value = 0, total = 100)
 
     chrs <- unique(data_standardized()$data$Chr)
-    chrs_idx <- which(chrs %in% input$sele_chr)
+    chrs_selected <- input$sele_chr
 
     if(!is.null(input$centromeres_file$datapath)){
       centromeres <- read.csv(input$centromeres_file$datapath, header = TRUE, stringsAsFactors = FALSE)
@@ -600,7 +659,7 @@ mod_qploidy_server <- function(input, output, session, parent_session){
       x = data_standardized(),
       sample = input$sample,
       type = input$plots,
-      chr = chrs_idx,
+      chr = chrs_selected,
       ploidy = input$ploidy,
       add_expected_peaks = as.logical(input$add_expected_peaks),
       add_estimated_peaks = as.logical(input$add_estimated_peaks),
@@ -633,11 +692,11 @@ mod_qploidy_server <- function(input, output, session, parent_session){
     ploidies <- as.numeric(unlist(strsplit(input$ploidy_range_hmm, ",")))
 
     chrs <- unique(data_standardized()$data$Chr)
-    chrs_idx <- which(chrs %in% input$sele_chr)
+    chrs_selected <- input$sele_chr
 
     esti <- hmm_estimate_CN(qploidy_standarize_result = data_standardized(),
                             sample_id = input$sample,
-                            chr = chrs_idx,
+                            chr = chrs_selected,
                             snps_per_window = input$snps_per_window,
                             min_snps_per_window = input$min_snps_per_window,
                             cn_grid = ploidies,
@@ -720,6 +779,16 @@ mod_qploidy_server <- function(input, output, session, parent_session){
       # draw!
       p <- built_plot()         # ggplot object (or similar)
       print(p)                  # crucial for ggplot2
+    }
+  )
+
+  output$download_ploidy_table_mm <- downloadHandler(
+    filename = function() {
+      paste0("ploidy_table_hmm_", Sys.Date(), ".tsv")
+    },
+    content = function(file) {
+      req(ploidies_hmm())
+      write.table(ploidies_hmm()[[1]], file, sep = "\t", row.names = FALSE, quote = FALSE)
     }
   )
 

@@ -1,6 +1,6 @@
-# Qploidy 2.0.0
+# Qploidy 1.5.0
 
-* Add HMM to estimate CN
+* Add HMM to estimate CN (beta version)
 * Shiny interface improvements
 * Add CSV or TSV as possible input files
 

@@ -9,9 +9,9 @@ hmm_estimate_CN(
   sample_id,
   chr = NULL,
   snps_per_window = 500,
-  min_snps_per_window = 100,
+  min_snps_per_window = 20,
   cn_grid = 2:8,
-  M = 121,
+  M = 100,
   bw = 0.03,
   max_iter = 60,
   het_lims = c(0, 1),
@@ -107,7 +107,7 @@ This function calls \code{\link{baf_template}}, \code{\link{baf_ll}}, \code{\lin
 
 \examples{
 \dontrun{
-# Suppose qploidy_standarize_result is from standardize(), 
+# Suppose qploidy_standarize_result is from standardize(),
 # with columns: SampleName, Chr, Position, baf, z
 res <- hmm_estimate_CN(
   qploidy_standarize_result = qploidy_standarize_result,

@@ -262,3 +262,338 @@ plot_cn_track <- function(hmm_CN,
     align = "v"
   )
 }
+
+#' Internal worker for parallel HMM CN estimation
+#'
+#' Runs hmm_estimate_CN for a single sample within a parallel loop, forwarding arguments.
+#' Returns the result or NULL on error (with a warning).
+#'
+#' @param sid Character. Sample identifier.
+#' @param obj Standardized input object for copy-number estimation (usually of class 'qploidy_standardization').
+#' @param dots Named list of additional arguments to pass to hmm_estimate_CN.
+#'
+#' @return List as returned by hmm_estimate_CN, or NULL if an error occurs.
+#' @seealso hmm_estimate_CN, parallel::parLapply
+#' @keywords internal
+#' @noRd
+worker <- function(sid, obj, dots) {
+  tryCatch({
+    res <- do.call(hmm_estimate_CN,
+                   c(list(obj, sample_id = sid), dots))
+    res
+  }, error = function(e) {
+    warning(sprintf("Sample '%s' failed: %s", sid, conditionMessage(e)))
+    NULL
+  })
+}
+
+#' Summarize copy number mode across windows
+#'
+#' Summarizes the most frequent copy number (mode) per sample, chromosome, or chromosome arm.
+#' Handles input as a data.frame or an hmm_CN object.
+#'
+#' @param df Data.frame or hmm_CN object containing windowed CN calls.
+#' @param level Character. Summarization level: 'sample', 'chromosome', or 'chromosome-arm'.
+#' @param centromeres Optional. Named numeric vector or data.frame with centromere positions (required for chromosome-arm).
+#' @param cn_col Character. Column name for CN calls (default: 'CN_call').
+#'
+#' @return Data.frame with columns for sample, chromosome (and arm if requested), CN mode, and window count.
+#' @examples
+#' # Summarize by chromosome
+#' summarize_cn_mode(hmm_CN$result, level = "chromosome")
+#' @export
+summarize_cn_mode <- function(df,
+                              level = c("sample", "chromosome", "chromosome-arm"),
+                              centromeres = NULL,
+                              cn_col = "CN_call") {
+  level <- match.arg(level)
+
+  # unwrap if hmm_CN-like object with $result
+  dat <- if (is.data.frame(df)) df else if (!is.null(df$result) && is.data.frame(df$result)) df$result else
+    stop("Input must be a data.frame or an hmm_CN-like object with a data.frame at `$result`.")
+
+  # required columns
+  req_cols <- c("Sample", "Chr", "Start", "End", cn_col)
+  miss <- setdiff(req_cols, names(dat))
+  if (length(miss)) stop("Missing required columns in data: ", paste(miss, collapse = ", "))
+
+  if (!is.numeric(dat[[cn_col]]) && !is.integer(dat[[cn_col]])) {
+    stop(sprintf("Column '%s' must be numeric/integer.", cn_col))
+  }
+
+  dat <- as.data.frame(dat)
+
+  # chromosome-arm handling → create chrID.1 (Chr) and chrID.2 (1=p, 2=q)
+  if (level == "chromosome-arm") {
+    if (is.null(centromeres))
+      stop("For level='chromosome-arm', provide `centromeres` (named numeric vector or data.frame with Chr, Centromere).")
+
+    if (is.data.frame(centromeres)) {
+      if (!all(c("Chr", "Centromere") %in% names(centromeres)))
+        stop("centromeres data.frame must have columns: Chr, Centromere")
+      cm <- setNames(centromeres$Centromere, centromeres$Chr)
+    } else if (is.numeric(centromeres) && !is.null(names(centromeres))) {
+      cm <- centromeres
+    } else {
+      stop("centromeres must be a named numeric vector or a data.frame with Chr and Centromere.")
+    }
+
+    mid <- (dat$Start + dat$End) / 2
+    has_cm <- dat$Chr %in% names(cm)
+
+    # Assign arm index: 1 = p (left), 2 = q (right)
+    chrID.2 <- rep(NA_integer_, nrow(dat))
+    chrID.2[has_cm] <- ifelse(mid[has_cm] < cm[dat$Chr[has_cm]], 1L, 2L)
+
+    if (any(!has_cm)) {
+      missing_chr <- unique(dat$Chr[!has_cm])
+      warning("No centromere provided for: ", paste(missing_chr, collapse = ", "),
+              ". Rows for these chromosomes will be dropped.")
+    }
+
+    dat <- dat[has_cm & !is.na(chrID.2), , drop = FALSE]
+    chrID.2 <- chrID.2[has_cm & !is.na(chrID.2)]
+
+    dat$chrID.1 <- dat$Chr
+    dat$chrID.2 <- chrID.2
+  }
+
+  # grouping variables
+  group_vars <- c("Sample")
+  if (level %in% c("chromosome", "chromosome-arm")) group_vars <- c(group_vars, "Chr")
+  if (level == "chromosome-arm") group_vars <- c(group_vars, "chrID.1", "chrID.2")
+
+  # summarize using base R
+  split_idx <- interaction(dat[group_vars], drop = TRUE, lex.order = TRUE)
+  grouped <- split(seq_len(nrow(dat)), split_idx)
+
+  out <- lapply(grouped, function(idx) {
+    g <- dat[idx, , drop = FALSE]
+    row <- list(
+      Sample    = g$Sample[1],
+      CN_mode   = mode(g[[cn_col]]),
+      n_windows = nrow(g)
+    )
+    if ("Chr" %in% group_vars)     row$Chr      <- g$Chr[1]
+    if ("chrID.1" %in% group_vars) row$chrID.1  <- g$chrID.1[1]
+    if ("chrID.2" %in% group_vars) row$chrID.2  <- g$chrID.2[1]
+    as.data.frame(row, stringsAsFactors = FALSE)
+  })
+  res <- do.call(rbind, out)
+
+  # Arrange columns nicely
+  want <- c("Sample",
+            if (level %in% c("chromosome", "chromosome-arm")) "Chr",
+            if (level == "chromosome-arm") c("chrID.1", "chrID.2"),
+            "CN_mode", "n_windows")
+  res <- res[want]
+
+  rownames(res) <- NULL
+  res
+}
+
+#' Summarize copy number mode and posterior probability
+#'
+#' Summarizes the mode of copy number calls and the mean maximum posterior probability per sample,
+#' chromosome, or chromosome arm. Handles input as a data.frame or hmm_CN object.
+#'
+#' @param df Data.frame or hmm_CN object containing windowed CN calls and posterior probabilities.
+#' @param level Character. Summarization level: 'sample', 'chromosome', or 'chromosome-arm'.
+#' @param centromeres Optional. Named numeric vector or data.frame with centromere positions (required for chromosome-arm).
+#' @param cn_col Character. Column name for CN calls (default: 'CN_call').
+#' @param post_col Character. Column name for maximum posterior probability (default: 'post_max').
+#'
+#' @return Data.frame with columns for sample, chromosome (and arm if requested), CN mode, mean max posterior, and window count.
+#' @examples
+#' # Summarize by chromosome with posterior
+#' summarize_cn_mode(hmm_CN$result, level = "chromosome", post_col = "post_max")
+#' @export
+summarize_cn_mode <- function(df,
+                              level = c("sample", "chromosome", "chromosome-arm"),
+                              centromeres = NULL,
+                              cn_col = "CN_call",
+                              post_col = "post_max") {
+  level <- match.arg(level)
+
+  # unwrap if hmm_CN-like object with $result
+  dat <- if (is.data.frame(df)) df else if (!is.null(df$result) && is.data.frame(df$result)) df$result else
+    stop("Input must be a data.frame or an hmm_CN-like object with a data.frame at `$result`.")
+
+  # required columns
+  req_cols <- c("Sample", "Chr", "Start", "End", cn_col, post_col)
+  miss <- setdiff(req_cols, names(dat))
+  if (length(miss)) stop("Missing required columns in data: ", paste(miss, collapse = ", "))
+
+  if (!is.numeric(dat[[cn_col]]) && !is.integer(dat[[cn_col]])) {
+    stop(sprintf("Column '%s' must be numeric/integer.", cn_col))
+  }
+  if (!is.numeric(dat[[post_col]])) {
+    stop(sprintf("Column '%s' must be numeric.", post_col))
+  }
+
+  dat <- as.data.frame(dat)
+
+  # chromosome-arm handling → create chrID.1 (Chr) and chrID.2 (1=p, 2=q)
+  if (level == "chromosome-arm") {
+    if (is.null(centromeres))
+      stop("For level='chromosome-arm', provide `centromeres` (named numeric vector or data.frame with Chr, Centromere).")
+
+    if (is.data.frame(centromeres)) {
+      if (!all(c("Chr", "Centromere") %in% names(centromeres)))
+        stop("centromeres data.frame must have columns: Chr, Centromere")
+      cm <- setNames(centromeres$Centromere, centromeres$Chr)
+    } else if (is.numeric(centromeres) && !is.null(names(centromeres))) {
+      cm <- centromeres
+    } else {
+      stop("centromeres must be a named numeric vector or a data.frame with Chr and Centromere.")
+    }
+
+    mid <- (dat$Start + dat$End) / 2
+    has_cm <- dat$Chr %in% names(cm)
+
+    # Assign arm index: 1 = p (left), 2 = q (right)
+    chrID.2 <- rep(NA_integer_, nrow(dat))
+    chrID.2[has_cm] <- ifelse(mid[has_cm] < cm[dat$Chr[has_cm]], 1L, 2L)
+
+    if (any(!has_cm)) {
+      missing_chr <- unique(dat$Chr[!has_cm])
+      warning("No centromere provided for: ", paste(missing_chr, collapse = ", "),
+              ". Rows for these chromosomes will be dropped.")
+    }
+
+    keep <- has_cm & !is.na(chrID.2)
+    dat <- dat[keep, , drop = FALSE]
+    chrID.2 <- chrID.2[keep]
+
+    dat$chrID.1 <- dat$Chr
+    dat$chrID.2 <- chrID.2
+  }
+
+  # grouping variables
+  group_vars <- c("Sample")
+  if (level %in% c("chromosome", "chromosome-arm")) group_vars <- c(group_vars, "Chr")
+  if (level == "chromosome-arm") group_vars <- c(group_vars, "chrID.1", "chrID.2")
+
+  # summarize (base R)
+  split_idx <- interaction(dat[group_vars], drop = TRUE, lex.order = TRUE)
+  grouped <- split(seq_len(nrow(dat)), split_idx)
+
+  out <- lapply(grouped, function(idx) {
+    g <- dat[idx, , drop = FALSE]
+    row <- list(
+      Sample        = g$Sample[1],
+      CN_mode       = mode(g[[cn_col]]),
+      mean_max_prob = mean(g[[post_col]], na.rm = TRUE),
+      n_windows     = nrow(g)
+    )
+    if ("Chr" %in% group_vars)     row$Chr      <- g$Chr[1]
+    if ("chrID.1" %in% group_vars) row$chrID.1  <- g$chrID.1[1]
+    if ("chrID.2" %in% group_vars) row$chrID.2  <- g$chrID.2[1]
+    as.data.frame(row, stringsAsFactors = FALSE)
+  })
+  res <- do.call(rbind, out)
+
+  # nice column ordering
+  want <- c("Sample",
+            if (level %in% c("chromosome", "chromosome-arm")) "Chr",
+            if (level == "chromosome-arm") c("chrID.1", "chrID.2"),
+            "CN_mode", "mean_max_prob", "n_windows")
+  res <- res[want]
+
+  rownames(res) <- NULL
+  res
+}
+
+#' Merge CN summary with area-based ploidy estimates
+#'
+#' Merges summarized HMM CN results with area-based ploidy estimates for each sample and chromosome (or arm).
+#' Useful for combining HMM and area-based results for reporting or downstream analysis.
+#'
+#' @param hmm_summarized Data.frame from summarize_cn_mode.
+#' @param qploidy_area_ploidy_estimation Object containing area-based ploidy matrices.
+#' @param level Character. Merge level: 'chromosome', 'chromosome-arm', or 'sample'.
+#'
+#' @return Data.frame with merged columns: sample, chromosome, HMM CN mode, area-based CN, confidence metrics, and window count.
+#' @examples
+#' # Merge by chromosome
+#' merge_cn_summary_with_estimates(hmm_summarized, area_est, level = "chromosome")
+#' @export
+merge_cn_summary_with_estimates <- function(hmm_summarized,
+                                            qploidy_area_ploidy_estimation,
+                                            level = c("chromosome", "chromosome-arm", "sample")) {
+  level <- match.arg(level)
+
+  if (!inherits(qploidy_area_ploidy_estimation, "qploidy_area_ploidy_estimation"))
+    stop("`qploidy_area_ploidy_estimation` must be a qploidy_area_ploidy_estimation object.")
+
+  ploidy_mat <- qploidy_area_ploidy_estimation$ploidy
+  diff_mat   <- qploidy_area_ploidy_estimation$diff_first_second
+
+  if (is.null(rownames(ploidy_mat)) || is.null(rownames(diff_mat)))
+    stop("Matrices in `qploidy_area_ploidy_estimation` must have rownames = sample IDs.")
+
+  mat_long <- function(M, value_name) {
+    tibble::as_tibble(M, rownames = "Sample") |>
+      tidyr::pivot_longer(cols = -Sample, names_to = "Chr", values_to = value_name)
+  }
+
+  if (level == "chromosome") {
+    est_ploidy_long <- mat_long(ploidy_mat, "CN_area")
+    est_diff_long   <- mat_long(diff_mat,   "area_diff_prob")
+    est_long <- merge(est_ploidy_long, est_diff_long, by = c("Sample", "Chr"), all = TRUE, sort = FALSE)
+
+    # hmm_summarized is expected to have CN_mode, mean_max_prob, n_windows from summarize_cn_mode()
+    out <- merge(hmm_summarized, est_long, by = c("Sample", "Chr"), all.x = TRUE, sort = FALSE)
+
+  } else if (level == "chromosome-arm") {
+    if (!all(c("Sample", "chrID.1", "chrID.2") %in% names(hmm_summarized)))
+      stop("For level='chromosome-arm', `hmm_summarized` must include: Sample, chrID.1, chrID.2.")
+    hmm_summarized$ChrArm <- paste(hmm_summarized$chrID.1, hmm_summarized$chrID.2, sep = ".")
+
+    est_ploidy_long <- mat_long(ploidy_mat, "CN_area") |>
+      dplyr::rename(ChrArm = Chr)
+    est_diff_long   <- mat_long(diff_mat,   "area_diff_prob") |>
+      dplyr::rename(ChrArm = Chr)
+
+    est_long <- merge(est_ploidy_long, est_diff_long, by = c("Sample", "ChrArm"), all = TRUE, sort = FALSE)
+    out <- merge(hmm_summarized, est_long, by.x = c("Sample", "ChrArm"), by.y = c("Sample", "ChrArm"),
+                 all.x = TRUE, sort = FALSE)
+
+    out$chrID.1 <- NULL
+    out$chrID.2 <- NULL
+    out$ChrArm  <- NULL
+
+  } else { # level == "sample"
+    # Aggregate matrices per sample
+    CN_area         <- apply(ploidy_mat, 1, function(x) mode(as.numeric(x)))
+    area_diff_prob  <- rowMeans(diff_mat, na.rm = TRUE)
+
+    est_sample <- tibble::tibble(
+      Sample         = names(CN_area),
+      CN_area        = as.numeric(CN_area),
+      area_diff_prob = as.numeric(area_diff_prob)
+    )
+
+    out <- merge(hmm_summarized, est_sample, by = "Sample", all.x = TRUE, sort = FALSE)
+    if (!("Chr" %in% names(out))) out$Chr <- NA_character_
+    out <- out[c("Sample", "Chr", setdiff(names(out), c("Sample", "Chr")))]
+  }
+
+  # ---- Rename to requested schema ----
+  # From summarize_cn_mode(): CN_mode -> CN_HMM; mean_max_prob -> HMM_max_prob; n_windows -> HMM_n_windows
+  rename_map <- c(CN_mode = "CN_HMM",
+                  mean_max_prob = "HMM_max_prob",
+                  n_windows = "HMM_n_windows")
+  for (old in names(rename_map)) {
+    if (old %in% names(out)) names(out)[names(out) == old] <- rename_map[[old]]
+  }
+
+  # Ensure all columns exist and ordered as requested
+  want <- c("Sample", "Chr", "CN_HMM", "CN_area", "HMM_max_prob", "area_diff_prob", "HMM_n_windows")
+  missing <- setdiff(want, names(out))
+  for (m in missing) out[[m]] <- NA
+  out <- out[want]
+
+  rownames(out) <- NULL
+  out
+}

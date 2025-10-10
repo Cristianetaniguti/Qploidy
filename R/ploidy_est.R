@@ -6,24 +6,24 @@ globalVariables(c("color", "xmax", "xmin", "value", "name",
 
 #' Estimate ploidy using area method
 #'
-#' This function estimates ploidy using the area method. It evaluates the 
-#' number of copies by chromosome, sample, or chromosome arm. Note that this 
-#' function does not have optimal performance, and visual inspection of the 
+#' This function estimates ploidy using the area method. It evaluates the
+#' number of copies by chromosome, sample, or chromosome arm. Note that this
+#' function does not have optimal performance, and visual inspection of the
 #' plots is required to confirm the estimated ploidy.
 #'
 #' @param qploidy_standardization Object of class qploidy_standardization.
-#' @param samples If "all", all samples contained in the qploidy_standardization 
-#' object will be evaluated. If a vector with sample names is provided, only 
+#' @param samples If "all", all samples contained in the qploidy_standardization
+#' object will be evaluated. If a vector with sample names is provided, only
 #' those will be evaluated.
-#' @param level Character identifying the level of the analysis. Must be one of 
-#' "chromosome", "sample", or "chromosome-arm". If `chromosome-arm`, the 
-#' analysis will be performed by chromosome arm (only if `centromeres` argument 
+#' @param level Character identifying the level of the analysis. Must be one of
+#' "chromosome", "sample", or "chromosome-arm". If `chromosome-arm`, the
+#' analysis will be performed by chromosome arm (only if `centromeres` argument
 #' is defined).
-#' @param ploidies Vector of ploidy levels to test. This parameter must be 
+#' @param ploidies Vector of ploidy levels to test. This parameter must be
 #' defined.
 #' @param area Area around the expected peak to be considered. Default is 0.75.
-#' @param centromeres Vector with centromere genomic positions in bp. The vector 
-#' should be named with the chromosome IDs. This information will only be used 
+#' @param centromeres Vector with centromere genomic positions in bp. The vector
+#' should be named with the chromosome IDs. This information will only be used
 #' if `chromosome-arm` level is defined.
 #'
 #' @return A list of class `qploidy_area_ploidy_estimation` containing:
@@ -73,23 +73,25 @@ area_estimate_ploidy <- function(qploidy_standardization = NULL,
 
   # Filter data based on samples
   if (all(samples == "all")) {
-    data_sample <- qploidy_standardization$data[, c(9, 10, 2, 8)] %>% 
+    data_sample <- qploidy_standardization$data[, c(9, 10, 2, 8)] %>%
       filter(!is.na(baf))
   } else {
-    data_sample <- qploidy_standardization$data[, c(9, 10, 2, 8)] %>% 
+    data_sample <- qploidy_standardization$data[, c(9, 10, 2, 8)] %>%
       filter(SampleName %in% samples & !is.na(baf))
   }
 
+  if (nrow(data_sample) == 0) stop("No data available for the selected samples.")
+
   # Check for duplicated marker positions
-  one_sample <- data_sample$Position[which(data_sample$SampleName %in% 
+  one_sample <- data_sample$Position[which(data_sample$SampleName %in%
                                            data_sample$SampleName[1])]
   if (any(duplicated(one_sample))) {
     warning("There are duplicated marker positions. Only the first one will be kept.")
-    data_sample <- data_sample %>% group_by(SampleName) %>% 
+    data_sample <- data_sample %>% group_by(SampleName) %>%
       filter(!duplicated(Position))
   }
 
-  data_sample <- pivot_wider(data_sample, names_from = SampleName, 
+  data_sample <- pivot_wider(data_sample, names_from = SampleName,
                              values_from = baf)
 
   if (is.null(data_sample)) stop("Define data_sample argument.")
@@ -128,7 +130,7 @@ area_estimate_ploidy <- function(qploidy_standardization = NULL,
   freq <- pascalTriangle(max(ploidies))
   freq <- freq[-1]
   ploidies <- unique(c(1, ploidies))
-  dots.int_tot <- corr_tot <- max_sd_tot <- modes_paste_tot <- 
+  dots.int_tot <- corr_tot <- max_sd_tot <- modes_paste_tot <-
     as.list(rep(NA, length(by_chr)))
   for (p in ploidies) {
     # Area method
@@ -142,11 +144,11 @@ area_estimate_ploidy <- function(qploidy_standardization = NULL,
     prop_tot <- modes_tot <- sd_areas_tot <- as.list(rep(NA, length(by_chr)))
     for (z in seq_along(by_chr)) {
       for (i in seq_len(nrow(rets))) {
-        prop <- apply(by_chr[[z]][, -c(1, 2)], 2, function(x) 
+        prop <- apply(by_chr[[z]][, -c(1, 2)], 2, function(x)
           sum(x >= rets$ymin[i] & x <= rets$ymax[i], na.rm = TRUE))
-        modes <- apply(by_chr[[z]][, -c(1, 2)], 2, function(x) 
+        modes <- apply(by_chr[[z]][, -c(1, 2)], 2, function(x)
           mode(x[x >= rets$ymin[i] & x <= rets$ymax[i]]))
-        sd_areas <- apply(by_chr[[z]][, -c(1, 2)], 2, function(x) 
+        sd_areas <- apply(by_chr[[z]][, -c(1, 2)], 2, function(x)
           sd(x[x >= rets$ymin[i] & x <= rets$ymax[i]], na.rm = TRUE))
 
         prop_tot[[z]] <- rbind(prop_tot[[z]], prop)
@@ -158,17 +160,17 @@ area_estimate_ploidy <- function(qploidy_standardization = NULL,
     # remove NAs
     prop_tot <- lapply(prop_tot, function(x) x[-1, ])
     for (z in seq_along(prop_tot)) {
-      if (is.null(ncol(prop_tot[[z]]))) dots.int <- sum(prop_tot[[z]], 
+      if (is.null(ncol(prop_tot[[z]]))) dots.int <- sum(prop_tot[[z]],
         na.rm = TRUE) / dim(by_chr[[z]])[1] else
-        dots.int <- apply(prop_tot[[z]], 2, function(x) sum(x, na.rm = TRUE) / 
+        dots.int <- apply(prop_tot[[z]], 2, function(x) sum(x, na.rm = TRUE) /
           dim(by_chr[[z]])[1])
       dots.int_tot[[z]] <- rbind(dots.int_tot[[z]], dots.int)
 
-      modes_paste <- apply(modes_tot[[z]], 2, function(x) 
+      modes_paste <- apply(modes_tot[[z]], 2, function(x)
         paste0(round(x[-1], 3), collapse = "/"))
       modes_paste_tot[[z]] <- rbind(modes_paste_tot[[z]], modes_paste)
 
-      corr <- apply(modes_tot[[z]], 2, function(x) 
+      corr <- apply(modes_tot[[z]], 2, function(x)
         cor(x = x[-1], y = seq(0, 1, 1 / p)))
       corr_tot[[z]] <- rbind(corr_tot[[z]], corr)
 
@@ -183,28 +185,28 @@ area_estimate_ploidy <- function(qploidy_standardization = NULL,
   max_sd_tot <- lapply(max_sd_tot, function(x) x[-1, ])
 
   # Area method
-  result.ploidy <- diff.count <- second <- diff.second <- 
+  result.ploidy <- diff.count <- second <- diff.second <-
     diff.first.second <- list()
   for (z in seq_along(dots.int_tot)) {
     if (is.null(rownames(dots.int_tot[[z]]))) {
       names(dots.int_tot[[z]]) <- ploidies
-      result.ploidy[[z]] <- ploidies[order(dots.int_tot[[z]], 
+      result.ploidy[[z]] <- ploidies[order(dots.int_tot[[z]],
         decreasing = T)][1]
 
-      diff.count[[z]] <- dots.int_tot[[z]][order(dots.int_tot[[z]], 
+      diff.count[[z]] <- dots.int_tot[[z]][order(dots.int_tot[[z]],
         decreasing = T)][1]
       second[[z]] <- ploidies[order(dots.int_tot[[z]], decreasing = T)][2]
-      diff.second[[z]] <- dots.int_tot[[z]][order(dots.int_tot[[z]], 
+      diff.second[[z]] <- dots.int_tot[[z]][order(dots.int_tot[[z]],
         decreasing = T)][2]
     } else {
       rownames(dots.int_tot[[z]]) <- ploidies
-      result.ploidy[[z]] <- apply(dots.int_tot[[z]], 2, function(x) 
+      result.ploidy[[z]] <- apply(dots.int_tot[[z]], 2, function(x)
         ploidies[order(x, decreasing = T)][1])
-      diff.count[[z]] <- apply(dots.int_tot[[z]], 2, function(x) 
+      diff.count[[z]] <- apply(dots.int_tot[[z]], 2, function(x)
         x[order(x, decreasing = T)][1])
-      second[[z]] <- apply(dots.int_tot[[z]], 2, function(x) 
+      second[[z]] <- apply(dots.int_tot[[z]], 2, function(x)
         ploidies[order(x, decreasing = T)][2])
-      diff.second[[z]] <- apply(dots.int_tot[[z]], 2, function(x) 
+      diff.second[[z]] <- apply(dots.int_tot[[z]], 2, function(x)
         x[order(x, decreasing = T)][2])
     }
     diff.first.second[[z]] <- diff.count[[z]] - diff.second[[z]]
@@ -225,7 +227,7 @@ area_estimate_ploidy <- function(qploidy_standardization = NULL,
     dots.int_tot <- lapply(dots.int_tot, t)
   }
 
-  sd_tot_mt <- corr_tot_mt <- dots.int_tot_mt <- modes_paste_tot_mt <- 
+  sd_tot_mt <- corr_tot_mt <- dots.int_tot_mt <- modes_paste_tot_mt <-
     matrix(NA, nrow = dim(result.ploidy)[1], ncol = dim(result.ploidy)[2])
   for (i in seq_len(dim(result.ploidy)[2])) { # Ind
     for (j in seq_len(dim(result.ploidy)[1])) { # Chr
@@ -244,11 +246,11 @@ area_estimate_ploidy <- function(qploidy_standardization = NULL,
   dots.int_tot_mt <- t(dots.int_tot_mt)
 
   colnames(result.ploidy) <- colnames(diff.first.second) <- names(by_chr)
-  colnames(sd_tot_mt) <- colnames(corr_tot_mt) <- colnames(modes_paste_tot_mt) <- 
+  colnames(sd_tot_mt) <- colnames(corr_tot_mt) <- colnames(modes_paste_tot_mt) <-
     colnames(dots.int_tot_mt) <- names(by_chr)
 
   rownames(diff.first.second) <- rownames(result.ploidy)
-  rownames(sd_tot_mt) <- rownames(corr_tot_mt) <- rownames(modes_paste_tot_mt) <- 
+  rownames(sd_tot_mt) <- rownames(corr_tot_mt) <- rownames(modes_paste_tot_mt) <-
     rownames(dots.int_tot_mt) <- rownames(result.ploidy)
 
   # Find homozygous
@@ -276,14 +278,14 @@ area_estimate_ploidy <- function(qploidy_standardization = NULL,
 #' Merges chromosome-arm level analysis results into chromosome level format
 #'
 #' @param x object of class qploidy_area_ploidy_estimation
-#' @param filter_diff filter by difference on area proportion between first and 
+#' @param filter_diff filter by difference on area proportion between first and
 #' second place
 #'
 #' @return An updated object of class `qploidy_area_ploidy_estimation` with the following modifications:
-#' 
-#' - `ploidy`: A matrix where chromosome-arm level results are merged into chromosome-level format. 
+#'
+#' - `ploidy`: A matrix where chromosome-arm level results are merged into chromosome-level format.
 #'    If `filter_diff` is provided, ploidy values with differences below the threshold are set to `NA`.
-#' 
+#'
 #' The structure of the returned object remains consistent with the input, but with updated ploidy information.
 #'
 #' @export
@@ -298,8 +300,8 @@ merge_arms_format <- function(x, filter_diff = NULL){
   result.ploidy.up <- vector()
   for (i in seq_along(unique(chr))) {
     if (!is.null(dim(ploidy[, which(chr == unique(chr)[i])])[1])) {
-      new.col <- apply(ploidy[, which(chr == unique(chr)[i])], 1, 
-        function(x) if (length(unique(x)) == 1) unique(x) else 
+      new.col <- apply(ploidy[, which(chr == unique(chr)[i])], 1,
+        function(x) if (length(unique(x)) == 1) unique(x) else
           paste0(x, collapse = "/"))
     } else new.col <- ploidy[, which(chr == unique(chr)[i])]
     result.ploidy.up <- cbind(result.ploidy.up, new.col)
@@ -320,9 +322,9 @@ merge_arms_format <- function(x, filter_diff = NULL){
 #' @param ... print parameters
 #'
 #' @method print qploidy_area_ploidy_estimation
-#' 
+#'
 #' @return No return value, called for side effects.
-#' 
+#'
 #' @export
 print.qploidy_area_ploidy_estimation <- function(x, ...){
 
@@ -335,8 +337,8 @@ print.qploidy_area_ploidy_estimation <- function(x, ...){
                           "Number of potential aneuploid samples:",
                           "Number of highly inbred samples:"),
                    c2 = c(dim(x$ploidy)[1],
-                          {if(!is.null(colnames(x$ploidy))) 
-                            paste0(colnames(x$ploidy), collapse = ",") else 
+                          {if(!is.null(colnames(x$ploidy)))
+                            paste0(colnames(x$ploidy), collapse = ",") else
                             paste0(x$chr, collapse = ",")},
                           paste0(x$tested, collapse = ","),
                           sum(!count_aneu, na.rm = TRUE),
@@ -355,8 +357,8 @@ print.qploidy_area_ploidy_estimation <- function(x, ...){
 #'
 #' @param ploidy_df ploidy table (chromosome in columns and individuals in rows)
 #'
-#' @return A logical vector where each element corresponds to an individual in the 
-#'         input ploidy table. The value is `TRUE` if the individual is identified 
+#' @return A logical vector where each element corresponds to an individual in the
+#'         input ploidy table. The value is `TRUE` if the individual is identified
 #'         as potentially aneuploid, and `FALSE` otherwise.
 #'
 #' @export

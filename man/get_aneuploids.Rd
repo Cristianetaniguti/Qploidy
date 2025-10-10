@@ -10,8 +10,8 @@ get_aneuploids(ploidy_df)
 \item{ploidy_df}{ploidy table (chromosome in columns and individuals in rows)}
 }
 \value{
-A logical vector where each element corresponds to an individual in the 
-        input ploidy table. The value is `TRUE` if the individual is identified 
+A logical vector where each element corresponds to an individual in the
+        input ploidy table. The value is `TRUE` if the individual is identified
         as potentially aneuploid, and `FALSE` otherwise.
 }
 \description{

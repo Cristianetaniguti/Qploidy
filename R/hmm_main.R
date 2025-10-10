@@ -422,32 +422,59 @@ hmm_estimate_CN <- function(
 #' @return A data.frame with results for all samples, as returned by hmm_estimate_CN$result, combined.
 #' @importFrom parallel makeCluster parLapply stopCluster clusterExport
 #' @export
-hmm_estimate_CN_multi <- function(qploidy_standarize_result, sample_ids = "all", n_cores = 2, ...) {
-  if (!is(qploidy_standarize_result, "qploidy_standardization")) {
+hmm_estimate_CN_multi <- function(qploidy_standarize_result,
+                                  sample_ids = "all",
+                                  n_cores = 2,
+                                  ...) {
+  # sanity check
+  if (!inherits(qploidy_standarize_result, "qploidy_standardization")) {
     stop("Input must be a qploidy_standardization object as returned by standardize().")
   }
+
   df <- as.data.frame(qploidy_standarize_result$data)
   all_samples <- unique(df$SampleName)
+
   if (identical(sample_ids, "all")) {
     sample_ids <- all_samples
   } else {
     sample_ids <- intersect(sample_ids, all_samples)
     if (length(sample_ids) == 0) stop("No valid sample IDs found in input data.")
   }
-  cl <- makeCluster(n_cores)
-  on.exit(stopCluster(cl))
-  clusterExport(cl, varlist = c("qploidy_standarize_result", "hmm_estimate_CN"), envir = environment())
-  results_list <- parLapply(cl, sample_ids, function(sid, ...) {
-    tryCatch({
-      hmm_estimate_CN(qploidy_standarize_result, sample_id = sid, ...)$result
-    }, error = function(e) {
-      warning(sprintf("Sample '%s' failed: %s", sid, e$message))
-      return(NULL)
-    })
-  }, ...)
+
+  # capture dots ONCE
+  dots <- list(...)
+
+  cl <- parallel::makeCluster(n_cores)
+  on.exit(parallel::stopCluster(cl), add = TRUE)
+
+  parallel::clusterEvalQ(cl, {
+    ## make errors surface promptly
+    options(warn = 1)
+    ## packages that define hmm_estimate_CN, classes, and helpers
+    library(methods)    # important for S4 on PSOCK clusters
+    library(Qploidy)
+    # library(dplyr)
+    # library(tidyr)
+    NULL
+  })
+
+  # make sure workers can see hmm_estimate_CN (and any helpers it needs)
+  parallel::clusterExport(cl,
+                          varlist = c("worker", "hmm_estimate_CN", "baf_template", "baf_ll", "logsumexp", "viterbi"),
+                          envir = environment()
+  )
+
+  results_list <- parallel::parLapply(cl, sample_ids, worker,
+                                      qploidy_standarize_result, dots)
+
+  parameters <- lapply(results_list, function(x) x$params)
+  results_list <- lapply(results_list, function(x) x$result)
   results_list <- Filter(Negate(is.null), results_list)
   if (length(results_list) == 0) stop("No results returned for any sample.")
+
   combined <- do.call(rbind, results_list)
   rownames(combined) <- NULL
-  return(combined)
+  return(structure(list(result =combined, params = parameters[[1]]), class = "hmm_CN"))
 }
+
+

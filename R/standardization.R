@@ -571,10 +571,8 @@ standardize <- function(data = NULL,
 
     if(verbose) cat("Going to parallel mode...\n")
     clust <- makeCluster(n.cores, type = parallel.type)
-    clusterExport(clust, c("get_centers", "rm_outlier"), envir = environment())
-    clusterEvalQ(clust, { library(magrittr); library(dplyr) }) # load required packages on workers
-    # Export rm_outlier again to ensure it's available inside get_centers
-    clusterExport(clust, "rm_outlier", envir = environment())
+    clusterExport(clust, c("get_centers", "rm_outlier"), envir = .GlobalEnv)
+    clusterEvalQ(clust, { library(magrittr); library(dplyr); library(Qploidy) }) # load required packages and Qploidy on workers
     clusters <- parLapply(clust, lst_standardization, get_centers,
                           ploidy= ploidy.standardization,
                           n.clusters.thr = threshold.n.clusters,

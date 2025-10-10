@@ -188,7 +188,7 @@ get_centers <- function(ratio_geno,
     if(is.null(n.clusters.thr)) n.clusters.thr <- ploidy + 1
 
     # Adjust codification
-    ad <- ratio_geno %>% dplyr::filter(!is.na(theta) & !is.na(geno)) %>% dplyr::group_by(geno) %>% dplyr::summarise(mean = mean(theta))
+    ad <- ratio_geno %>% filter(!is.na(theta) & !is.na(geno)) %>% group_by(geno) %>% summarise(mean = mean(theta))
     if(ad$mean[1] > ad$mean[nrow(ad)]) {
       genos = data.frame(geno = 0:ploidy, geno.new = ploidy:0)
       ratio_geno$geno <- genos$geno.new[match(ratio_geno$geno,genos$geno)]
@@ -495,7 +495,7 @@ rm_outlier <- function(data, alpha=0.05){
 #' @importFrom dplyr group_by summarize filter mutate inner_join full_join
 #' @importFrom tidyr pivot_wider pivot_longer
 #' @importFrom vroom vroom_write
-#' @importFrom parallel makeCluster stopCluster clusterExport parLapply
+#' @importFrom parallel makeCluster stopCluster clusterExport parLapply clusterEvalQ
 #' @importFrom stats sd
 #'
 #' @export
@@ -571,7 +571,8 @@ standardize <- function(data = NULL,
 
     if(verbose) cat("Going to parallel mode...\n")
     clust <- makeCluster(n.cores, type = parallel.type)
-    #clusterExport(clust, c("get_centers", "rm_outlier", "%>%"))
+    clusterExport(clust, c("get_centers", "rm_outlier"), envir = environment())
+    clusterEvalQ(clust, { library(magrittr); library(dplyr) }) # load required packages on workers
     clusters <- parLapply(clust, lst_standardization, get_centers,
                           ploidy= ploidy.standardization,
                           n.clusters.thr = threshold.n.clusters,

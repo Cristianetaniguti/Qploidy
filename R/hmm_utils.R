@@ -1,5 +1,5 @@
 # Suppress global variable warnings for non-standard evaluation in dplyr/ggplot2
-utils::globalVariables(c(
+globalVariables(c(
   "Sample", "Chr", "Start", "End", "CN_call", "prob_call", "w_baf", "Mid"
 ))
 
@@ -158,6 +158,8 @@ viterbi <- function(ll_em, logA, logpi0) {
 #' @import ggplot2
 #' @importFrom dplyr filter
 #' @importFrom magrittr %>%
+#' @importFrom ggpubr ggarrange
+#' 
 #' @export
 plot_cn_track <- function(hmm_CN,
                           sample_id = NULL,
@@ -176,7 +178,7 @@ plot_cn_track <- function(hmm_CN,
 
   # defaults BEFORE filtering
   if (is.null(sample_id)) sample_id <- unique(df$Sample)[1]
-  x <- dplyr::filter(df, Sample == sample_id)
+  x <- filter(df, Sample == sample_id)
   if (nrow(x) == 0) stop("No rows for sample_id = ", sample_id)
 
   if (is.null(cn_min)) cn_min <- min(x$CN_call, na.rm = TRUE)
@@ -197,13 +199,13 @@ plot_cn_track <- function(hmm_CN,
   vlines <- NULL
   if (show_window_lines) {
     vlines <- x |>
-      dplyr::distinct(Chr, Start) |>
-      dplyr::arrange(Chr, Start)
+      distinct(Chr, Start) |>
+      arrange(Chr, Start)
     if (!include_first_in_chr) {
       vlines <- vlines |>
-        dplyr::group_by(Chr) |>
-        dplyr::filter(Start != min(Start)) |>
-        dplyr::ungroup()
+        group_by(Chr) |>
+        filter(Start != min(Start)) |>
+        ungroup()
     }
   }
 
@@ -255,7 +257,7 @@ plot_cn_track <- function(hmm_CN,
 
   # -------- stack with ggpubr (no patchwork needed) --------
   # align = "v" keeps x-axes aligned; widths are matched automatically
-  ggpubr::ggarrange(
+  ggarrange(
     p_z, p_cn,
     ncol = 1, nrow = 2,
     heights = heights,
@@ -273,7 +275,7 @@ plot_cn_track <- function(hmm_CN,
 #' @param dots Named list of additional arguments to pass to hmm_estimate_CN.
 #'
 #' @return List as returned by hmm_estimate_CN, or NULL if an error occurs.
-#' @seealso hmm_estimate_CN, parallel::parLapply
+#' 
 #' @keywords internal
 #' @noRd
 worker <- function(sid, obj, dots) {
@@ -298,9 +300,7 @@ worker <- function(sid, obj, dots) {
 #' @param cn_col Character. Column name for CN calls (default: 'CN_call').
 #'
 #' @return Data.frame with columns for sample, chromosome (and arm if requested), CN mode, and window count.
-#' @examples
-#' # Summarize by chromosome
-#' summarize_cn_mode(hmm_CN$result, level = "chromosome")
+#' 
 #' @export
 summarize_cn_mode <- function(df,
                               level = c("sample", "chromosome", "chromosome-arm"),
@@ -404,9 +404,8 @@ summarize_cn_mode <- function(df,
 #' @param post_col Character. Column name for maximum posterior probability (default: 'post_max').
 #'
 #' @return Data.frame with columns for sample, chromosome (and arm if requested), CN mode, mean max posterior, and window count.
-#' @examples
-#' # Summarize by chromosome with posterior
-#' summarize_cn_mode(hmm_CN$result, level = "chromosome", post_col = "post_max")
+#' 
+#' 
 #' @export
 summarize_cn_mode <- function(df,
                               level = c("sample", "chromosome", "chromosome-arm"),
@@ -514,9 +513,10 @@ summarize_cn_mode <- function(df,
 #' @param level Character. Merge level: 'chromosome', 'chromosome-arm', or 'sample'.
 #'
 #' @return Data.frame with merged columns: sample, chromosome, HMM CN mode, area-based CN, confidence metrics, and window count.
-#' @examples
-#' # Merge by chromosome
-#' merge_cn_summary_with_estimates(hmm_summarized, area_est, level = "chromosome")
+#' 
+#' @importFrom dplyr rename
+#' @importFrom tidyr pivot_longer as_tibble
+#' 
 #' @export
 merge_cn_summary_with_estimates <- function(hmm_summarized,
                                             qploidy_area_ploidy_estimation,
@@ -533,8 +533,8 @@ merge_cn_summary_with_estimates <- function(hmm_summarized,
     stop("Matrices in `qploidy_area_ploidy_estimation` must have rownames = sample IDs.")
 
   mat_long <- function(M, value_name) {
-    tibble::as_tibble(M, rownames = "Sample") |>
-      tidyr::pivot_longer(cols = -Sample, names_to = "Chr", values_to = value_name)
+    as_tibble(M, rownames = "Sample") |>
+      pivot_longer(cols = -Sample, names_to = "Chr", values_to = value_name)
   }
 
   if (level == "chromosome") {
@@ -551,9 +551,9 @@ merge_cn_summary_with_estimates <- function(hmm_summarized,
     hmm_summarized$ChrArm <- paste(hmm_summarized$chrID.1, hmm_summarized$chrID.2, sep = ".")
 
     est_ploidy_long <- mat_long(ploidy_mat, "CN_area") |>
-      dplyr::rename(ChrArm = Chr)
+      rename(ChrArm = Chr)
     est_diff_long   <- mat_long(diff_mat,   "area_diff_prob") |>
-      dplyr::rename(ChrArm = Chr)
+      rename(ChrArm = Chr)
 
     est_long <- merge(est_ploidy_long, est_diff_long, by = c("Sample", "ChrArm"), all = TRUE, sort = FALSE)
     out <- merge(hmm_summarized, est_long, by.x = c("Sample", "ChrArm"), by.y = c("Sample", "ChrArm"),
@@ -568,7 +568,7 @@ merge_cn_summary_with_estimates <- function(hmm_summarized,
     CN_area         <- apply(ploidy_mat, 1, function(x) mode(as.numeric(x)))
     area_diff_prob  <- rowMeans(diff_mat, na.rm = TRUE)
 
-    est_sample <- tibble::tibble(
+    est_sample <- tibble(
       Sample         = names(CN_area),
       CN_area        = as.numeric(CN_area),
       area_diff_prob = as.numeric(area_diff_prob)

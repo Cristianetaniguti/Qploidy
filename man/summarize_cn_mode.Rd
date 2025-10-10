@@ -43,9 +43,3 @@ Handles input as a data.frame or an hmm_CN object.
 Summarizes the mode of copy number calls and the mean maximum posterior probability per sample,
 chromosome, or chromosome arm. Handles input as a data.frame or hmm_CN object.
 }
-\examples{
-# Summarize by chromosome
-summarize_cn_mode(hmm_CN$result, level = "chromosome")
-# Summarize by chromosome with posterior
-summarize_cn_mode(hmm_CN$result, level = "chromosome", post_col = "post_max")
-}

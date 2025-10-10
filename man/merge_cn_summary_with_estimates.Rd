@@ -24,7 +24,3 @@ Data.frame with merged columns: sample, chromosome, HMM CN mode, area-based CN, 
 Merges summarized HMM CN results with area-based ploidy estimates for each sample and chromosome (or arm).
 Useful for combining HMM and area-based results for reporting or downstream analysis.
 }
-\examples{
-# Merge by chromosome
-merge_cn_summary_with_estimates(hmm_summarized, area_est, level = "chromosome")
-}

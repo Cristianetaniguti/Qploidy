@@ -106,7 +106,7 @@ mod_qploidy_ui <- function(id){
       ),
       column(width = 9,
              box(
-               title = "Standardization Plots", status = "info", solidHeader = FALSE, width = 12,
+               title = "Standardization Plots by Sample", status = "info", solidHeader = FALSE, width = 12, collapsed = TRUE,
                box(title = "Plot Controls", status = "info", solidHeader = FALSE, collapsible = TRUE, width = 12,
                    fluidRow(
                      column(width = 6,
@@ -214,29 +214,49 @@ mod_qploidy_ui <- function(id){
                  tooltip = tooltipOptions(title = "Click to see inputs!")
                ))
              ),
-             box(
-               title = "HMM CN Estimation", status = "info", solidHeader = FALSE, width = 12,
-               "The Hidden Markov Model multipoint approach will be based on the standardized values.",
-               "Therefore, make sure the plots look good before proceeding, adjust the following paramenters and click the 'Run HMM' button below to run the estimation.", br(),
-               hr(),
+              box(collapsed = TRUE,
+                title = tagList(
+                  "HMM CN Estimation by Sample",
+                  tags$span("(BETA)", class = "label label-warning", style = "margin-left:8px;")
+                ),
+                status = "info", solidHeader = FALSE, width = 12,
+
+                tags$div(
+                  role = "note", `aria-live` = "polite",
+                  style = "margin-bottom:10px;",
+                  tags$p(
+                    tags$strong(icon("flask"), " This feature is in beta. "),
+                    "The multipoint Hidden Markov Model (HMM) copy-number estimation is under active development and testing.",
+                    "Results may change between versions and should be treated as provisional."
+                  ),
+                  tags$ul(
+                    tags$li("The algorithm operates on standardized values."),
+                    tags$li("Before running, inspect the diagnostic plots and ensure they look reasonable."),
+                    tags$li("Adjust the parameters below as needed, then click ",
+                            tags$code("Run HMM"), " to start the estimation.")
+                  )
+                ),
+                hr(),
                fluidRow(
                  column(width = 6,
-                        textInput(ns("ploidy_range_hmm"), "Ploidies to be tested", placeholder = "2,3,4", value = "2,3,4"),
-                        numericInput(ns("exp_ploidy"), "Expected overall ploidy", min = 1, value = 2),
-                        actionButton(ns("est_ploidy_hmm"), "Run HMM")
+                        textInput(ns("ploidy_range_hmm"), "Ploidies to be tested", placeholder = "2,3,4", value = "2,3,4"), 
+                        numericInput(ns("exp_ploidy"), "Expected overall ploidy", min = 1, value = 2)
                  ),
                  column(width = 6,
                         numericInput(ns("snps_per_window"), "Number of SNPs per window", min = 5, value = 20),
-                        numericInput(ns("min_snps_per_window"), "Minimum number of SNPs per window", min = 1, value = 5),
-                        numericInput(ns("n_bins"), "Number of bins to split BAF", min = 5, value = 100)
-                 )
+                        actionButton(ns("est_ploidy_hmm"), "Run HMM"), br(),
+                        actionButton(ns("advanced_options_hmm"),
+                                    label = HTML(paste(icon("cog", style = "color: #007bff;"), "Advanced Options")),
+                                    style = "background-color: transparent; border: none; color: #007bff; font-size: smaller; text-decoration: underline; padding: 0;"
+                        )
+                 )                        
                ),
                br(), hr(),
                plotOutput(ns("plot_hmm")), br(),
                DTOutput(ns("ploidy_table_hmm")),br(),
-               downloadButton(ns("download_ploidy_table_mm"), "Download Ploidy Table")
+               downloadButton(ns("download_ploidy_table_mm"), "Download HMM CN Estimations Table")
              ),
-             box(
+             box(collapsed = TRUE,
                title = "All Samples Ploidy Estimation", status = "info", solidHeader = FALSE, width = 12,
                "Check the plots above before obtaining the estimated ploidies for all samples.",
                "If the plots look good, adjust the following paramenters and click the 'Estimate Ploidies' button below to run the estimation.", br(),
@@ -253,6 +273,16 @@ mod_qploidy_ui <- function(id){
                                 fileInput(ns("centromeres_file2"),
                                           "Centromere positions file (CSV format with columns: Chromosome, Centromere Start Position)", accept = ".csv")
                ),
+               checkboxInput(ns("all_hmm"), "Run HMM CN estimations (beta)", value = FALSE),
+               conditionalPanel(condition = "input.all_hmm",
+                                  ns = ns,
+                                  "The HMM CN estimation will be run for all samples using the parameters specified in the HMM CN Estimation box above.",
+                                  "The process is paralellized by sample define the number of CPU cores to be used:",
+                                  column(width = 3,
+                                  numericInput(ns("n_cores_hmm"), "",
+                                  min = 1, value = 1)
+                                )
+              ),
                br(),
                actionButton(ns("est_ploidy"), "Estimate Ploidies by Area"), hr(), br(),
                DTOutput(ns("ploidy_table")),br(),
@@ -354,6 +384,32 @@ mod_qploidy_server <- function(input, output, session, parent_session){
       footer = tagList(
         modalButton("Close"),
         actionButton(ns("save_advanced_options"), "Save")
+      )
+    ))
+  })
+
+    #UI popup window for input
+  observeEvent(input$advanced_options_hmm, {
+    showModal(modalDialog(
+      title = "Advanced Options for HMM CN Estimation",
+      numericInput(ns("min_snps_per_window"), "Minimum number of SNPs per window",
+        min = 1, value = 20),
+      numericInput(ns("n_bins"), "Number of bins to split BAF",
+        min = 5, value = 100),
+      numericInput(ns("bw"), "Bandwidth (SD) of the Gaussian kernels used to generate the BAF comb templates",
+        min = 0, value = 0.03),
+      sliderInput(ns("het_lims"), "BAF limits to consider a SNP heterozygous",
+        min = 0, max = 1, value = c(0, 1), step = 0.005),
+      numericInput(ns("het_weight"), "Quantile used to scale BAF emission weight based on heterozygote count",
+        min = 0, max = 1, value = 0.8),
+      numericInput(ns("z_range"), "Padding added to min/max z for initial mean estimation",
+        min = 0, value = 0.2),
+      numericInput(ns("transition_jump"), "Diagonal value for transition matrix (probability to stay in same CN state)",
+        min = 0, max = 1,value = 0.995),
+      checkboxInput(ns("z_only"), "Fit the HMM using the z-emission only (ignores BAF)", value = FALSE),
+      footer = tagList(
+        modalButton("Close"),
+        actionButton(ns("save_advanced_options_hmm"), "Save")
       )
     ))
   })
@@ -701,11 +757,14 @@ mod_qploidy_server <- function(input, output, session, parent_session){
                             min_snps_per_window = input$min_snps_per_window,
                             cn_grid = ploidies,
                             M = input$n_bins,
-                            bw = 0.03,
+                            bw = input$bw,
                             exp_ploidy = input$exp_ploidy,
-                            het_lims = c(0.01, 0.99),
+                            het_lims = input$het_lims,
+                            het_weight = input$het_weight,
+                            z_range = input$z_range,
+                            transition_jump = input$transition_jump,
                             max_iter = 60,
-                            z_only = FALSE)
+                            z_only = input$z_only)
 
     updateProgressBar(session = session, id = "pb_qploidy", value = 75)
 

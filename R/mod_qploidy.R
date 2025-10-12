@@ -20,7 +20,14 @@ mod_qploidy_ui <- function(id){
       window.scrollTo({ top: 0, behavior: 'smooth' });
     });
   "))),
-    tags$style(HTML("#to_top { position: fixed; right: 20px; bottom: 20px; z-index: 9999; }")),
+    tags$style(HTML("#to_top { position: fixed; right: 20px; bottom: 20px; z-index: 9999; }",
+                    "    /* make each tab's content white with some padding and a soft border */
+    .tab-content > .tab-pane {
+      background: #ffffff;
+      padding: 16px;
+      border: 1px solid #e6e6e6;
+      border-radius: 8px;
+    }")),
     # Add qploidy content here
     fluidRow(
       disconnectMessage(
@@ -105,225 +112,244 @@ mod_qploidy_ui <- function(id){
              ),
       ),
       column(width = 9,
-             box(
-               title = "Standardization Plots by Sample", status = "info", solidHeader = FALSE, width = 12, collapsed = FALSE,
-               box(title = "Plot Controls", status = "info", solidHeader = FALSE, collapsible = TRUE, width = 12,
-                   fluidRow(
-                     column(width = 6,
-                            virtualSelectInput(
-                              inputId = ns("sample"),
-                              label = "Select Sample*:",
-                              choices = NULL,
-                              showValueAsTags = TRUE,
-                              search = TRUE,
-                              multiple = FALSE
-                            ),
-                            virtualSelectInput(
-                              inputId = ns("plots"),
-                              label = "Select Plot(s)*:",
-                              choices = c("Heterozygosity" = "het",
-                                          "Standardized Ratio (BAF) Scatterplot" = "BAF",
-                                          "Sum of Allele Counts/Intensities Zscore" = "zscore",
-                                          "Standardized Ratio (BAF) Histogram" = "BAF_hist",
-                                          "Non-standardized Ratio Scatterplot" = "ratio",
-                                          "Sample-level Non-standardized Ratio Histogram" = "Ratio_hist_overall",
-                                          "Sample-level Standardized Ratio (BAF) Histogram" = "BAF_hist_overall"),
-                              showValueAsTags = TRUE,
-                              search = TRUE,
-                              multiple = TRUE
-                            ),
-                            virtualSelectInput(
-                              inputId = ns("sele_chr_standardization"),
-                              label = "Select Chromosome(s)*:",
-                              choices = NULL,
-                              showValueAsTags = TRUE,
-                              search = TRUE,
-                              multiple = TRUE
-                            ),
-
-                            radioButtons(
-                              inputId = ns("add_estimated_peaks"),
-                              label = "Add Estimated Peaks:",
-                              choiceNames  = c("True", "False"),
-                              choiceValues = list(TRUE, FALSE),
-                              selected = FALSE,
-                              inline = TRUE
-                            ),
-
-                            radioButtons(
-                              inputId = ns("add_expected_peaks"),
-                              label = "Add Expected Peaks:",
-                              choiceNames  = c("True", "False"),
-                              choiceValues = list(TRUE, FALSE),
-                              selected = FALSE,
-                              inline = TRUE
-                            ),
-
-                            conditionalPanel(condition = "input.add_expected_peaks == 'TRUE'",
-                                             ns = ns,
-                                             numericInput(ns('ploidy_standardization'), label = 'Ploidy', value = 2),
-                            )
-                     ),
-                     column(width = 6,
-                            radioButtons(
-                              inputId = ns("add_centromeres"),
-                              label = "Add Centromere Position:",
-                              choiceNames  = c("True", "False"),
-                              choiceValues = list(TRUE, FALSE),
-                              selected = FALSE,
-                              inline = TRUE
-                            ),
-
-                            conditionalPanel(condition = "input.add_centromeres == 'TRUE'",
-                                             ns = ns,
-                                             fileInput(ns("centromeres_file_standardization"),
-                                                       "Centromere positions file (CSV format with columns: Chromosome, Centromere Start Position)", accept = ".csv")
-                            ),
-
-                            radioButtons(
-                              inputId = ns("rm_homozygous"),
-                              label = "Remove Homozygous Peaks:",
-                              choiceNames  = c("True", "False"),
-                              choiceValues = list(TRUE, FALSE),
-                              selected = FALSE,
-                              inline = TRUE
-                            ),
-
-                            numericInput(ns('dot.size'), label = 'Dot size', value = 0.05),
-                            numericInput(ns('font'), label = 'Font size', value = 2),
-                            actionButton(ns("build_plot"), "Build plot"),
-
-                     )
-                   )
-               ), hr(),
-
-               uiOutput(ns("plot_ui")),
-
-               div(style="display:inline-block; float:left",dropdownButton(
-                 tags$h3("Save Image"),
-                 selectInput(inputId = ns('image_type'), label = 'File Type', choices = c("jpeg","tiff","png","svg"), selected = "jpeg"),
-                 sliderInput(inputId = ns('image_res'), label = 'Resolution', value = 300, min = 50, max = 1000, step=50),
-                 sliderInput(inputId = ns('image_width'), label = 'Width', value = 9, min = 1, max = 20, step=0.5),
-                 sliderInput(inputId = ns('image_height'), label = 'Height', value = 5, min = 1, max = 20, step = 0.5),
-                 fluidRow(
-                   downloadButton(ns("download_figure"), "Save Image"), br(),
-                   downloadButton(ns("download_stand"), "Save Standardized Data")),
-                 circle = FALSE,
-                 status = "danger",
-                 icon = icon("floppy-disk"), width = "300px", label = "Save",
-                 tooltip = tooltipOptions(title = "Click to see inputs!")
-               ))
-             ),
-             box(collapsed = FALSE,
-                 title = tagList(
-                   "HMM CN Estimation by Sample",
-                   tags$span("(BETA)", class = "label label-warning", style = "margin-left:8px;")
-                 ),
-                 status = "info", solidHeader = FALSE, width = 12,
-
-                 tags$div(
-                   role = "note", `aria-live` = "polite",
-                   style = "margin-bottom:10px;",
-                   tags$p(
-                     tags$strong(icon("flask"), " This feature is in beta. "),
-                     "The multipoint Hidden Markov Model (HMM) copy-number estimation is under active development and testing.",
-                     "Results may change between versions and should be treated as provisional."
-                   ),
-                   tags$ul(
-                     tags$li("The algorithm operates on standardized values."),
-                     tags$li("Before running, inspect the diagnostic plots and ensure they look reasonable."),
-                     tags$li("Adjust the parameters below as needed, then click ",
-                             tags$code("Run HMM"), " to start the estimation.")
-                   )
-                 ),
-                 hr(),
-                 fluidRow(
-                   column(width = 6,
-                          virtualSelectInput(
-                            inputId = ns("sample_hmm"),
-                            label = "Select Sample*:",
-                            choices = NULL,
-                            showValueAsTags = TRUE,
-                            search = TRUE,
-                            multiple = FALSE
+             bs4Dash::tabsetPanel(
+               id = "Qploidy_results",
+               tabPanel("Standardization \n Plots by Sample", value = "stand_by_sample", br(),
+                        tags$div(
+                          role = "note", `aria-live` = "polite",
+                          style = "margin-bottom:10px;",
+                          tags$p(
+                            tags$strong(icon("chart-line"), " Explore Standardized Plots. "),
+                            "Interactively visualize standardized allele ratios, BAF scatterplots, z-scores, and more for each sample. Use the controls below to select samples, chromosomes, and plot types."
                           ),
-                          virtualSelectInput(
-                            inputId = ns("sele_chr_hmm"),
-                            label = "Select Chromosome(s)*:",
-                            choices = NULL,
-                            showValueAsTags = TRUE,
-                            search = TRUE,
-                            multiple = TRUE
-                          ),
-
-                          textInput(ns("ploidy_range_hmm"), "Ploidies to be tested", placeholder = "2,3,4", value = "2,3,4"), br(),
-                          actionButton(ns("est_ploidy_hmm"), "Run HMM"), br(),
-                   ),
-                   column(width = 6,
-                          numericInput(ns("snps_per_window_hmm"), "Number of SNPs per window", min = 5, value = 20),
-                          numericInput(ns("exp_ploidy_hmm"), "Expected overall ploidy", min = 1, value = 2),
-                          actionButton(ns("advanced_options_hmm"),
-                                       label = HTML(paste(icon("cog", style = "color: #007bff;"), "Advanced Options")),
-                                       style = "background-color: transparent; border: none; color: #007bff; font-size: smaller; text-decoration: underline; padding: 0;"
+                          tags$ul(
+                            tags$li(" Select a sample and chromosome/s to view its plots."),
+                            tags$li(" Adjust plot options to improve visualization."),
+                            tags$li(" Review diagnostic plots before further analysis.")
                           )
-                   )
-                 ),
-                 br(), hr(),
-                 plotOutput(ns("plot_hmm")), br(),
-                 box(title="HMM results", collapsed = TRUE, width = 12,
-                     DTOutput(ns("ploidy_table_hmm")),br(),
-                     downloadButton(ns("download_ploidy_table_hmm"), "Download HMM CN Estimations Table")
-                 )
-             ),
-             box(collapsed = FALSE,
-                 title = "All Samples Ploidy Estimation", status = "info", solidHeader = FALSE, width = 12,
-                 "Check the plots above before obtaining the estimated ploidies for all samples.",
-                 "If the plots look good, adjust the following paramenters and click the 'Estimate All Samples Ploidies' button below to run the estimation.", br(),
-                 hr(),
-                 textInput(ns("ploidy_range"), "Ploidies to be tested", placeholder = "2,3,4", value = "2,3,4"),
-                 selectInput(ns('res_lvl'),
-                             label = 'Select Resolution Level',
-                             choices = c("Sample" = "sample",
-                                         "Chromosome" = "chromosome",
-                                         "Chromosome-arm" = "chromosome-arm"),
-                             selected = "Chromosome"),
-                 conditionalPanel(condition = "input.res_lvl == 'chromosome-arm'",
-                                  ns = ns,
-                                  fileInput(ns("centromeres_file2"),
-                                            "Centromere positions file (CSV format with columns: Chromosome, Centromere Start Position)", accept = ".csv")
-                 ),
-                 checkboxInput(ns("all_hmm"), "Run HMM CN estimations (beta)", value = FALSE),
-                 conditionalPanel(condition = "input.all_hmm",
-                                  ns = ns,
-                                  fluidRow(
-                                    column(width = 6,
-                                           virtualSelectInput(
-                                             inputId = ns("sele_chr_all"),
-                                             label = "Select Chromosome(s)*:",
-                                             choices = NULL,
-                                             showValueAsTags = TRUE,
-                                             search = TRUE,
-                                             multiple = TRUE
-                                           ),
-                                           numericInput(ns("exp_ploidy_all"), "Expected overall ploidy", min = 1, value = 2),
-                                    ),
-                                    column(width = 6,
-                                           numericInput(ns("snps_per_window_all"), "Number of SNPs per window", min = 5, value = 20),
-                                           numericInput(ns("n_cores_hmm"), "The process is paralellized by sampl. Define the number of CPU cores to be used:",
-                                                        min = 1, value = 1),
-                                           actionButton(ns("advanced_options_hmm_all"),
-                                                        label = HTML(paste(icon("cog", style = "color: #007bff;"), "Advanced Options")),
-                                                        style = "background-color: transparent; border: none; color: #007bff; font-size: smaller; text-decoration: underline; padding: 0;"
-                                           )
-                                    )
+                        ),
+                        box(title = "Plot Controls", status = "info", solidHeader = FALSE, collapsible = TRUE, width = 12,
+                            fluidRow(
+                              column(width = 6,
+                                     virtualSelectInput(
+                                       inputId = ns("sample"),
+                                       label = "Select Sample*:",
+                                       choices = NULL,
+                                       showValueAsTags = TRUE,
+                                       search = TRUE,
+                                       multiple = FALSE
+                                     ),
+                                     virtualSelectInput(
+                                       inputId = ns("plots"),
+                                       label = "Select Plot(s)*:",
+                                       choices = c("Heterozygosity" = "het",
+                                                   "Standardized Ratio (BAF) Scatterplot" = "BAF",
+                                                   "Sum of Allele Counts/Intensities Zscore" = "zscore",
+                                                   "Standardized Ratio (BAF) Histogram" = "BAF_hist",
+                                                   "Non-standardized Ratio Scatterplot" = "ratio",
+                                                   "Sample-level Non-standardized Ratio Histogram" = "Ratio_hist_overall",
+                                                   "Sample-level Standardized Ratio (BAF) Histogram" = "BAF_hist_overall"),
+                                       showValueAsTags = TRUE,
+                                       search = TRUE,
+                                       multiple = TRUE
+                                     ),
+                                     virtualSelectInput(
+                                       inputId = ns("sele_chr_standardization"),
+                                       label = "Select Chromosome(s)*:",
+                                       choices = NULL,
+                                       showValueAsTags = TRUE,
+                                       search = TRUE,
+                                       multiple = TRUE
+                                     ),
 
-                                  )
-                 ),
-                 br(),
-                 actionButton(ns("est_ploidy"), "Estimate All Samples Ploidy"), hr(), br(),
-                 uiOutput(ns("ploidy_table_note")),
-                 DTOutput(ns("ploidy_table")),br(),
-                 downloadButton(ns("download_ploidy_table"), "Download Table")
+                                     radioButtons(
+                                       inputId = ns("add_estimated_peaks"),
+                                       label = "Add Estimated Peaks:",
+                                       choiceNames  = c("True", "False"),
+                                       choiceValues = list(TRUE, FALSE),
+                                       selected = FALSE,
+                                       inline = TRUE
+                                     ),
+
+                                     radioButtons(
+                                       inputId = ns("add_expected_peaks"),
+                                       label = "Add Expected Peaks:",
+                                       choiceNames  = c("True", "False"),
+                                       choiceValues = list(TRUE, FALSE),
+                                       selected = FALSE,
+                                       inline = TRUE
+                                     ),
+
+                                     conditionalPanel(condition = "input.add_expected_peaks == 'TRUE'",
+                                                      ns = ns,
+                                                      numericInput(ns('ploidy_standardization'), label = 'Ploidy', value = 2),
+                                     )
+                              ),
+                              column(width = 6,
+                                     radioButtons(
+                                       inputId = ns("add_centromeres"),
+                                       label = "Add Centromere Position:",
+                                       choiceNames  = c("True", "False"),
+                                       choiceValues = list(TRUE, FALSE),
+                                       selected = FALSE,
+                                       inline = TRUE
+                                     ),
+
+                                     conditionalPanel(condition = "input.add_centromeres == 'TRUE'",
+                                                      ns = ns,
+                                                      fileInput(ns("centromeres_file_standardization"),
+                                                                "Centromere positions file (CSV format with columns: Chromosome, Centromere Start Position)", accept = ".csv")
+                                     ),
+
+                                     radioButtons(
+                                       inputId = ns("rm_homozygous"),
+                                       label = "Remove Homozygous Peaks:",
+                                       choiceNames  = c("True", "False"),
+                                       choiceValues = list(TRUE, FALSE),
+                                       selected = FALSE,
+                                       inline = TRUE
+                                     ),
+
+                                     numericInput(ns('dot.size'), label = 'Dot size', value = 0.05),
+                                     numericInput(ns('font'), label = 'Font size', value = 2),
+                                     actionButton(ns("build_plot"), "Build plot"),
+                                     div(style="float:right",dropdownButton(
+                                       tags$h3("Save Image"),
+                                       selectInput(inputId = ns('image_type'), label = 'File Type', choices = c("jpeg","tiff","png","svg"), selected = "jpeg"),
+                                       sliderInput(inputId = ns('image_res'), label = 'Resolution', value = 300, min = 50, max = 1000, step=50),
+                                       sliderInput(inputId = ns('image_width'), label = 'Width', value = 9, min = 1, max = 20, step=0.5),
+                                       sliderInput(inputId = ns('image_height'), label = 'Height', value = 5, min = 1, max = 20, step = 0.5),
+                                       fluidRow(
+                                         downloadButton(ns("download_figure"), "Save Image"), br(),
+                                         downloadButton(ns("download_stand"), "Save Standardized Data")),
+                                       circle = FALSE,
+                                       status = "danger",
+                                       icon = icon("floppy-disk"), width = "300px", label = "Save",
+                                       tooltip = tooltipOptions(title = "Click to see inputs!")
+                                     )
+                                     )
+                              )
+                            ), hr(),
+
+                            uiOutput(ns("plot_ui"))
+                        )
+               ),
+               tabPanel(title = "HMM by Sample (BETA)", value = "hmm_by_sample", br(),
+                        tags$div(
+                          role = "note", `aria-live` = "polite",
+                          style = "margin-bottom:10px;",
+                          tags$p(
+                            tags$strong(icon("flask"), " This feature is in beta. "),
+                            "The multipoint Hidden Markov Model (HMM) copy-number estimation is under active development and testing.",
+                            "Results may change between versions and should be treated as provisional."
+                          ),
+                          tags$ul(
+                            tags$li("The algorithm operates on standardized values."),
+                            tags$li("Before running, inspect the diagnostic plots and ensure they look reasonable."),
+                            tags$li("Adjust the parameters below as needed, then click ",
+                                    tags$code("Run HMM"), " to start the estimation.")
+                          )
+                        ),
+                        hr(),
+                        fluidRow(
+                          column(width = 6,
+                                 virtualSelectInput(
+                                   inputId = ns("sample_hmm"),
+                                   label = "Select Sample*:",
+                                   choices = NULL,
+                                   showValueAsTags = TRUE,
+                                   search = TRUE,
+                                   multiple = FALSE
+                                 ),
+                                 virtualSelectInput(
+                                   inputId = ns("sele_chr_hmm"),
+                                   label = "Select Chromosome(s)*:",
+                                   choices = NULL,
+                                   showValueAsTags = TRUE,
+                                   search = TRUE,
+                                   multiple = TRUE
+                                 ),
+
+                                 textInput(ns("ploidy_range_hmm"), "Ploidies to be tested", placeholder = "2,3,4", value = "2,3,4"), br(),
+                                 actionButton(ns("est_ploidy_hmm"), "Run HMM"), br(),
+                          ),
+                          column(width = 6,
+                                 numericInput(ns("snps_per_window_hmm"), "Number of SNPs per window", min = 5, value = 20),
+                                 numericInput(ns("exp_ploidy_hmm"), "Expected overall ploidy", min = 1, value = 2),
+                                 actionButton(ns("advanced_options_hmm"),
+                                              label = HTML(paste(icon("cog", style = "color: #007bff;"), "Advanced Options")),
+                                              style = "background-color: transparent; border: none; color: #007bff; font-size: smaller; text-decoration: underline; padding: 0;"
+                                 )
+                          )
+                        ),
+                        br(), hr(),
+                        plotOutput(ns("plot_hmm")), br(),
+                        box(title="HMM results", collapsed = TRUE, width = 12,
+                            DTOutput(ns("ploidy_table_hmm")),br(),
+                            downloadButton(ns("download_ploidy_table_hmm"), "Download HMM CN Estimations Table")
+                        )
+               ),
+               tabPanel(title = "All Samples Ploidy", value = "all_samples_ploidy", br(),
+                        tags$div(
+                          role = "note", `aria-live` = "polite",
+                          style = "margin-bottom:10px;",
+                          tags$p(
+                            tags$strong(icon("users"), " Estimate Ploidy for All Samples. "),
+                            "Review the plots in the 'Standardization Plots by Sample' and 'HMM by Sample (BETA)' tabs before estimating ploidies for all samples. Once satisfied, adjust the parameters below and click ",
+                            tags$code("Estimate All Samples Ploidy"), " to run the analysis."
+                          ),
+                          tags$ul(
+                            tags$li(" Inspect standardization and HMM plots for quality control."),
+                            tags$li(" Set analysis parameters and resolution level."),
+                            tags$li(" Review and download the results table below.")
+                          )
+                        ),
+                        hr(),
+                        textInput(ns("ploidy_range"), "Ploidies to be tested", placeholder = "2,3,4", value = "2,3,4"),
+                        selectInput(ns('res_lvl'),
+                                    label = 'Select Resolution Level',
+                                    choices = c("Sample" = "sample",
+                                                "Chromosome" = "chromosome",
+                                                "Chromosome-arm" = "chromosome-arm"),
+                                    selected = "Chromosome"),
+                        conditionalPanel(condition = "input.res_lvl == 'chromosome-arm'",
+                                         ns = ns,
+                                         fileInput(ns("centromeres_file2"),
+                                                   "Centromere positions file (CSV format with columns: Chromosome, Centromere Start Position)", accept = ".csv")
+                        ),
+                        checkboxInput(ns("all_hmm"), "Run HMM CN estimations (beta)", value = FALSE),
+                        conditionalPanel(condition = "input.all_hmm",
+                                         ns = ns,
+                                         fluidRow(
+                                           column(width = 6,
+                                                  virtualSelectInput(
+                                                    inputId = ns("sele_chr_all"),
+                                                    label = "Select Chromosome(s)*:",
+                                                    choices = NULL,
+                                                    showValueAsTags = TRUE,
+                                                    search = TRUE,
+                                                    multiple = TRUE
+                                                  ),
+                                                  numericInput(ns("exp_ploidy_all"), "Expected overall ploidy", min = 1, value = 2),
+                                           ),
+                                           column(width = 6,
+                                                  numericInput(ns("snps_per_window_all"), "Number of SNPs per window", min = 5, value = 20),
+                                                  numericInput(ns("n_cores_hmm"), "The process is paralellized by sampl. Define the number of CPU cores to be used:",
+                                                               min = 1, value = 1),
+                                                  actionButton(ns("advanced_options_hmm_all"),
+                                                               label = HTML(paste(icon("cog", style = "color: #007bff;"), "Advanced Options")),
+                                                               style = "background-color: transparent; border: none; color: #007bff; font-size: smaller; text-decoration: underline; padding: 0;"
+                                                  )
+                                           )
+
+                                         )
+                        ),
+                        br(),
+                        actionButton(ns("est_ploidy"), "Estimate All Samples Ploidy"), hr(), br(),
+                        uiOutput(ns("ploidy_table_note")),
+                        DTOutput(ns("ploidy_table")),br(),
+                        downloadButton(ns("download_ploidy_table"), "Download Table")
+               )
              )
       )
     )
@@ -802,11 +828,11 @@ mod_qploidy_server <- function(input, output, session, parent_session){
     req(ploidies())
     tab <- if (input$all_hmm) ploidies()$hmm else ploidies()$area$ploidy
     if (is.null(tab) || nrow(tab) == 0) return(NULL) else {
-    tags$div(
-      style = "margin-bottom:10px; background-color:#f8f9fa; border-radius:6px; padding:10px; border:1px solid #e2e3e5;",
-      tags$strong(icon("mouse-pointer"), " Tip: "),
-      "Click a row in the table below to update the selected sample in the plot and HMM estimation panels."
-    )
+      tags$div(
+        style = "margin-bottom:10px; background-color:#f8f9fa; border-radius:6px; padding:10px; border:1px solid #e2e3e5;",
+        tags$strong(icon("mouse-pointer"), " Tip: "),
+        "Click a row in the table below to update the selected sample in the plot and HMM estimation panels."
+      )
     }
   })
 
@@ -832,7 +858,10 @@ mod_qploidy_server <- function(input, output, session, parent_session){
       selected = picked_samples()
     )
 
-    session$sendCustomMessage("scroll-top", TRUE)
+      # select specific tab
+      updateTabsetPanel(session = parent_session, inputId = "Qploidy_results",
+                        selected = "stand_by_sample")
+
   })
 
   output$download_ploidy_table <- downloadHandler(

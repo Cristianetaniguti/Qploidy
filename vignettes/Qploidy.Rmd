@@ -877,8 +877,6 @@ New plots for roses real data after round 1 and 2 of standardization:
 
 `Qploidy` provides a powerful function, `hmm_estimate_CN`, for estimating copy number (CN) across the genome using a Hidden Markov Model (HMM) approach. This method combines standardized depth (z-score) and BAF (standardized ratio) information in windows to infer CN states for each region.
 
-**Function usage:**
-
 ```{r, eval=FALSE}
 # Estimate copy number for a sample using HMM
 hmm_result <- hmm_estimate_CN(
@@ -901,11 +899,44 @@ The output is a list with:
 
 See `?hmm_estimate_CN` for full details.
 
-## Visualizing Copy Number Results
+## Parallel HMM Estimation for Multiple Samples
 
-To visualize the HMM results, use the `plot_cn_track` function. This produces a genome-wide track for each window, showing the called CN and the confidence (posterior probability) for each call. The top panel shows z-scores, and the bottom panel shows CN segments colored by confidence.
+To efficiently estimate copy number for all samples in your dataset, use the new function `hmm_estimate_CN_multi`. This function runs HMM estimation in parallel across samples, leveraging multiple CPU cores for faster analysis. It is cross-platform compatible (Windows, macOS, Linux) and automatically handles cluster setup and package loading.
 
-**Function usage:**
+```{r, eval=FALSE}
+# Estimate copy number for all samples in parallel
+multi_hmm_result <- hmm_estimate_CN_multi(
+  qploidy_standarize_result = simu_data_standardized, # standardized object
+  sample_ids = "all",                               # or a vector of sample names
+  n_cores = 4,                                       # number of CPU cores to use
+  chr = 1:2,                                         # chromosomes to analyze
+  snps_per_window = 20,                              # SNPs per window
+  min_snps_per_window = 5,                           # minimum SNPs per window
+  cn_grid = c(2, 3, 4, 5),                           # ploidies to test
+  M = 100,                                           # BAF bins
+  bw = 0.03,                                         # BAF template bandwidth
+  exp_ploidy = 4                                     # expected ploidy
+)
+```
+
+The output is a list of HMM results for each sample.
+
+## Summarizing Parallel HMM Results
+
+After running parallel HMM estimation, you can summarize the results using the new function `summarize_cn_mode`. This function extracts the most likely copy number state for each region and provides a summary table at the desired resolution (sample, chromosome, or chromosome-arm).
+
+```{r, eval=FALSE}
+# Summarize HMM results for all samples
+hmm_summary <- summarize_cn_mode(
+  multi_hmm_result,           # output from hmm_estimate_CN_multi
+  level = "chromosome"       # resolution: "sample", "chromosome", or "chromosome-arm"
+)
+head(hmm_summary)
+```
+
+You can further merge these results with area-based ploidy estimates using `merge_cn_summary_with_estimates` for integrated reporting.
+
+See `?hmm_estimate_CN_multi`, `?summarize_cn_mode`, and `?merge_cn_summary_with_estimates` for details and examples.
 
 ```{r, eval=FALSE}
 # Plot CN track for a sample
@@ -917,6 +948,19 @@ plot_cn_track(
 ```
 
 See `?plot_cn_track` for more options and details.
+
+### Interpreting the CN Track Plot
+
+The CN track plot provides a visual summary of copy number states across the genome for a given sample:
+- **Top panel:** Shows the z-score (standardized depth) for each window, highlighting regions of copy number variation.
+- **Bottom panel:** Displays the called copy number segments, colored by confidence (posterior probability). Each segment represents a genomic window, and the color intensity reflects the certainty of the CN call.
+- **Window boundaries:** Vertical lines indicate the start and end of each window used in the HMM analysis.
+- **Legend:** The plot includes a legend for copy number states and confidence levels, helping you quickly identify regions of aneuploidy or CN changes.
+
+Use this plot to:
+- Assess the quality and resolution of CN calls across chromosomes.
+- Identify regions with high or low confidence in CN estimation.
+- Compare CN patterns between samples or across chromosomes.
 
 # Try the Qploidy Shiny App!
 

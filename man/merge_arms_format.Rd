@@ -9,13 +9,13 @@ merge_arms_format(x, filter_diff = NULL)
 \arguments{
 \item{x}{object of class qploidy_area_ploidy_estimation}
 
-\item{filter_diff}{filter by difference on area proportion between first and 
+\item{filter_diff}{filter by difference on area proportion between first and
 second place}
 }
 \value{
 An updated object of class `qploidy_area_ploidy_estimation` with the following modifications:
 
-- `ploidy`: A matrix where chromosome-arm level results are merged into chromosome-level format. 
+- `ploidy`: A matrix where chromosome-arm level results are merged into chromosome-level format.
    If `filter_diff` is provided, ploidy values with differences below the threshold are set to `NA`.
 
 The structure of the returned object remains consistent with the input, but with updated ploidy information.

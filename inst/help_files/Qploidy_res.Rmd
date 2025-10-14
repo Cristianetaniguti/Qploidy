@@ -1,0 +1,31 @@
+---
+title: "Qploidy_res"
+output: html_document
+---
+
+# Qploidy Results Overview
+
+This document summarizes the main types of results users can obtain from the Qploidy package:
+
+## Ploidy CSV File
+A table of estimated ploidy levels for each sample and chromosome, typically generated after running the HMM-based copy number estimation. Includes columns for sample name, chromosome, estimated ploidy, and confidence metrics.
+
+## Qploidy Data
+Standardized SNP-level data for all samples and chromosomes, including normalized allele counts or intensities, B-allele frequency (BAF), and z-scores. This data is used for downstream analyses and visualization.
+
+## Copy Number (CN) Calls
+Windowed copy number calls per sample and chromosome, as produced by `hmm_estimate_CN` or `hmm_estimate_CN_multi`. Includes CN state, posterior probabilities, and window summary statistics.
+
+## Visualization Plots
+Plots of BAF, z-score, and copy number tracks for each sample and chromosome, including guides for expected ploidy states. Useful for visual inspection and reporting.
+
+## Standardization Reports
+Summary metrics and diagnostic plots from the standardization process, including outlier detection and normalization quality checks.
+
+## Input/Output Format Examples
+Help files and vignettes provide example input formats (VCF, array, CSV/TSV, fitpoly) and example output tables for easy reference.
+
+## Shiny App Outputs
+Interactive results and downloadable tables from the Qploidy Shiny app, including ploidy tables, CN tracks, and visualizations.
+
+For more details and code examples, see the Qploidy vignette and help files included in the package.

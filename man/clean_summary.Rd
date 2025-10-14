@@ -13,7 +13,7 @@ clean_summary(summary_df)
 A list with cleaned A and B probes.
 }
 \description{
-This function removes consecutive A allele probes from an Axiom summary 
+This function removes consecutive A allele probes from an Axiom summary
 file.
 }
 \examples{

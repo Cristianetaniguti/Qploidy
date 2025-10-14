@@ -386,7 +386,7 @@ hmm_estimate_CN <- function(
       n_snps    = win_df$n_snps,
       n_het     = win_df$n_het,
       z         = z,
-      w_baf     = w_baf,
+      w_baf     = if(z_only) 0 else w_baf,
       CN_call   = cn_call,
       post_max  = post_max,
       stringsAsFactors = FALSE

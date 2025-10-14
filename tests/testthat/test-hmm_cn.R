@@ -49,6 +49,6 @@ test_that("hmm_estimate_CN and plot_cn_track return expected results", {
   expect_true(all(c("Sample", "Chr", "WindowID", "CN_call") %in% names(res$result)))
 
   # plot_cn_track test
-  p <- plot_cn_track(hmm_CN = res, sample_id = sample, show_window_lines = TRUE)
+  p <- plot_cn_track(hmm_CN = res, qploidy_standarize_result = simu_data_standardized, sample_id = sample, show_window_lines = TRUE)
   expect_true(inherits(p, "gg"))
 })

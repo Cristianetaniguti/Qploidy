@@ -283,7 +283,7 @@ mod_qploidy_ui <- function(id){
                           )
                         ),
                         br(), hr(),
-                        plotOutput(ns("plot_hmm")), br(),
+                        plotOutput(ns("plot_hmm"), height = 800), br(),
                         box(title="HMM results", collapsed = TRUE, width = 12,
                             DTOutput(ns("ploidy_table_hmm")),br(),
                             downloadButton(ns("download_ploidy_table_hmm"), "Download HMM CN Estimations Table")
@@ -432,26 +432,24 @@ mod_qploidy_server <- function(input, output, session, parent_session){
     updateBox(id = "Qploidy_box", action = "toggle", session = parent_session)
   })
 
-  #UI popup window for input
-  observeEvent(input$advanced_options, {
-    showModal(modalDialog(
-      title = "Advanced Options",
-      numericInput(ns("miss"), "Remove SNPs with >= % missing data", min = 1, max = 100,value = 90),
-      numericInput(ns("prob"), "Remove genotypes with <= probability", min = 0, value = 0.8),
-      numericInput(ns("n.clusters"), "Remove genotypes with <= # of dosage clusters",
-                   min = 2, value = {
-                     ploidy <- c(input$ref_ploidy, input$common_ploidy)
-                     ploidy <- ploidy[-is.na(ploidy)]
-                     as.numeric(ploidy) + 1
-                   }),
-      footer = tagList(
-        modalButton("Close"),
-        actionButton(ns("save_advanced_options"), "Save")
-      )
-    ))
+  observeEvent(list(input$ref_ploidy, input$common_ploidy), {
+    # Update n.clusters reactively using input values
+    ploidy <- c(input$ref_ploidy, input$common_ploidy)
+    ploidy <- ploidy[!is.na(ploidy)]
+    if(length(ploidy) > 0) {
+      advanced_options$n.clusters <- as.numeric(ploidy) + 1
+    } else {
+      advanced_options$n.clusters <- input$n.clusters
+    }
   })
 
-  # Default model choices
+  # Initialize with static defaults only
+  advanced_options <- reactiveValues(
+    miss = 90,
+    prob = 0.8,
+    n.clusters = 3 # default value, will be updated reactively
+  )
+
   advanced_options_hmm <- reactiveValues(
     min_snps_per_window = 20,
     n_bins = 100,
@@ -464,6 +462,21 @@ mod_qploidy_server <- function(input, output, session, parent_session){
   )
 
   #UI popup window for input
+  observeEvent(input$advanced_options, {
+    showModal(modalDialog(
+      title = "Standardization Advanced Options",
+      numericInput(ns("miss"), "Remove SNPs with >= % missing data", min = 1, max = 100,value = advanced_options$miss),
+      numericInput(ns("prob"), "Remove genotypes with <= probability", min = 0, value = advanced_options$prob),
+      numericInput(ns("n.clusters"), "Remove genotypes with <= # of dosage clusters",
+                   min = 2, value = advanced_options$n.clusters),
+      footer = tagList(
+        modalButton("Close"),
+        actionButton(ns("save_advanced_options"), "Save")
+      )
+    ))
+  })
+
+  #UI popup window for input
   observeEvent(input$advanced_options_hmm, {
     showModal(modalDialog(
       title = "Advanced Options for HMM CN Estimation",
@@ -474,7 +487,7 @@ mod_qploidy_server <- function(input, output, session, parent_session){
       numericInput(ns("bw_hmm"), "Bandwidth (SD) of the Gaussian kernels used to generate the BAF comb templates",
                    min = 0, value = advanced_options_hmm$bw),
       sliderInput(ns("het_lims_hmm"), "BAF limits to consider a SNP heterozygous",
-                  min = 0, max = 1, value = advanced_options_hmm$het_lims_hmm, step = 0.005),
+                  min = 0, max = 1, value = advanced_options_hmm$het_lims, step = 0.005),
       numericInput(ns("het_weight_hmm"), "Quantile used to scale BAF emission weight based on heterozygote count",
                    min = 0, max = 1, value = advanced_options_hmm$het_weight),
       numericInput(ns("z_range_hmm"), "Padding added to min/max z for initial mean estimation",
@@ -499,7 +512,7 @@ mod_qploidy_server <- function(input, output, session, parent_session){
       numericInput(ns("bw_all"), "Bandwidth (SD) of the Gaussian kernels used to generate the BAF comb templates",
                    min = 0, value = advanced_options_hmm$bw),
       sliderInput(ns("het_lims_all"), "BAF limits to consider a SNP heterozygous",
-                  min = 0, max = 1, value = advanced_options_hmm$het_lims_all , step = 0.005),
+                  min = 0, max = 1, value = advanced_options_hmm$het_lims , step = 0.005),
       numericInput(ns("het_weight_all"), "Quantile used to scale BAF emission weight based on heterozygote count",
                    min = 0, max = 1, value = advanced_options_hmm$het_weight),
       numericInput(ns("z_range_all"), "Padding added to min/max z for initial mean estimation",
@@ -512,6 +525,15 @@ mod_qploidy_server <- function(input, output, session, parent_session){
         actionButton(ns("save_advanced_options_hmm_all"), "Save")
       )
     ))
+  })
+
+  # Close popup window when user "saves options"
+  observeEvent(input$save_advanced_options, {
+    advanced_options$miss <- input$miss
+    advanced_options$prob <- input$prob
+    advanced_options$n.clusters <- input$n.clusters
+
+    removeModal() # Close the modal after saving
   })
 
   observeEvent(input$save_advanced_options_hmm, {
@@ -1016,7 +1038,10 @@ mod_qploidy_server <- function(input, output, session, parent_session){
   output$plot_hmm <- renderPlot({
     req(ploidies_hmm())
 
-    p <- plot_cn_track(hmm_CN = ploidies_hmm(), sample_id = input$sample_hmm, show_window_lines = TRUE)
+    p <- plot_cn_track(hmm_CN = ploidies_hmm(), 
+                      qploidy_standarize_result= data_standardized(), 
+                      sample_id = input$sample_hmm, 
+                      show_window_lines = TRUE)
 
     updateProgressBar(session = session, id = "pb_qploidy", value = 100)
     p

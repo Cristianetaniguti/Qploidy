@@ -173,7 +173,7 @@ plot_cn_track <- function(hmm_CN,
                           line_alpha = 0.6,
                           line_width = 0.3,
                           line_linetype = "dashed",
-                          heights = c(1, 1.5)) {
+                          heights = c(2, 2.5)) {
 
   stopifnot(inherits(hmm_CN, "hmm_CN"))
   stopifnot(inherits(qploidy_standarize_result, "qploidy_standardization"))
@@ -255,7 +255,7 @@ plot_cn_track <- function(hmm_CN,
       panel.grid.major.x = element_blank(),
       panel.grid.minor   = element_blank(),
       strip.background   = element_rect(fill = "grey95"),
-      legend.position    = "right",
+      legend.position    = "bottom",
       axis.text.x = element_text(angle = 30, vjust = 1, hjust = 1)
     )
 
@@ -311,7 +311,7 @@ plot_cn_track <- function(hmm_CN,
     scale_color_distiller(palette = "RdBu", direction = -1, limits = c(0, 1), name = "BAF weight")+
     theme(
       axis.text.x = element_text(angle = 30, vjust = 1, hjust = 1),
-      legend.position = "right",
+      legend.position = "top",
       text = element_text(size = 12),
       axis.title.x       = element_blank()
     )

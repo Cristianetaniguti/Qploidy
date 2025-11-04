@@ -2,10 +2,11 @@
 % Please edit documentation in R/hmm_utils.R
 \name{plot_cn_track}
 \alias{plot_cn_track}
-\title{Plot copy-number segments per window with posterior shading}
+\title{Plot copy-number segments per window with posterior shading and BAF}
 \usage{
 plot_cn_track(
   hmm_CN,
+  qploidy_standarize_result,
   sample_id = NULL,
   cn_min = NULL,
   cn_max = NULL,
@@ -15,11 +16,13 @@ plot_cn_track(
   line_alpha = 0.6,
   line_width = 0.3,
   line_linetype = "dashed",
-  heights = c(1, 1.2)
+  heights = c(2, 2.5)
 )
 }
 \arguments{
 \item{hmm_CN}{An object of class \code{hmm_CN} (output from \code{hmm_estimate_CN}), containing a \code{result} data frame with one row per window and columns: \code{Sample}, \code{Chr}, \code{Start}, \code{End}, \code{CN_call}, \code{post_CN*}, etc.}
+
+\item{qploidy_standarize_result}{An object of class \code{qploidy_standardization} (output from \code{standardize}), used to extract BAF values for the BAF panel.}
 
 \item{sample_id}{Character scalar. Which sample from \code{hmm_CN$Sample} to display. Defaults to the first unique value in \code{hmm_CN$Sample}.}
 
@@ -31,16 +34,16 @@ plot_cn_track(
 
 \item{line_color, line_alpha, line_width, line_linetype}{Appearance settings for window boundary lines.}
 
-\item{heights}{Numeric vector of length 2. Relative heights of the top (z) and bottom (CN) panels.}
+\item{heights}{Numeric vector of length 2 or 3. Relative heights of the BAF, z, and CN panels.}
 }
 \value{
-A \code{ggplot} object. Print to render, or add layers/scales as needed.
+A \code{ggplot} object (from ggpubr::ggarrange). Print to render, or add layers/scales as needed.
 }
 \description{
-Plots a genome track for each window, showing the called copy number (CN) as a horizontal segment and coloring by the posterior probability of that call. Facets are split by chromosome. The top panel shows z-scores per window, colored by BAF weight; the bottom panel shows CN segments colored by posterior probability.
+Plots a genome track for each window, showing the called copy number (CN) as a horizontal segment and coloring by the posterior probability of that call. Facets are split by chromosome. The top panel shows z-scores per window, colored by BAF weight; the bottom panel shows CN segments colored by posterior probability. The new top panel shows BAF values per SNP, colored by BAF weight, for the selected sample and chromosomes.
 }
 \details{
-Posterior columns are detected by the prefix "post_CN" and matched to \code{CN_call} values, so the function is agnostic to the specific CN grid. If your column naming differs, rename them before calling this function.
+Posterior columns are detected by the prefix "post_CN" and matched to \code{CN_call} values, so the function is agnostic to the specific CN grid. The BAF panel shows per-SNP BAF values for the selected sample and chromosomes, colored by the BAF weight for the corresponding region. The z panel shows window z-scores, colored by BAF weight. The CN panel shows copy number segments colored by posterior probability.
 }
 \section{Expected columns}{
 
@@ -60,7 +63,8 @@ toy <- data.frame(
   post_CN2 = c(0.95, 0.05, 0.9),
   post_CN3 = c(0.05, 0.94, 0.1)
 )
-plot_cn_track(toy, sample_id = "S1")
+# qploidy_standarize_result should be a qploidy_standardization object with $data containing BAF values
+plot_cn_track(toy, qploidy_standarize_result, sample_id = "S1")
 }
 
 }

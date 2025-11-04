@@ -2,16 +2,8 @@
 % Please edit documentation in R/hmm_utils.R
 \name{summarize_cn_mode}
 \alias{summarize_cn_mode}
-\title{Summarize copy number mode across windows}
+\title{Summarize copy number mode and posterior probability}
 \usage{
-summarize_cn_mode(
-  df,
-  level = c("sample", "chromosome", "chromosome-arm"),
-  centromeres = NULL,
-  cn_col = "CN_call",
-  post_col = "post_max"
-)
-
 summarize_cn_mode(
   df,
   level = c("sample", "chromosome", "chromosome-arm"),
@@ -32,14 +24,9 @@ summarize_cn_mode(
 \item{post_col}{Character. Column name for maximum posterior probability (default: 'post_max').}
 }
 \value{
-Data.frame with columns for sample, chromosome (and arm if requested), CN mode, and window count.
-
 Data.frame with columns for sample, chromosome (and arm if requested), CN mode, mean max posterior, and window count.
 }
 \description{
-Summarizes the most frequent copy number (mode) per sample, chromosome, or chromosome arm.
-Handles input as a data.frame or an hmm_CN object.
-
 Summarizes the mode of copy number calls and the mean maximum posterior probability per sample,
 chromosome, or chromosome arm. Handles input as a data.frame or hmm_CN object.
 }

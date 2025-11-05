@@ -119,22 +119,23 @@ viterbi <- function(ll_em, logA, logpi0) {
   path
 }
 
-#' Plot copy-number segments per window with posterior shading
+#' Plot copy-number segments per window with posterior shading and BAF
 #'
-#' Plots a genome track for each window, showing the called copy number (CN) as a horizontal segment and coloring by the posterior probability of that call. Facets are split by chromosome. The top panel shows z-scores per window, colored by BAF weight; the bottom panel shows CN segments colored by posterior probability.
+#' Plots a genome track for each window, showing the called copy number (CN) as a horizontal segment and coloring by the posterior probability of that call. Facets are split by chromosome. The top panel shows z-scores per window, colored by BAF weight; the bottom panel shows CN segments colored by posterior probability. The new top panel shows BAF values per SNP, colored by BAF weight, for the selected sample and chromosomes.
 #'
 #' @param hmm_CN An object of class \code{hmm_CN} (output from \code{hmm_estimate_CN}), containing a \code{result} data frame with one row per window and columns: \code{Sample}, \code{Chr}, \code{Start}, \code{End}, \code{CN_call}, \code{post_CN*}, etc.
+#' @param qploidy_standarize_result An object of class \code{qploidy_standardization} (output from \code{standardize}), used to extract BAF values for the BAF panel.
 #' @param sample_id Character scalar. Which sample from \code{hmm_CN$Sample} to display. Defaults to the first unique value in \code{hmm_CN$Sample}.
 #' @param cn_min,cn_max Numeric scalars. Y-axis limits for CN. Defaults span the min/max of \code{CN_call}.
 #' @param show_window_lines Logical. If TRUE, show dashed vertical lines at window boundaries.
 #' @param include_first_in_chr Logical. If TRUE, include the first window line in each chromosome.
 #' @param line_color,line_alpha,line_width,line_linetype Appearance settings for window boundary lines.
-#' @param heights Numeric vector of length 2. Relative heights of the top (z) and bottom (CN) panels.
+#' @param heights Numeric vector of length 2 or 3. Relative heights of the BAF, z, and CN panels.
 #'
-#' @return A \code{ggplot} object. Print to render, or add layers/scales as needed.
+#' @return A \code{ggplot} object (from ggpubr::ggarrange). Print to render, or add layers/scales as needed.
 #'
 #' @details
-#' Posterior columns are detected by the prefix "post_CN" and matched to \code{CN_call} values, so the function is agnostic to the specific CN grid. If your column naming differs, rename them before calling this function.
+#' Posterior columns are detected by the prefix "post_CN" and matched to \code{CN_call} values, so the function is agnostic to the specific CN grid. The BAF panel shows per-SNP BAF values for the selected sample and chromosomes, colored by the BAF weight for the corresponding region. The z panel shows window z-scores, colored by BAF weight. The CN panel shows copy number segments colored by posterior probability.
 #'
 #' @section Expected columns:
 #' The function assumes posterior columns named exactly \code{post_CN<k>} for each copy-number state \code{k}. If your column naming differs, rename them before calling this function.
@@ -152,16 +153,19 @@ viterbi <- function(ll_em, logA, logpi0) {
 #'   post_CN2 = c(0.95, 0.05, 0.9),
 #'   post_CN3 = c(0.05, 0.94, 0.1)
 #' )
-#' plot_cn_track(toy, sample_id = "S1")
+#' # qploidy_standarize_result should be a qploidy_standardization object with $data containing BAF values
+#' plot_cn_track(toy, qploidy_standarize_result, sample_id = "S1")
 #' }
 #'
 #' @import ggplot2
-#' @importFrom dplyr filter
+#' @import dplyr
+#' @import tidyr
 #' @importFrom magrittr %>%
 #' @importFrom ggpubr ggarrange
-#' 
+#'
 #' @export
 plot_cn_track <- function(hmm_CN,
+                          qploidy_standarize_result,  # for BAF plot
                           sample_id = NULL,
                           cn_min = NULL,
                           cn_max = NULL,
@@ -171,9 +175,11 @@ plot_cn_track <- function(hmm_CN,
                           line_alpha = 0.6,
                           line_width = 0.3,
                           line_linetype = "dashed",
-                          heights = c(1, 1.2)) {
+                          heights = c(2, 2.5)) {
 
   stopifnot(inherits(hmm_CN, "hmm_CN"))
+  stopifnot(inherits(qploidy_standarize_result, "qploidy_standardization"))
+
   df <- hmm_CN$result
 
   # defaults BEFORE filtering
@@ -229,9 +235,9 @@ plot_cn_track <- function(hmm_CN,
       panel.grid.major.x = element_blank(),
       panel.grid.minor   = element_blank(),
       strip.background   = element_rect(fill = "grey95"),
-      legend.position    = "right",
+      legend.position    = "none",
       axis.title.x       = element_blank(),
-      axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 0.5)
+      axis.text.x = element_text(angle = 30, vjust = 1, hjust = 1)
     )
 
   # -------- bottom panel: CN segments (color = P(CN call)) --------
@@ -251,15 +257,72 @@ plot_cn_track <- function(hmm_CN,
       panel.grid.major.x = element_blank(),
       panel.grid.minor   = element_blank(),
       strip.background   = element_rect(fill = "grey95"),
-      legend.position    = "right",
-      axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 0.5)
+      legend.position    = "bottom",
+      axis.text.x = element_text(angle = 30, vjust = 1, hjust = 1)
+    )
+
+  # -------- BAF -----
+  data_sample2 <- qploidy_standarize_result$data %>% filter(SampleName == sample_id & Chr %in% unique(x$Chr))
+
+  data_tagged <- data_sample2 %>%
+    group_by(Chr) %>%
+    group_modify(function(df, key) {
+      chr_starts <- vlines %>%
+        filter(Chr == key$Chr[1]) %>%
+        arrange(Start) %>%
+        pull(Start)
+      # regions: [-Inf, s1), [s1, s2), ..., [sN, +Inf)
+      brks <- c(-Inf, chr_starts, Inf)
+      df$region_id <- cut(df$Position, breaks = brks, labels = FALSE, right = FALSE)
+      df
+    }) %>%
+    ungroup()
+
+  ## 2) Build a region-to-w_baf table
+  regions_tbl <- vlines %>%
+    arrange(Chr, Start) %>%
+    count(Chr, name = "n_vlines") %>%
+    mutate(n_regions = n_vlines + 1L) %>%
+    select(Chr, n_regions) %>%
+    rowwise() %>%
+    mutate(region_id = list(seq_len(n_regions))) %>%
+    unnest(region_id) %>%
+    ungroup()
+
+  # If your x$w_baf is for a single chromosome (like chr1) and matches the
+  # region order, attach it like this:
+  # (If you have per-Chr w_baf values already in a data.frame, join that instead.)
+  w_baf_tbl <- regions_tbl %>%
+    group_by(Chr) %>%
+    mutate(w_baf = x$w_baf[region_id]) %>%  # ensure the vector aligns: length == n_regions
+    ungroup()
+
+  ## 3) Join w_baf onto points and plot
+  plot_df <- data_tagged %>%
+    left_join(w_baf_tbl, by = c("Chr", "region_id"))
+
+  p_baf <- ggplot(plot_df, aes(x = Position, y = baf, color = w_baf)) +
+    geom_point(alpha = 0.7, size = 1) +
+    { if (show_window_lines)
+      geom_vline(data = vlines, aes(xintercept = Start),
+                 color = line_color, alpha = line_alpha,
+                 linewidth = line_width, linetype = line_linetype) else NULL } +
+    facet_grid(~Chr, scales = "free_x") +
+    theme_bw() +
+    ylab("BAF") +
+    scale_color_distiller(palette = "RdBu", direction = -1, limits = c(0, 1), name = "BAF weight")+
+    theme(
+      axis.text.x = element_text(angle = 30, vjust = 1, hjust = 1),
+      legend.position = "top",
+      text = element_text(size = 12),
+      axis.title.x       = element_blank()
     )
 
   # -------- stack with ggpubr (no patchwork needed) --------
   # align = "v" keeps x-axes aligned; widths are matched automatically
   ggarrange(
-    p_z, p_cn,
-    ncol = 1, nrow = 2,
+    p_baf, p_z, p_cn,
+    ncol = 1, nrow = 3,
     heights = heights,
     align = "v"
   )
@@ -275,7 +338,7 @@ plot_cn_track <- function(hmm_CN,
 #' @param dots Named list of additional arguments to pass to hmm_estimate_CN.
 #'
 #' @return List as returned by hmm_estimate_CN, or NULL if an error occurs.
-#' 
+#'
 #' @keywords internal
 #' @noRd
 worker <- function(sid, obj, dots) {
@@ -287,109 +350,6 @@ worker <- function(sid, obj, dots) {
     warning(sprintf("Sample '%s' failed: %s", sid, conditionMessage(e)))
     NULL
   })
-}
-
-#' Summarize copy number mode across windows
-#'
-#' Summarizes the most frequent copy number (mode) per sample, chromosome, or chromosome arm.
-#' Handles input as a data.frame or an hmm_CN object.
-#'
-#' @param df Data.frame or hmm_CN object containing windowed CN calls.
-#' @param level Character. Summarization level: 'sample', 'chromosome', or 'chromosome-arm'.
-#' @param centromeres Optional. Named numeric vector or data.frame with centromere positions (required for chromosome-arm).
-#' @param cn_col Character. Column name for CN calls (default: 'CN_call').
-#'
-#' @return Data.frame with columns for sample, chromosome (and arm if requested), CN mode, and window count.
-#' 
-#' @export
-summarize_cn_mode <- function(df,
-                              level = c("sample", "chromosome", "chromosome-arm"),
-                              centromeres = NULL,
-                              cn_col = "CN_call") {
-  level <- match.arg(level)
-
-  # unwrap if hmm_CN-like object with $result
-  dat <- if (is.data.frame(df)) df else if (!is.null(df$result) && is.data.frame(df$result)) df$result else
-    stop("Input must be a data.frame or an hmm_CN-like object with a data.frame at `$result`.")
-
-  # required columns
-  req_cols <- c("Sample", "Chr", "Start", "End", cn_col)
-  miss <- setdiff(req_cols, names(dat))
-  if (length(miss)) stop("Missing required columns in data: ", paste(miss, collapse = ", "))
-
-  if (!is.numeric(dat[[cn_col]]) && !is.integer(dat[[cn_col]])) {
-    stop(sprintf("Column '%s' must be numeric/integer.", cn_col))
-  }
-
-  dat <- as.data.frame(dat)
-
-  # chromosome-arm handling → create chrID.1 (Chr) and chrID.2 (1=p, 2=q)
-  if (level == "chromosome-arm") {
-    if (is.null(centromeres))
-      stop("For level='chromosome-arm', provide `centromeres` (named numeric vector or data.frame with Chr, Centromere).")
-
-    if (is.data.frame(centromeres)) {
-      if (!all(c("Chr", "Centromere") %in% names(centromeres)))
-        stop("centromeres data.frame must have columns: Chr, Centromere")
-      cm <- setNames(centromeres$Centromere, centromeres$Chr)
-    } else if (is.numeric(centromeres) && !is.null(names(centromeres))) {
-      cm <- centromeres
-    } else {
-      stop("centromeres must be a named numeric vector or a data.frame with Chr and Centromere.")
-    }
-
-    mid <- (dat$Start + dat$End) / 2
-    has_cm <- dat$Chr %in% names(cm)
-
-    # Assign arm index: 1 = p (left), 2 = q (right)
-    chrID.2 <- rep(NA_integer_, nrow(dat))
-    chrID.2[has_cm] <- ifelse(mid[has_cm] < cm[dat$Chr[has_cm]], 1L, 2L)
-
-    if (any(!has_cm)) {
-      missing_chr <- unique(dat$Chr[!has_cm])
-      warning("No centromere provided for: ", paste(missing_chr, collapse = ", "),
-              ". Rows for these chromosomes will be dropped.")
-    }
-
-    dat <- dat[has_cm & !is.na(chrID.2), , drop = FALSE]
-    chrID.2 <- chrID.2[has_cm & !is.na(chrID.2)]
-
-    dat$chrID.1 <- dat$Chr
-    dat$chrID.2 <- chrID.2
-  }
-
-  # grouping variables
-  group_vars <- c("Sample")
-  if (level %in% c("chromosome", "chromosome-arm")) group_vars <- c(group_vars, "Chr")
-  if (level == "chromosome-arm") group_vars <- c(group_vars, "chrID.1", "chrID.2")
-
-  # summarize using base R
-  split_idx <- interaction(dat[group_vars], drop = TRUE, lex.order = TRUE)
-  grouped <- split(seq_len(nrow(dat)), split_idx)
-
-  out <- lapply(grouped, function(idx) {
-    g <- dat[idx, , drop = FALSE]
-    row <- list(
-      Sample    = g$Sample[1],
-      CN_mode   = mode(g[[cn_col]]),
-      n_windows = nrow(g)
-    )
-    if ("Chr" %in% group_vars)     row$Chr      <- g$Chr[1]
-    if ("chrID.1" %in% group_vars) row$chrID.1  <- g$chrID.1[1]
-    if ("chrID.2" %in% group_vars) row$chrID.2  <- g$chrID.2[1]
-    as.data.frame(row, stringsAsFactors = FALSE)
-  })
-  res <- do.call(rbind, out)
-
-  # Arrange columns nicely
-  want <- c("Sample",
-            if (level %in% c("chromosome", "chromosome-arm")) "Chr",
-            if (level == "chromosome-arm") c("chrID.1", "chrID.2"),
-            "CN_mode", "n_windows")
-  res <- res[want]
-
-  rownames(res) <- NULL
-  res
 }
 
 #' Summarize copy number mode and posterior probability
@@ -404,8 +364,8 @@ summarize_cn_mode <- function(df,
 #' @param post_col Character. Column name for maximum posterior probability (default: 'post_max').
 #'
 #' @return Data.frame with columns for sample, chromosome (and arm if requested), CN mode, mean max posterior, and window count.
-#' 
-#' 
+#'
+#'
 #' @export
 summarize_cn_mode <- function(df,
                               level = c("sample", "chromosome", "chromosome-arm"),
@@ -513,10 +473,10 @@ summarize_cn_mode <- function(df,
 #' @param level Character. Merge level: 'chromosome', 'chromosome-arm', or 'sample'.
 #'
 #' @return Data.frame with merged columns: sample, chromosome, HMM CN mode, area-based CN, confidence metrics, and window count.
-#' 
+#'
 #' @importFrom dplyr rename
 #' @importFrom tidyr pivot_longer as_tibble
-#' 
+#'
 #' @export
 merge_cn_summary_with_estimates <- function(hmm_summarized,
                                             qploidy_area_ploidy_estimation,

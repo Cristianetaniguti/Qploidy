@@ -283,7 +283,7 @@ mod_qploidy_ui <- function(id){
                           )
                         ),
                         br(), hr(),
-                        plotOutput(ns("plot_hmm")), br(),
+                        plotOutput(ns("plot_hmm"), height = 800), br(),
                         box(title="HMM results", collapsed = TRUE, width = 12,
                             DTOutput(ns("ploidy_table_hmm")),br(),
                             downloadButton(ns("download_ploidy_table_hmm"), "Download HMM CN Estimations Table")
@@ -432,18 +432,43 @@ mod_qploidy_server <- function(input, output, session, parent_session){
     updateBox(id = "Qploidy_box", action = "toggle", session = parent_session)
   })
 
+  observeEvent(list(input$ref_ploidy, input$common_ploidy), {
+    # Update n.clusters reactively using input values
+    ploidy <- c(input$ref_ploidy, input$common_ploidy)
+    ploidy <- ploidy[!is.na(ploidy)]
+    if(length(ploidy) > 0) {
+      advanced_options$n.clusters <- as.numeric(ploidy) + 1
+    } else {
+      advanced_options$n.clusters <- input$n.clusters
+    }
+  })
+
+  # Initialize with static defaults only
+  advanced_options <- reactiveValues(
+    miss = 90,
+    prob = 0.8,
+    n.clusters = 3 # default value, will be updated reactively
+  )
+
+  advanced_options_hmm <- reactiveValues(
+    min_snps_per_window = 20,
+    n_bins = 100,
+    bw = 0.03,
+    het_lims = c(0,1),
+    het_weight = 0.8,
+    z_range = 0.2,
+    transition_jump =0.995,
+    z_only = FALSE
+  )
+
   #UI popup window for input
   observeEvent(input$advanced_options, {
     showModal(modalDialog(
-      title = "Advanced Options",
-      numericInput(ns("miss"), "Remove SNPs with >= % missing data", min = 1, max = 100,value = 90),
-      numericInput(ns("prob"), "Remove genotypes with <= probability", min = 0, value = 0.8),
+      title = "Standardization Advanced Options",
+      numericInput(ns("miss"), "Remove SNPs with >= % missing data", min = 1, max = 100,value = advanced_options$miss),
+      numericInput(ns("prob"), "Remove genotypes with <= probability", min = 0, value = advanced_options$prob),
       numericInput(ns("n.clusters"), "Remove genotypes with <= # of dosage clusters",
-                   min = 2, value = {
-                     ploidy <- c(input$ref_ploidy, input$common_ploidy)
-                     ploidy <- ploidy[-is.na(ploidy)]
-                     as.numeric(ploidy) + 1
-                   }),
+                   min = 2, value = advanced_options$n.clusters),
       footer = tagList(
         modalButton("Close"),
         actionButton(ns("save_advanced_options"), "Save")
@@ -456,20 +481,20 @@ mod_qploidy_server <- function(input, output, session, parent_session){
     showModal(modalDialog(
       title = "Advanced Options for HMM CN Estimation",
       numericInput(ns("min_snps_per_window_hmm"), "Minimum number of SNPs per window",
-                   min = 1, value = 20),
+                   min = 1, value = advanced_options_hmm$min_snps_per_window),
       numericInput(ns("n_bins_hmm"), "Number of bins to split BAF",
-                   min = 5, value = 100),
+                   min = 5, value = advanced_options_hmm$n_bins),
       numericInput(ns("bw_hmm"), "Bandwidth (SD) of the Gaussian kernels used to generate the BAF comb templates",
-                   min = 0, value = 0.03),
+                   min = 0, value = advanced_options_hmm$bw),
       sliderInput(ns("het_lims_hmm"), "BAF limits to consider a SNP heterozygous",
-                  min = 0, max = 1, value = c(0, 1), step = 0.005),
+                  min = 0, max = 1, value = advanced_options_hmm$het_lims, step = 0.005),
       numericInput(ns("het_weight_hmm"), "Quantile used to scale BAF emission weight based on heterozygote count",
-                   min = 0, max = 1, value = 0.8),
+                   min = 0, max = 1, value = advanced_options_hmm$het_weight),
       numericInput(ns("z_range_hmm"), "Padding added to min/max z for initial mean estimation",
-                   min = 0, value = 0.2),
+                   min = 0, value = advanced_options_hmm$z_range),
       numericInput(ns("transition_jump_hmm"), "Diagonal value for transition matrix (probability to stay in same CN state)",
-                   min = 0, max = 1,value = 0.995),
-      checkboxInput(ns("z_only_hmm"), "Fit the HMM using the z-emission only (ignores BAF)", value = FALSE),
+                   min = 0, max = 1,value = advanced_options_hmm$transition_jump),
+      checkboxInput(ns("z_only_hmm"), "Fit the HMM using the z-emission only (ignores BAF)", value = advanced_options_hmm$z_only),
       footer = tagList(
         modalButton("Close"),
         actionButton(ns("save_advanced_options_hmm"), "Save")
@@ -481,20 +506,20 @@ mod_qploidy_server <- function(input, output, session, parent_session){
     showModal(modalDialog(
       title = "Advanced Options for HMM CN Estimation",
       numericInput(ns("min_snps_per_window_all"), "Minimum number of SNPs per window",
-                   min = 1, value = 20),
+                   min = 1, value = advanced_options_hmm$min_snps_per_window),
       numericInput(ns("n_bins_all"), "Number of bins to split BAF",
-                   min = 5, value = 100),
+                   min = 5, value = advanced_options_hmm$n_bins),
       numericInput(ns("bw_all"), "Bandwidth (SD) of the Gaussian kernels used to generate the BAF comb templates",
-                   min = 0, value = 0.03),
+                   min = 0, value = advanced_options_hmm$bw),
       sliderInput(ns("het_lims_all"), "BAF limits to consider a SNP heterozygous",
-                  min = 0, max = 1, value = c(0, 1), step = 0.005),
+                  min = 0, max = 1, value = advanced_options_hmm$het_lims , step = 0.005),
       numericInput(ns("het_weight_all"), "Quantile used to scale BAF emission weight based on heterozygote count",
-                   min = 0, max = 1, value = 0.8),
+                   min = 0, max = 1, value = advanced_options_hmm$het_weight),
       numericInput(ns("z_range_all"), "Padding added to min/max z for initial mean estimation",
-                   min = 0, value = 0.2),
+                   min = 0, value = advanced_options_hmm$z_range),
       numericInput(ns("transition_jump_all"), "Diagonal value for transition matrix (probability to stay in same CN state)",
-                   min = 0, max = 1,value = 0.995),
-      checkboxInput(ns("z_only_all"), "Fit the HMM using the z-emission only (ignores BAF)", value = FALSE),
+                   min = 0, max = 1,value = advanced_options_hmm$transition_jump),
+      checkboxInput(ns("z_only_all"), "Fit the HMM using the z-emission only (ignores BAF)", value = advanced_options_hmm$z_only),
       footer = tagList(
         modalButton("Close"),
         actionButton(ns("save_advanced_options_hmm_all"), "Save")
@@ -502,6 +527,40 @@ mod_qploidy_server <- function(input, output, session, parent_session){
     ))
   })
 
+  # Close popup window when user "saves options"
+  observeEvent(input$save_advanced_options, {
+    advanced_options$miss <- input$miss
+    advanced_options$prob <- input$prob
+    advanced_options$n.clusters <- input$n.clusters
+
+    removeModal() # Close the modal after saving
+  })
+
+  observeEvent(input$save_advanced_options_hmm, {
+    advanced_options_hmm$min_snps_per_window <- input$min_snps_per_window_hmm
+    advanced_options_hmm$n_bins <- input$n_bins_hmm
+    advanced_options_hmm$bw <- input$bw_hmm
+    advanced_options_hmm$het_lims <- input$het_lims_hmm
+    advanced_options_hmm$het_weight <- input$het_weight_hmm
+    advanced_options_hmm$z_range <- input$z_range_hmm
+    advanced_options_hmm$transition_jump <- input$transition_jump_hmm
+    advanced_options_hmm$z_only <- input$z_only_hmm
+
+    removeModal() # Close the modal after saving
+  })
+
+  observeEvent(input$save_advanced_options_hmm_all, {
+    advanced_options_hmm$min_snps_per_window <- input$min_snps_per_window_hmm_all
+    advanced_options_hmm$n_bins <- input$n_bins_hmm_all
+    advanced_options_hmm$bw <- input$bw_hmm_all
+    advanced_options_hmm$het_lims <- input$het_lims_hmm_all
+    advanced_options_hmm$het_weight <- input$het_weight_hmm_all
+    advanced_options_hmm$z_range <- input$z_range_hmm_all
+    advanced_options_hmm$transition_jump <- input$transition_jump_hmm_all
+    advanced_options_hmm$z_only <- input$z_only_hmm_all
+
+    removeModal() # Close the modal after saving
+  })
 
   n.markers.start <- geno.prob.rm <- miss.rm <- clusters.rm <- no.geno.info.rm <- n.markers.end <- reactiveVal(0)
 
@@ -772,17 +831,17 @@ mod_qploidy_server <- function(input, output, session, parent_session){
                                           n_cores = if(is.null(input$n_cores_hmm)) 1 else input$n_cores_hmm,
                                           chr = input$sele_chr_all,
                                           snps_per_window = if(is.null(input$snps_per_window_all)) 20 else input$snps_per_window_all,
-                                          min_snps_per_window = if(is.null(input$min_snps_per_window_all)) 20 else input$min_snps_per_window_all,
+                                          min_snps_per_window = if(is.null(advanced_options_hmm$min_snps_per_window)) 20 else advanced_options_hmm$min_snps_per_window,
                                           cn_grid = if(is.null(ploidies)) c(2,3,4) else ploidies,
-                                          M = if(is.null(input$n_bins_all)) 100 else input$n_bins_all,
-                                          bw = if(is.null(input$bw_all)) 0.03 else input$bw_all,
+                                          M = if(is.null(advanced_options_hmm$n_bins)) 100 else advanced_options_hmm$n_bins,
+                                          bw = if(is.null(advanced_options_hmm$bw)) 0.03 else advanced_options_hmm$bw,
                                           exp_ploidy = if(is.null(input$exp_ploidy_all)) 2 else input$exp_ploidy_all,
-                                          het_lims = if(is.null(input$het_lims_all)) c(0,1) else input$het_lims_all,
-                                          het_weight = if(is.null(input$het_weight_all)) 0.8 else input$het_weight_all,
-                                          z_range = if(is.null(input$z_range_all)) 0.2 else input$z_range_all,
-                                          transition_jump = if(is.null(input$transition_jump_all)) 0.995 else input$transition_jump_all,
+                                          het_lims = if(is.null(advanced_options_hmm$het_lims)) c(0,1) else advanced_options_hmm$het_lims,
+                                          het_weight = if(is.null(advanced_options_hmm$het_weight)) 0.8 else advanced_options_hmm$het_weight,
+                                          z_range = if(is.null(advanced_options_hmm$z_range)) 0.2 else advanced_options_hmm$z_range,
+                                          transition_jump = if(is.null(advanced_options_hmm$transition_jump)) 0.995 else advanced_options_hmm$transition_jump,
                                           max_iter = 60,
-                                          z_only = if(is.null(input$z_only_all)) FALSE else input$z_only_all)
+                                          z_only = if(is.null(input$z_only)) FALSE else input$z_only)
 
       updateProgressBar(session = session, id = "pb_qploidy", value = 60)
 
@@ -939,17 +998,17 @@ mod_qploidy_server <- function(input, output, session, parent_session){
       sample_id = input$sample_hmm,
       chr = input$sele_chr_hmm,
       snps_per_window = if(is.null(input$snps_per_window_hmm)) 20 else input$snps_per_window_hmm,
-      min_snps_per_window = if(is.null(input$min_snps_per_window_hmm)) 20 else input$min_snps_per_window_hmm,
+      min_snps_per_window = if(is.null(advanced_options_hmm$min_snps_per_window)) 20 else advanced_options_hmm$min_snps_per_window,
       cn_grid = if(is.null(ploidies)) c(2,3,4) else ploidies,
-      M = if(is.null(input$n_bins_hmm)) 100 else input$n_bins_hmm,
-      bw = if(is.null(input$bw_hmm)) 0.03 else input$bw_hmm,
+      M = if(is.null(advanced_options_hmm$n_bins)) 100 else advanced_options_hmm$n_bins,
+      bw = if(is.null(advanced_options_hmm$bw)) 0.03 else advanced_options_hmm$bw,
       exp_ploidy = if(is.null(input$exp_ploidy_hmm)) 2 else input$exp_ploidy_hmm,
-      het_lims = if(is.null(input$het_lims_hmm)) c(0,1) else input$het_lims_hmm,
-      het_weight = if(is.null(input$het_weight_hmm)) 0.8 else input$het_weight_hmm,
-      z_range = if(is.null(input$z_range_hmm)) 0.2 else input$z_range_hmm,
-      transition_jump = if(is.null(input$transition_jump_hmm)) 0.995 else input$transition_jump_hmm,
+      het_lims = if(is.null(advanced_options_hmm$het_lims)) c(0,1) else advanced_options_hmm$het_lims,
+      het_weight = if(is.null(advanced_options_hmm$het_weight)) 0.8 else advanced_options_hmm$het_weight,
+      z_range = if(is.null(advanced_options_hmm$z_range)) 0.2 else advanced_options_hmm$z_range,
+      transition_jump = if(is.null(advanced_options_hmm$transition_jump)) 0.995 else advanced_options_hmm$transition_jump,
       max_iter = 60,
-      z_only = if(is.null(input$z_only_hmm)) FALSE else input$z_only_hmm
+      z_only = if(is.null(advanced_options_hmm$z_only)) FALSE else advanced_options_hmm$z_only
     )
 
     updateProgressBar(session = session, id = "pb_qploidy", value = 75)
@@ -979,7 +1038,10 @@ mod_qploidy_server <- function(input, output, session, parent_session){
   output$plot_hmm <- renderPlot({
     req(ploidies_hmm())
 
-    p <- plot_cn_track(hmm_CN = ploidies_hmm(), sample_id = input$sample_hmm, show_window_lines = TRUE)
+    p <- plot_cn_track(hmm_CN = ploidies_hmm(), 
+                      qploidy_standarize_result= data_standardized(), 
+                      sample_id = input$sample_hmm, 
+                      show_window_lines = TRUE)
 
     updateProgressBar(session = session, id = "pb_qploidy", value = 100)
     p

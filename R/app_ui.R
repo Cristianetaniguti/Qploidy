@@ -16,8 +16,7 @@ app_ui <- function(request) {
       skin = "black",
       bs4DashNavbar(
         title = tagList(
-          tags$img(src = 'www/Qploidy_logo.png', height = '40', width = '35'),
-          tags$img(src = 'www/BIG_R_logo.png', height = '40', width = '50'),
+          tags$img(src = 'www/Qploidy_logo.png', height = '40', width = '35')
         ),
         rightUi = tags$li(
           class = "dropdown",

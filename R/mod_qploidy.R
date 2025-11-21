@@ -550,14 +550,14 @@ mod_qploidy_server <- function(input, output, session, parent_session){
   })
 
   observeEvent(input$save_advanced_options_hmm_all, {
-    advanced_options_hmm$min_snps_per_window <- input$min_snps_per_window_hmm_all
-    advanced_options_hmm$n_bins <- input$n_bins_hmm_all
-    advanced_options_hmm$bw <- input$bw_hmm_all
-    advanced_options_hmm$het_lims <- input$het_lims_hmm_all
-    advanced_options_hmm$het_weight <- input$het_weight_hmm_all
-    advanced_options_hmm$z_range <- input$z_range_hmm_all
-    advanced_options_hmm$transition_jump <- input$transition_jump_hmm_all
-    advanced_options_hmm$z_only <- input$z_only_hmm_all
+    advanced_options_hmm$min_snps_per_window <- input$min_snps_per_window_all
+    advanced_options_hmm$n_bins <- input$n_bins_all
+    advanced_options_hmm$bw <- input$bw_all
+    advanced_options_hmm$het_lims <- input$het_lims_all
+    advanced_options_hmm$het_weight <- input$het_weight_all
+    advanced_options_hmm$z_range <- input$z_range_all
+    advanced_options_hmm$transition_jump <- input$transition_jump_all
+    advanced_options_hmm$z_only <- input$z_only_all
 
     removeModal() # Close the modal after saving
   })
@@ -841,7 +841,7 @@ mod_qploidy_server <- function(input, output, session, parent_session){
                                           z_range = if(is.null(advanced_options_hmm$z_range)) 0.2 else advanced_options_hmm$z_range,
                                           transition_jump = if(is.null(advanced_options_hmm$transition_jump)) 0.995 else advanced_options_hmm$transition_jump,
                                           max_iter = 60,
-                                          z_only = if(is.null(input$z_only)) FALSE else input$z_only)
+                                          z_only = if(is.null(advanced_options_hmm$z_only)) FALSE else advanced_options_hmm$z_only)
 
       updateProgressBar(session = session, id = "pb_qploidy", value = 60)
 
@@ -1038,9 +1038,9 @@ mod_qploidy_server <- function(input, output, session, parent_session){
   output$plot_hmm <- renderPlot({
     req(ploidies_hmm())
 
-    p <- plot_cn_track(hmm_CN = ploidies_hmm(), 
-                      qploidy_standarize_result= data_standardized(), 
-                      sample_id = input$sample_hmm, 
+    p <- plot_cn_track(hmm_CN = ploidies_hmm(),
+                      qploidy_standarize_result= data_standardized(),
+                      sample_id = input$sample_hmm,
                       show_window_lines = TRUE)
 
     updateProgressBar(session = session, id = "pb_qploidy", value = 100)

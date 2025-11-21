@@ -182,7 +182,7 @@ hmm_estimate_CN <- function(
       d[["Position"]] <= win_df$End[i]
     baf_list[[i]] <- d[wrows, "baf"]
     if (length(baf_list[[i]]) == 0 || all(is.na(baf_list[[i]]))) {
-      stop(sprintf("Window %d (Chr %s, WindowID %s) has no valid BAF values.",
+      warning(sprintf("Window %d (Chr %s, WindowID %s) has no valid BAF values.",
                    i, win_df$Chr[i], win_df$WindowID[i]))
     }
   }
@@ -194,7 +194,7 @@ hmm_estimate_CN <- function(
   hist_counts <- matrix(0L, nrow = W, ncol = M)
   for (i in seq_len(W)) {
     if (length(baf_list[[i]]) == 0 || all(is.na(baf_list[[i]]))) {
-      stop(sprintf("Window %d (Chr %s, WindowID %s) has no valid BAF values for histogram.",
+      warning(sprintf("Window %d (Chr %s, WindowID %s) has no valid BAF values for histogram.",
                    i, win_df$Chr[i], win_df$WindowID[i]))
     }
     hist_counts[i, ] <- hist(baf_list[[i]], breaks = breaks, plot = FALSE)$counts
@@ -420,7 +420,9 @@ hmm_estimate_CN <- function(
 #' @param n_cores Number of cores to use (default: 2).
 #' @param ... Additional arguments passed to hmm_estimate_CN (e.g., chr, snps_per_window, etc).
 #' @return A data.frame with results for all samples, as returned by hmm_estimate_CN$result, combined.
+#'
 #' @importFrom parallel makeCluster parLapply stopCluster clusterExport
+#'
 #' @export
 hmm_estimate_CN_multi <- function(qploidy_standarize_result,
                                   sample_ids = "all",
@@ -444,10 +446,10 @@ hmm_estimate_CN_multi <- function(qploidy_standarize_result,
   # capture dots ONCE
   dots <- list(...)
 
-  cl <- parallel::makeCluster(n_cores)
-  on.exit(parallel::stopCluster(cl), add = TRUE)
+  cl <- makeCluster(n_cores)
+  on.exit(stopCluster(cl), add = TRUE)
 
-  parallel::clusterEvalQ(cl, {
+  clusterEvalQ(cl, {
     ## make errors surface promptly
     options(warn = 1)
     ## packages that define hmm_estimate_CN, classes, and helpers
@@ -459,12 +461,12 @@ hmm_estimate_CN_multi <- function(qploidy_standarize_result,
   })
 
   # make sure workers can see hmm_estimate_CN (and any helpers it needs)
-  parallel::clusterExport(cl,
+  clusterExport(cl,
                           varlist = c("worker", "hmm_estimate_CN", "baf_template", "baf_ll", "logsumexp", "viterbi"),
                           envir = environment()
   )
 
-  results_list <- parallel::parLapply(cl, sample_ids, worker,
+  results_list <- parLapply(cl, sample_ids, worker,
                                       qploidy_standarize_result, dots)
 
   parameters <- lapply(results_list, function(x) x$params)

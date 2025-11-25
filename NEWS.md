@@ -1,3 +1,9 @@
+# Qploidy 1.5.1
+
+* Fix HMM CNV estimation when some of the windows don't have heterozygous genotypes (use only z-score for them)
+* Improve Shiny interface for HMM CNV estimation
+
+
 # Qploidy 1.5.0
 
 * Add HMM to estimate CN (beta version)

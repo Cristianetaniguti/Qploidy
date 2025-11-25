@@ -1,6 +1,6 @@
 Package: Qploidy
 Title: Estimation of Ploidy and Detection of Aneuploidy Using Genotyping Data
-Version: 1.5.0
+Version: 1.5.1
 Authors@R: c(person(given='Cristiane', 
                     family='Taniguti', 
                     email = 'cht47@cornell.edu', 

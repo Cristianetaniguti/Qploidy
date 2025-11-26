@@ -215,8 +215,22 @@ plot_cn_track <- function(hmm_CN,
     }
   }
 
+  data_sample2 <- qploidy_standarize_result$data %>% filter(SampleName == sample_id & Chr %in% unique(x$Chr))
+
+  # Per-chromosome genomic range (based on BAF; you can also combine with Start/End if you prefer)
+  chrom_ghost <- data_sample2 %>%
+    group_by(Chr) %>%
+    summarise(Position = range(Position, na.rm = TRUE), .groups = "drop")
+  # This gives 2 rows per Chr: min and max Position
+
   # -------- top panel: z dots (fill = w_baf) --------
   p_z <- ggplot(x, aes(Mid, z)) +
+    # force x scale to span full chromosome range
+    geom_blank(
+      data = chrom_ghost,
+      inherit.aes = FALSE,
+      aes(x = Position, y = 0)
+    ) +
     # connect points within each chromosome
     geom_line(aes(group = Chr, alpha = w_baf), color = "grey50", linewidth = 0.6) +
     scale_alpha(range = c(0.2, 0.9), guide = "none") +
@@ -242,6 +256,11 @@ plot_cn_track <- function(hmm_CN,
 
   # -------- bottom panel: CN segments (color = P(CN call)) --------
   p_cn <- ggplot(x) +
+    geom_blank(
+      data = chrom_ghost,
+      inherit.aes = FALSE,
+      aes(x = Position, y = 0)
+    ) +
     geom_segment(aes(x = Start, xend = End, y = CN_call, yend = CN_call, color = prob_call),
                  linewidth = 2, lineend = "butt") +
     { if (show_window_lines)
@@ -262,7 +281,6 @@ plot_cn_track <- function(hmm_CN,
     )
 
   # -------- BAF -----
-  data_sample2 <- qploidy_standarize_result$data %>% filter(SampleName == sample_id & Chr %in% unique(x$Chr))
 
   data_tagged <- data_sample2 %>%
     group_by(Chr) %>%
@@ -302,12 +320,17 @@ plot_cn_track <- function(hmm_CN,
     left_join(w_baf_tbl, by = c("Chr", "region_id"))
 
   p_baf <- ggplot(plot_df, aes(x = Position, y = baf, color = w_baf)) +
+    geom_blank(
+      data = chrom_ghost,
+      inherit.aes = FALSE,
+      aes(x = Position, y = 0)
+    ) +
     geom_point(alpha = 0.7, size = 1) +
     { if (show_window_lines)
       geom_vline(data = vlines, aes(xintercept = Start),
                  color = line_color, alpha = line_alpha,
                  linewidth = line_width, linetype = line_linetype) else NULL } +
-    facet_grid(~Chr, scales = "free_x") +
+    facet_wrap(~Chr, scales = "free_x", nrow=1) +
     theme_bw() +
     ylab("BAF") +
     scale_color_distiller(palette = "RdBu", direction = -1, limits = c(0, 1), name = "BAF weight")+

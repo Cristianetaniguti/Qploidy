@@ -425,78 +425,83 @@ rm_outlier <- function(data, alpha=0.05){
 #' to estimate BAF, and generates a final annotated output suitable for CNV or
 #' dosage variation analyses.
 #'
+#' Filtering steps:
+#'   1. Genotype probability filter: Genotypes with probability below `threshold.geno.prob` are set to missing.
+#'   2. Marker missingness filter: Markers with fraction of missing genotypes above `threshold.missing.geno` are removed.
+#'   3. Cluster number filter: Markers with fewer than `threshold.n.clusters` clusters are removed.
+#'   4. Genomic info filter: Markers lacking chromosome or position info are removed.
+#'
+#' Merging logic:
+#'   - The function merges filtered genotype and signal data, estimates cluster centers, computes BAFs in parallel,
+#'     and calculates Z-scores. Results are merged into a single output data.frame containing BAF, Z-score, and genotype info.
+#'
 #' @param data A `data.frame` containing the full dataset with the following columns:
-#' \describe{
-#'   \item{MarkerName}{Marker identifiers.}
-#'   \item{SampleName}{Sample identifiers.}
-#'   \item{X}{Reference allele intensity or count.}
-#'   \item{Y}{Alternative allele intensity or count.}
-#'   \item{R}{Total signal intensity or read depth (X + Y).}
-#'   \item{ratio}{Allelic ratio, typically Y / (X + Y).}
-#' }
+#'   - MarkerName: Marker identifiers.
+#'   - SampleName: Sample identifiers.
+#'   - X: Reference allele intensity or count.
+#'   - Y: Alternative allele intensity or count.
+#'   - R: Total signal intensity or read depth (X + Y).
+#'   - ratio: Allelic ratio, typically Y / (X + Y).
 #'
 #' @param genos A `data.frame` containing genotype dosage information for the reference panel.
-#' This should include samples of known ploidy and ideally euploid individuals.
-#' Required columns:
-#' \describe{
-#'   \item{MarkerName}{Marker identifiers.}
-#'   \item{SampleName}{Sample identifiers.}
-#'   \item{geno}{Estimated dosage (0, 1, 2, ...).}
-#'   \item{prob}{Genotype call probability (used for filtering low-confidence genotypes).}
-#' }
+#'   - MarkerName: Marker identifiers.
+#'   - SampleName: Sample identifiers.
+#'   - geno: Estimated dosage (0, 1, 2, ...).
+#'   - prob: Genotype call probability (used for filtering low-confidence genotypes).
 #'
-#' @param geno.pos A `data.frame` with marker position metadata. Required columns:
-#' \describe{
-#'   \item{MarkerName}{Marker identifiers.}
-#'   \item{Chromosome}{Chromosome names.}
-#'   \item{Position}{Base-pair positions on the genome.}
-#' }
+#' @param geno.pos A `data.frame` with marker position metadata.
+#'   - MarkerName: Marker identifiers.
+#'   - Chromosome: Chromosome names.
+#'   - Position: Base-pair positions on the genome.
 #'
 #' @param threshold.missing.geno Numeric (0–1). Maximum fraction of missing genotype data allowed per marker.
-#' Markers with a higher fraction will be removed.
+#'   Markers with a higher fraction will be removed.
 #'
 #' @param threshold.geno.prob Numeric (0–1). Minimum genotype call probability threshold.
-#' Genotypes with lower probability will be treated as missing.
+#'   Genotypes with lower probability will be treated as missing.
 #'
 #' @param ploidy.standardization Integer. The ploidy level of the reference panel used for standardization.
 #'
 #' @param threshold.n.clusters Integer. Minimum number of expected dosage clusters per marker.
-#' For diploid data, this is typically 3 (corresponding to genotypes 0, 1, and 2).
+#'   For diploid data, this is typically 3 (corresponding to genotypes 0, 1, and 2).
 #'
 #' @param n.cores Integer. Number of cores to use in parallel computations (e.g., for cluster center estimation and BAF generation).
 #'
-#' @param type Character. Type of data used for clustering:
-#' \describe{
-#'   \item{"intensities"}{For array-based allele intensity data.}
-#'   \item{"counts"}{For sequencing data.}
-#'   \item{"updog"}{Automatically set when `multidog_obj` is provided.}
-#' }
-#'
-#' @param multidog_obj Optional. An object of class `multidog` from the `updog` package, containing model fits and estimated biases.
-#' If provided, this will override the `type` parameter and use `updog`'s expected cluster positions.
-#'
 #' @param out_filename Optional. Path to save the final standardized dataset to disk as a CSV file (suitable for Qploidy).
 #'
-#' @param parallel.type Character. Parallel backend to use (`"FORK"` or `"PSOCK"`). `"FORK"` is faster but only works on Unix-like systems.
+#' @param type Character. Type of data used for clustering:
+#'   - "intensities": For array-based allele intensity data.
+#'   - "counts": For sequencing data.
+#'   - "updog": Automatically set when `multidog_obj` is provided.
 #'
-#' @param rm_outlier Logical. If `TRUE`, uses Bonferroni-Holm corrected residuals to remove outliers before estimating cluster centers.
+#' @param multidog_obj Optional. An object of class `multidog` from the `updog` package, containing model fits and estimated biases.
+#'   If provided, this will override the `type` parameter and use `updog`'s expected cluster positions.
 #'
-#' @param cluster_median Logical. If `TRUE`, uses the median of theta values to estimate cluster centers. If `FALSE`, uses the mean.
+#' @param parallel.type Character. Parallel backend to use ("FORK" or "PSOCK"). "FORK" is faster but only works on Unix-like systems.
 #'
-#' @param verbose Logical. If `TRUE`, prints progress and filtering information to the console.
+#' @param rm_outlier Logical. If TRUE, uses Bonferroni-Holm corrected residuals to remove outliers before estimating cluster centers.
 #'
-#' @return An object of class `"qploidy_standardization"` (list) with the following components:
-#' \describe{
-#'   \item{info}{Named vector of standardization parameters.}
-#'   \item{filters}{Named vector summarizing how many markers were removed at each filtering step.}
-#'   \item{data}{A data.frame containing merged BAF, Z-score, and genotype information by marker and sample.}
-#' }
+#' @param cluster_median Logical. If TRUE, uses the median of theta values to estimate cluster centers. If FALSE, uses the mean.
+#'
+#' @param verbose Logical. If TRUE, prints progress and filtering information to the console.
+#'
+#' @return An object of class "qploidy_standardization" (list) with the following components:
+#'   - info: Named vector of standardization parameters.
+#'   - filters: Named vector summarizing how many markers were removed at each filtering step.
+#'   - data: A data.frame containing merged BAF, Z-score, and genotype information by marker and sample.
 #'
 #' @importFrom dplyr group_by summarize filter mutate inner_join full_join
 #' @importFrom tidyr pivot_wider pivot_longer
 #' @importFrom vroom vroom_write
 #' @importFrom parallel makeCluster stopCluster clusterExport parLapply clusterEvalQ
 #' @importFrom stats sd
+#'
+#' @examples
+#' # Example usage:
+#' # data <- ... # see vignette for example data
+#' # genos <- ...
+#' # geno.pos <- ...
+#' # result <- standardize(data, genos, geno.pos, ploidy.standardization=2, threshold.n.clusters=3, n.cores=2)
 #'
 #' @export
 standardize <- function(data = NULL,
@@ -657,7 +662,7 @@ standardize <- function(data = NULL,
 
   # Z score
   if(verbose) cat("Generating z scores...\n")
-  zscore <- get_zscore(data, geno.pos)
+  zscore <- get_zscore(data_filt, geno.pos) # z score is calculated only for markers that passed missing data filter
   if(verbose) cat("Z scores ready!\n")
 
   if(verbose) cat("Merging results into qploidy_standardization object...\n")

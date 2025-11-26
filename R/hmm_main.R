@@ -132,12 +132,38 @@ hmm_estimate_CN <- function(
     if (nrow(d) == 0) stop("No data found for specified chromosomes after filtering.")
   }
 
+  # Remove markers with missing baf and z
+  rm <- which(is.na(d[["baf"]]) & is.na(d[["z"]]))
+  if(length(rm) > 0) d <- d[-rm, , drop = FALSE]
+
+
   # --- build windows ---
   d <- d[order(d[["Chr"]], d[["Position"]]), ]
 
   # equal-SNP windows within chromosome
-  d$.__w__ <- with(d, ave(seq_len(nrow(d)), d[["Chr"]],
-                          FUN = function(k) ceiling(seq_along(k) / snps_per_window)))
+  d$.__w__ <- with(
+    d,
+    ave(
+      seq_len(nrow(d)),
+      d[["Chr"]],
+      FUN = function(k) {
+        n <- length(k)
+
+        # initial windowing (same idea as before)
+        w <- ceiling(seq_along(k) / snps_per_window)
+
+        # if there is a remainder AND we have more than one full window,
+        # merge the last (small) window into the previous one
+        if (n > snps_per_window && n %% snps_per_window != 0L) {
+          last <- max(w)
+          w[w == last] <- last - 1L
+        }
+
+        w
+      }
+    )
+  )
+
   win_col <- ".__w__"
 
   # summarize per window
@@ -160,13 +186,16 @@ hmm_estimate_CN <- function(
     )
   }))
   rownames(win_df) <- NULL
+
+  if(any(is.nan(win_df$z_mean))) {
+    warning("Some windows have no z-score values.")
+  }
+
   if (is.null(win_df) || nrow(win_df) == 0) stop("No windows could be formed. Check input data and window parameters.")
 
   # drop very small windows - mostly for the last window
   keep <- win_df$n_snps >= min_snps_per_window
   if (!any(keep)) stop("All windows dropped by min_snps_per_window filter. Try lowering min_snps_per_window or check input data.")
-  if (!all(keep)) win_df <- win_df[keep, ]
-  if (nrow(win_df) == 0) stop("All windows dropped by min_snps_per_window filter. Try lowering min_snps_per_window or check input data.")
 
   # order windows first by chr then start
   o <- order(win_df$Chr, win_df$Start)
@@ -291,6 +320,7 @@ hmm_estimate_CN <- function(
     for (k in seq_len(K)) {
       c <- cn_grid[k]
       llz <- dnorm(z, mean=mu[as.character(c)], sd=sig, log=TRUE) # Values from a normal distribution for z considering ploidy/state mean
+      if(any(is.nan(llz))) llz[which(is.nan(llz))] <- 0 # if any window don't have z score values, only BAF is considered
       if (z_only) {
         ll_em[,k] <- llz
       } else {

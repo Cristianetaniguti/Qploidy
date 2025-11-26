@@ -619,7 +619,22 @@ mod_qploidy_server <- function(input, output, session, parent_session){
 
     # Read input file based on type
     if (input$file_type == "VCF") {
-      input_data <- qploidy_read_vcf(input$input_file$datapath)
+
+        if(input$known_ploidy){
+          reference_samples_df <- read.csv(input$reference_samples$datapath, header = TRUE, stringsAsFactors = FALSE)
+          if (!"Sample_ID" %in% colnames(reference_samples_df)) {
+            shinyalert(
+              title = "Reference Samples Format Error",
+              text = "The Reference Samples file must contain a column named 'Sample_ID'.",
+              type = "error"
+            )
+            return()
+          }
+          reference_samples <- reference_samples_df$Sample_ID
+        }
+
+        input_data <- qploidy_read_vcf(input$input_file$datapath)
+
     } else if (input$file_type == "Axiom Array") {
       input_data <- read_axiom(input$input_file$datapath)
     } else if(input$file_type == "Illumina Array") {
@@ -649,7 +664,6 @@ mod_qploidy_server <- function(input, output, session, parent_session){
         if(all(is.na(genos.pos[,1]))) genos.pos$MarkerName <- paste0(genos.pos$Chromosome, "_", genos.pos$Position)
 
         if(input$known_ploidy){
-          reference_samples <- read.csv(input$reference_samples$datapath, header = TRUE, stringsAsFactors = FALSE)$Sample_ID
           genos <- genos[which(genos$SampleName %in% reference_samples), ]
         }
 
@@ -677,7 +691,7 @@ mod_qploidy_server <- function(input, output, session, parent_session){
 
       # Verify if informed ploidy is the same in file
       ploidy <- c(input$ref_ploidy, input$common_ploidy)
-      ploidy <- ploidy[-is.na(ploidy)]
+      ploidy <- ploidy[-which(is.na(ploidy))]
 
       if (length(ploidy) > 1) {
         if (!all(max(genos$geno, na.rm = TRUE) %in% ploidy)) {

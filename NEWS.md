@@ -1,3 +1,15 @@
+# Qploidy 1.5.2
+
+* Z-score calculation is now only applied to markers not filtered by genotype probabilities and missing data
+* Markers filtered out during standardization are not considered to define the window boundaries for HMM CNV estimation 
+* Last window of each chromosome are never smaller than the defined window size
+* CN HMM plots follow same scale for easier comparison between metrics by window
+
+# Qploidy 1.5.1
+
+* Fix HMM CNV estimation when some of the windows don't have heterozygous genotypes (use only z-score for them)
+* Improve Shiny interface for HMM CNV estimation
+
 # Qploidy 1.5.0
 
 * Add HMM to estimate CN (beta version)

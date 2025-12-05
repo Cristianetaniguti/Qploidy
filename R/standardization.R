@@ -532,7 +532,7 @@ standardize <- function(data = NULL,
   dose <- max(genos$geno, na.rm = T)
   if(dose != ploidy.standardization) stop("Ploidy of the provided reference samples do not match with the one defined in the ploidy.standardization parameter.")
 
-  if(verbose) cat("Generating standardize BAFs...\n")
+  if(verbose) cat("Generating standardized BAFs...\n")
   if(is.null(threshold.n.clusters)) threshold.n.clusters <- ploidy.standardization + 1
 
   ## Filter by prob
@@ -549,7 +549,7 @@ standardize <- function(data = NULL,
   rm.mks <- n.na$MarkerName[which(n.na$n.na > threshold.missing.geno)]
   mis.rm <- length(rm.mks)
 
-  if(verbose) print(paste0("Markers remove because of excess of missing data:", mis.rm))
+  if(verbose) print(paste0("Markers removed because of excess of missing data:", mis.rm))
 
   if(length(rm.mks) > 0){
     genos_filt <- genos[which(!(genos$MarkerName %in% rm.mks)),]
@@ -599,7 +599,7 @@ standardize <- function(data = NULL,
   rm.mks <- sapply(clusters, function(x) x$rm != 0)
   clusters.rm <- sum(rm.mks)
 
-  if(verbose) print(paste0("Markers remove because of smaller number of clusters than set threshold:",clusters.rm))
+  if(verbose) print(paste0("Markers removed because of smaller number of clusters than set threshold:",clusters.rm))
 
   if(length(which(rm.mks)) > 0)  clusters_filt <- clusters[-which(rm.mks)] else clusters_filt <- clusters
 

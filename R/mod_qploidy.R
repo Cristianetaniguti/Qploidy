@@ -229,9 +229,14 @@ mod_qploidy_ui <- function(id){
                                      )
                                      )
                               )
-                            ), hr(),
-
-                            uiOutput(ns("plot_ui"))
+                            )
+                        ),
+                        box(title = "Plots", status = "info", solidHeader = FALSE, collapsible = TRUE, width = 12,
+                            fluidRow(
+                              column(width = 12,
+                                     uiOutput(ns("plot_ui"))
+                              )
+                            )
                         )
                ),
                tabPanel(title = "HMM by Sample (BETA)", value = "hmm_by_sample", br(),
@@ -455,7 +460,8 @@ mod_qploidy_server <- function(input, output, session, parent_session){
     n_bins = 100,
     bw = 0.03,
     het_lims = c(0,1),
-    het_weight = 0.8,
+    het_quantile = 0.8,
+    baf_weight = 1,
     z_range = 0.2,
     transition_jump =0.995,
     z_only = FALSE
@@ -488,8 +494,10 @@ mod_qploidy_server <- function(input, output, session, parent_session){
                    min = 0, value = advanced_options_hmm$bw),
       sliderInput(ns("het_lims_hmm"), "BAF limits to consider a SNP heterozygous",
                   min = 0, max = 1, value = advanced_options_hmm$het_lims, step = 0.005),
-      numericInput(ns("het_weight_hmm"), "Quantile used to scale BAF emission weight based on heterozygote count",
-                   min = 0, max = 1, value = advanced_options_hmm$het_weight),
+      numericInput(ns("het_quantile_hmm"), "Quantile used to scale BAF emission weight based on heterozygote count",
+                   min = 0, max = 1, value = advanced_options_hmm$het_quantile),
+      numericInput(ns("baf_weight_hmm"), "Weight of the BAF emission in the final emission probability",
+                   min = 0, max = 1, value = advanced_options_hmm$baf_weight),
       numericInput(ns("z_range_hmm"), "Padding added to min/max z for initial mean estimation",
                    min = 0, value = advanced_options_hmm$z_range),
       numericInput(ns("transition_jump_hmm"), "Diagonal value for transition matrix (probability to stay in same CN state)",
@@ -513,8 +521,10 @@ mod_qploidy_server <- function(input, output, session, parent_session){
                    min = 0, value = advanced_options_hmm$bw),
       sliderInput(ns("het_lims_all"), "BAF limits to consider a SNP heterozygous",
                   min = 0, max = 1, value = advanced_options_hmm$het_lims , step = 0.005),
-      numericInput(ns("het_weight_all"), "Quantile used to scale BAF emission weight based on heterozygote count",
-                   min = 0, max = 1, value = advanced_options_hmm$het_weight),
+      numericInput(ns("het_quantile_all"), "Quantile used to scale BAF emission weight based on heterozygote count",
+                   min = 0, max = 1, value = advanced_options_hmm$het_quantile),
+      numericInput(ns("baf_weight_all"), "Weight of the BAF emission in the final emission probability",
+                   min = 0, max = 1, value = advanced_options_hmm$baf_weight),
       numericInput(ns("z_range_all"), "Padding added to min/max z for initial mean estimation",
                    min = 0, value = advanced_options_hmm$z_range),
       numericInput(ns("transition_jump_all"), "Diagonal value for transition matrix (probability to stay in same CN state)",
@@ -541,7 +551,8 @@ mod_qploidy_server <- function(input, output, session, parent_session){
     advanced_options_hmm$n_bins <- input$n_bins_hmm
     advanced_options_hmm$bw <- input$bw_hmm
     advanced_options_hmm$het_lims <- input$het_lims_hmm
-    advanced_options_hmm$het_weight <- input$het_weight_hmm
+    advanced_options_hmm$het_quantile <- input$het_quantile_hmm
+    advanced_options_hmm$baf_weight <- input$baf_weight_hmm
     advanced_options_hmm$z_range <- input$z_range_hmm
     advanced_options_hmm$transition_jump <- input$transition_jump_hmm
     advanced_options_hmm$z_only <- input$z_only_hmm
@@ -554,7 +565,8 @@ mod_qploidy_server <- function(input, output, session, parent_session){
     advanced_options_hmm$n_bins <- input$n_bins_all
     advanced_options_hmm$bw <- input$bw_all
     advanced_options_hmm$het_lims <- input$het_lims_all
-    advanced_options_hmm$het_weight <- input$het_weight_all
+    advanced_options_hmm$het_quantile <- input$het_quantile_all
+    advanced_options_hmm$baf_weight <- input$baf_weight_all
     advanced_options_hmm$z_range <- input$z_range_all
     advanced_options_hmm$transition_jump <- input$transition_jump_all
     advanced_options_hmm$z_only <- input$z_only_all
@@ -620,20 +632,20 @@ mod_qploidy_server <- function(input, output, session, parent_session){
     # Read input file based on type
     if (input$file_type == "VCF") {
 
-        if(input$known_ploidy){
-          reference_samples_df <- read.csv(input$reference_samples$datapath, header = TRUE, stringsAsFactors = FALSE)
-          if (!"Sample_ID" %in% colnames(reference_samples_df)) {
-            shinyalert(
-              title = "Reference Samples Format Error",
-              text = "The Reference Samples file must contain a column named 'Sample_ID'.",
-              type = "error"
-            )
-            return()
-          }
-          reference_samples <- reference_samples_df$Sample_ID
+      if(input$known_ploidy){
+        reference_samples_df <- read.csv(input$reference_samples$datapath, header = TRUE, stringsAsFactors = FALSE)
+        if (!"Sample_ID" %in% colnames(reference_samples_df)) {
+          shinyalert(
+            title = "Reference Samples Format Error",
+            text = "The Reference Samples file must contain a column named 'Sample_ID'.",
+            type = "error"
+          )
+          return()
         }
+        reference_samples <- reference_samples_df$Sample_ID
+      }
 
-        input_data <- qploidy_read_vcf(input$input_file$datapath)
+      input_data <- qploidy_read_vcf(input$input_file$datapath)
 
     } else if (input$file_type == "Axiom Array") {
       input_data <- read_axiom(input$input_file$datapath)
@@ -851,7 +863,8 @@ mod_qploidy_server <- function(input, output, session, parent_session){
                                           bw = if(is.null(advanced_options_hmm$bw)) 0.03 else advanced_options_hmm$bw,
                                           exp_ploidy = if(is.null(input$exp_ploidy_all)) 2 else input$exp_ploidy_all,
                                           het_lims = if(is.null(advanced_options_hmm$het_lims)) c(0,1) else advanced_options_hmm$het_lims,
-                                          het_weight = if(is.null(advanced_options_hmm$het_weight)) 0.8 else advanced_options_hmm$het_weight,
+                                          het_quantile = if(is.null(advanced_options_hmm$het_quantile)) 0.8 else advanced_options_hmm$het_quantile,
+                                          baf_weight = if(is.null(advanced_options_hmm$baf_weight)) 1 else advanced_options_hmm$baf_weight,
                                           z_range = if(is.null(advanced_options_hmm$z_range)) 0.2 else advanced_options_hmm$z_range,
                                           transition_jump = if(is.null(advanced_options_hmm$transition_jump)) 0.995 else advanced_options_hmm$transition_jump,
                                           max_iter = 60,
@@ -931,9 +944,9 @@ mod_qploidy_server <- function(input, output, session, parent_session){
       selected = picked_samples()
     )
 
-      # select specific tab
-      updateTabsetPanel(session = parent_session, inputId = "Qploidy_results",
-                        selected = "stand_by_sample")
+    # select specific tab
+    updateTabsetPanel(session = parent_session, inputId = "Qploidy_results",
+                      selected = "stand_by_sample")
 
   })
 
@@ -1018,7 +1031,8 @@ mod_qploidy_server <- function(input, output, session, parent_session){
       bw = if(is.null(advanced_options_hmm$bw)) 0.03 else advanced_options_hmm$bw,
       exp_ploidy = if(is.null(input$exp_ploidy_hmm)) 2 else input$exp_ploidy_hmm,
       het_lims = if(is.null(advanced_options_hmm$het_lims)) c(0,1) else advanced_options_hmm$het_lims,
-      het_weight = if(is.null(advanced_options_hmm$het_weight)) 0.8 else advanced_options_hmm$het_weight,
+      het_quantile = if(is.null(advanced_options_hmm$het_quantile)) 0.8 else advanced_options_hmm$het_quantile,
+      baf_weight = if(is.null(advanced_options_hmm$baf_weight)) 1 else advanced_options_hmm$baf_weight,
       z_range = if(is.null(advanced_options_hmm$z_range)) 0.2 else advanced_options_hmm$z_range,
       transition_jump = if(is.null(advanced_options_hmm$transition_jump)) 0.995 else advanced_options_hmm$transition_jump,
       max_iter = 60,
@@ -1053,9 +1067,9 @@ mod_qploidy_server <- function(input, output, session, parent_session){
     req(ploidies_hmm())
 
     p <- plot_cn_track(hmm_CN = ploidies_hmm(),
-                      qploidy_standarize_result= data_standardized(),
-                      sample_id = input$sample_hmm,
-                      show_window_lines = TRUE)
+                       qploidy_standarize_result= data_standardized(),
+                       sample_id = input$sample_hmm,
+                       show_window_lines = TRUE)
 
     updateProgressBar(session = session, id = "pb_qploidy", value = 100)
     p

@@ -15,7 +15,8 @@ hmm_estimate_CN(
   bw = 0.03,
   max_iter = 60,
   het_lims = c(0, 1),
-  het_weight = 0.8,
+  het_quantile = 0.8,
+  baf_weight = 1,
   z_range = 0.2,
   transition_jump = 0.995,
   exp_ploidy = NULL,
@@ -44,7 +45,7 @@ hmm_estimate_CN(
 
 \item{het_lims}{Numeric vector of length 2. BAF limits to consider a SNP heterozygous. Default \code{c(0,1)}.}
 
-\item{het_weight}{Numeric. Quantile used to scale BAF emission weight based on heterozygote count. Default \code{0.8}.}
+\item{het_quantile}{Numeric. Quantile used to scale BAF emission weight based on heterozygote count. Default \code{0.8}.}
 
 \item{z_range}{Numeric. Padding added to min/max z for initial mean estimation. Default \code{0.2}.}
 

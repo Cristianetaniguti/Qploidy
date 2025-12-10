@@ -17,7 +17,7 @@
 #' @param bw Numeric. Bandwidth (SD) of the Gaussian kernels used to generate the BAF comb templates. Default \code{0.03}.
 #' @param max_iter Integer. Maximum EM iterations. Default \code{60}.
 #' @param het_lims Numeric vector of length 2. BAF limits to consider a SNP heterozygous. Default \code{c(0,1)}.
-#' @param het_weight Numeric. Quantile used to scale BAF emission weight based on heterozygote count. Default \code{0.8}.
+#' @param het_quantile Numeric. Quantile used to scale BAF emission weight based on heterozygote count. Default \code{0.8}.
 #' @param z_range Numeric. Padding added to min/max z for initial mean estimation. Default \code{0.2}.
 #' @param transition_jump Numeric. Diagonal value for transition matrix (probability to stay in same CN state). Default \code{0.995}.
 #' @param exp_ploidy Integer. Expected ploidy for initialization. If \code{NULL}, median of \code{cn_grid} is used.
@@ -94,7 +94,8 @@ hmm_estimate_CN <- function(
     bw = 0.03,
     max_iter = 60,
     het_lims = c(0,1), # baf limits to consider a SNP heterozygous
-    het_weight = 0.8, # increase this value to reduce the weight of baf when few hets
+    het_quantile = 0.8, # increase this value to reduce the weight of baf when few hets
+    baf_weight = 1,
     z_range = 0.2, # increase this value if you think that extreme ploidy tested are unlikely
     transition_jump = 0.995, # decrease this value if you think there changes in CN is likely
     exp_ploidy = NULL, # if NULL, median(cn_grid) is used
@@ -245,7 +246,7 @@ hmm_estimate_CN <- function(
   # If there are no heterozygous, only z-score will be considered
   HET_N <- win_df$n_het
   if (any(HET_N > 0)) {
-    ref_q <- suppressWarnings(quantile(HET_N[HET_N>0], het_weight, na.rm=TRUE))
+    ref_q <- suppressWarnings(quantile(HET_N[HET_N>0], het_quantile, na.rm=TRUE))
     if (!is.finite(ref_q) || ref_q <= 0) ref_q <- max(HET_N, na.rm=TRUE)
     if (!is.finite(ref_q) || ref_q <= 0) ref_q <- 1
     w_baf <- sqrt(pmin(1, HET_N / ref_q))  # sqrt: temper influence
@@ -253,6 +254,7 @@ hmm_estimate_CN <- function(
     w_baf <- rep(0, W)
   }
   w_baf[!is.finite(w_baf)] <- 0
+  w_baf <- w_baf * baf_weight
 
   # --- HMM setup ---
   K <- length(cn_grid) # The number of HMM states are the number of ploidies tested

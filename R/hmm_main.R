@@ -18,6 +18,7 @@
 #' @param max_iter Integer. Maximum EM iterations. Default \code{60}.
 #' @param het_lims Numeric vector of length 2. BAF limits to consider a SNP heterozygous. Default \code{c(0,1)}.
 #' @param het_quantile Numeric. Quantile used to scale BAF emission weight based on heterozygote count. Default \code{0.8}.
+#' @param baf_weight Numeric. Overall weight applied to BAF emission (0–1). Default \code{1}.
 #' @param z_range Numeric. Padding added to min/max z for initial mean estimation. Default \code{0.2}.
 #' @param transition_jump Numeric. Diagonal value for transition matrix (probability to stay in same CN state). Default \code{0.995}.
 #' @param exp_ploidy Integer. Expected ploidy for initialization. If \code{NULL}, median of \code{cn_grid} is used.

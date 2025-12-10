@@ -47,6 +47,8 @@ hmm_estimate_CN(
 
 \item{het_quantile}{Numeric. Quantile used to scale BAF emission weight based on heterozygote count. Default \code{0.8}.}
 
+\item{baf_weight}{Numeric. Overall weight applied to BAF emission (0–1). Default \code{1}.}
+
 \item{z_range}{Numeric. Padding added to min/max z for initial mean estimation. Default \code{0.2}.}
 
 \item{transition_jump}{Numeric. Diagonal value for transition matrix (probability to stay in same CN state). Default \code{0.995}.}

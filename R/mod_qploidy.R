@@ -182,7 +182,11 @@ mod_qploidy_ui <- function(id){
 
                                      conditionalPanel(condition = "input.add_expected_peaks == 'TRUE'",
                                                       ns = ns,
-                                                      numericInput(ns('ploidy_standardization'), label = 'Ploidy', value = 2),
+                                                      textInput(
+                                                        ns("ploidy_expected"),
+                                                        label = "Ploidy (e.g. 4 or 2,2,4,2)",
+                                                        value = "2"
+                                                      ),
                                      )
                               ),
                               column(width = 6,
@@ -840,6 +844,7 @@ mod_qploidy_server <- function(input, output, session, parent_session){
     }
 
     ploidies <- as.numeric(unlist(strsplit(input$ploidy_range, ",")))
+
     estimated_ploidies <- area_estimate_ploidy(
       qploidy_standardization = data_standardized(),
       samples = "all",
@@ -870,6 +875,7 @@ mod_qploidy_server <- function(input, output, session, parent_session){
                                           max_iter = 60,
                                           z_only = if(is.null(advanced_options_hmm$z_only)) FALSE else advanced_options_hmm$z_only)
 
+      print("ended multi_esti")
       updateProgressBar(session = session, id = "pb_qploidy", value = 60)
 
       summ_hmm <- summarize_cn_mode(multi_esti, level = input$res_lvl)
@@ -886,28 +892,34 @@ mod_qploidy_server <- function(input, output, session, parent_session){
     req(ploidies())
     if(input$all_hmm){
       tab <- ploidies()$hmm
-      num_cols <- sapply(tab, is.numeric)
-      tab[num_cols] <- lapply(tab[num_cols], function(x) round(x, 4))
-      datatable(tab,
-                selection = "single",
-                options = list(pageLength = 10, scrollX = TRUE))
+      num_cols <- which(apply(tab, 2, is.numeric))
+      if(length(num_cols) != 0)
+        tab[, num_cols] <- apply(tab[, num_cols], 2, function(x) round(x, 4))
+
+      res <- datatable(tab,
+                       selection = "single",
+                       options = list(pageLength = 10, scrollX = TRUE))
     } else {
       ploidy <- ploidies()$area$ploidy
       ploidy[which(ploidies()$area$diff_first_second < 0.01)] <- NA
 
       if(ncol(ploidy) > 1){
-        num_cols <- sapply(ploidy, is.numeric)
-        ploidy[num_cols] <- lapply(ploidy[num_cols], function(x) round(x, 4))
+        num_cols <- which(apply(ploidy, 2, is.numeric))
+        if(length(num_cols) != 0)
+          ploidy[, num_cols] <- apply(ploidy[, num_cols], 2, function(x) round(x, 4))
+        colnames(ploidy) <- colnames(ploidies()$area$ploidy)
       } else {
         ploidy <- as.data.frame(round(ploidy, 4))
         rownames(ploidy) <- rownames(ploidies()$area$ploidy)
         colnames(ploidy) <- colnames(ploidies()$area$ploidy)
       }
 
-      datatable(ploidy,
-                selection = "single",
-                options = list(pageLength = 10, scrollX = TRUE))
+      res <- datatable(ploidy,
+                       selection = "single",
+                       options = list(pageLength = 10, scrollX = TRUE))
     }
+
+    res
   })
 
   output$ploidy_table_note <- renderUI({
@@ -984,12 +996,17 @@ mod_qploidy_server <- function(input, output, session, parent_session){
 
     updateProgressBar(session = session, id = "pb_qploidy", value = 50)
 
+    x <- input$ploidy_expected
+    x <- gsub("\\s+", "", x)
+    vals <- unlist(strsplit(x, ","))
+    vals <- suppressWarnings(as.numeric(vals))
+
     p <- plot_qploidy_standardization(
       x = data_standardized(),
       sample = input$sample,
       type = input$plots,
       chr = input$sele_chr_standardization,
-      ploidy = input$ploidy_standardization,
+      ploidy = vals,
       add_expected_peaks = as.logical(input$add_expected_peaks),
       add_estimated_peaks = as.logical(input$add_estimated_peaks),
       rm_homozygous = as.logical(input$rm_homozygous),

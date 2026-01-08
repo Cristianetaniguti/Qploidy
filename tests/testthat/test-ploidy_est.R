@@ -14,7 +14,7 @@ test_that("area_estimate_ploidy handles missing data correctly", {
     verbose = FALSE
   )
 
-  result <- area_estimate_ploidy(
+  result1 <- area_estimate_ploidy(
     qploidy_standardization = qploidy_standardization,
     samples = "all",
     level = "chromosome",
@@ -22,8 +22,8 @@ test_that("area_estimate_ploidy handles missing data correctly", {
     area = 0.75
   )
 
-  expect_s3_class(result, "qploidy_area_ploidy_estimation")
-  expect_true(!is.null(result$ploidy))
+  expect_s3_class(result1, "qploidy_area_ploidy_estimation")
+  expect_true(!is.null(result1$ploidy))
 
   result <- area_estimate_ploidy(
     qploidy_standardization = qploidy_standardization,
@@ -76,5 +76,61 @@ test_that("area_estimate_ploidy handles missing data correctly", {
   expect_true(file.exists(paste0(temp2, "_res:chromosome_arm.png")))
   expect_true(file.exists(paste0(temp2, "_res:chromosome.png")))
   expect_true(file.exists(paste0(temp2, "_res:sample.png")))
-  
+
+
+  multi_esti <- hmm_estimate_CN_multi(qploidy_standarize_result = qploidy_standardization,
+                                      sample_ids = "all",
+                                      n_cores = 1 ,
+                                      chr = NULL,
+                                      snps_per_window = 20,
+                                      cn_grid =  c(2,3,4) ,
+                                      M = 100 ,
+                                      bw = 0.03,
+                                      exp_ploidy = 2 ,
+                                      het_lims = c(0,1),
+                                      het_quantile = 0.8,
+                                      baf_weight = 1 ,
+                                      z_range =  0.2 ,
+                                      transition_jump =  0.995  ,
+                                      max_iter = 60,
+                                      z_only = FALSE)
+
+
+  summ_hmm <- summarize_cn_mode(multi_esti, level = "chromosome")
+  merged_table <- merge_cn_summary_with_estimates(summ_hmm, result1, level="chromosome")
+  ploidies <- list(area = result1, hmm = merged_table)
+
+  all_hmm <- TRUE
+  if(all_hmm){
+    tab <- ploidies$hmm
+    num_cols <- which(apply(tab, 2, is.numeric))
+    if(length(num_cols) != 0)
+      tab[, num_cols] <- apply(tab[, num_cols], 2, function(x) round(x, 4))
+    res <- datatable(tab,
+                     selection = "single",
+                     options = list(pageLength = 10, scrollX = TRUE))
+  } else {
+    ploidy <- ploidies$area$ploidy
+    ploidy[which(ploidies$area$diff_first_second < 0.01)] <- NA
+
+    if(ncol(ploidy) > 1){
+      num_cols <- which(apply(ploidy, 2, is.numeric))
+      if(length(num_cols) != 0)
+        ploidy[, num_cols] <- apply(ploidy[, num_cols], 2, function(x) round(x, 4))
+      colnames(ploidy) <- colnames(ploidies$area$ploidy)
+
+    } else {
+      ploidy <- as.data.frame(round(ploidy, 4))
+      rownames(ploidy) <- rownames(ploidies$area$ploidy)
+      colnames(ploidy) <- colnames(ploidies$area$ploidy)
+    }
+
+    res <- datatable(ploidy,
+                     selection = "single",
+                     options = list(pageLength = 10, scrollX = TRUE))
+  }
+
+  expect_equal(mean(tab[,3]), 4)
+  expect_equal(mean(tab[,6]), 0.1818, tolerance = 0.001)
+
 })

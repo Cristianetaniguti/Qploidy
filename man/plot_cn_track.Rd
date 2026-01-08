@@ -63,7 +63,8 @@ toy <- data.frame(
   post_CN2 = c(0.95, 0.05, 0.9),
   post_CN3 = c(0.05, 0.94, 0.1)
 )
-# qploidy_standarize_result should be a qploidy_standardization object with $data containing BAF values
+# qploidy_standarize_result should be a
+# qploidy_standardization object with $data containing BAF values
 plot_cn_track(toy, qploidy_standarize_result, sample_id = "S1")
 }
 

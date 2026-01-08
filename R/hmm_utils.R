@@ -1,6 +1,7 @@
 # Suppress global variable warnings for non-standard evaluation in dplyr/ggplot2
 globalVariables(c(
-  "Sample", "Chr", "Start", "End", "CN_call", "prob_call", "w_baf", "Mid"
+  "Sample", "Chr", "Start", "End", "CN_call", "prob_call", "w_baf", "Mid",
+  "n_vlines", "n_regions", "region_id"
 ))
 
 #' Numerically stable log-sum-exp
@@ -22,35 +23,175 @@ logsumexp <- function(x) {
 
 #' Build a polyploid BAF comb template for a given copy number
 #'
-#' Constructs a discrete BAF density template on [0,1] for a given copy number \code{c}, by placing Gaussian kernels at genotype fractions \eqn{d/c} for \eqn{d=0,...,c}. Reflection kernels keep mass within [0,1]. Binomial weights are used for relative peak heights.
+#' Constructs a discrete BAF density template on [0,1] for a given copy number
+#' \code{c}, by placing kernels at genotype fractions \eqn{d/c} for
+#' \eqn{d=0,...,c}. Binomial weights are used for relative peak heights.
 #'
 #' @param c Integer. Copy number (e.g., 2 for diploid, 4 for tetraploid).
-#' @param M Integer. Number of histogram bins over [0,1]. Default is 101.
-#' @param bw Numeric. Kernel bandwidth (standard deviation) for the Gaussians. Default is 0.03.
-#' @param floor_eps Numeric. Small positive value added to the template before renormalization to ensure strictly positive probabilities. Default is 1e-8.
+#' @param M Integer. Number of bins over [0,1]. Default is 101.
+#' @param bw Numeric. Bandwidth / concentration control (interpretation depends
+#'   on \code{dist}). For \code{gaussian}, it is sd on the BAF scale.
+#'   For \code{beta}, it controls concentration around the mode.
+#'   For \code{beta_binomial} and \code{negative_binomial}, it controls optional
+#'   smoothing applied on the x-grid.
+#' @param floor_eps Numeric. Small positive value added before renormalization.
+#' @param dist Character. One of \code{"gaussian"}, \code{"beta"},
+#'   \code{"beta_binomial"}, \code{"negative_binomial"}.
+#' @param reflect Logical. If TRUE (default), apply reflection for continuous
+#'   kernels to keep mass within [0,1] (useful for gaussian).
 #'
-#' @return Numeric vector of length \code{M} summing to 1. The BAF template for copy number \code{c}.
-#'
-#' @details
-#' Peaks are centered at \eqn{d/c}. Binomial weights \code{dbinom(0:c, c, 0.5)} provide relative mass across clusters. Boundary reflections (\eqn{\mu,-\mu,2-\mu}) prevent leakage outside [0,1].
-#'
-#' @examples
-#' t4 <- baf_template(4, M = 121, bw = 0.03)
-#' sum(t4)            # 1
-#' which.max(t4)      # near BAF = 0.5 for c = 4
+#' @return Numeric vector of length \code{M} summing to 1.
 #'
 #' @export
-baf_template <- function(c, M=101, bw=0.03, floor_eps=1e-8) {
-  x <- seq(0, 1, length.out=M)
-  centers <- 0:c / c
-  wd <- dbinom(0:c, size=c, prob=0.5)
-  # Gaussian kernels with reflection to keep mass in [0,1]
-  kfun <- function(mu) dnorm(x, mu, bw) + dnorm(x, -mu, bw) + dnorm(x, 2 - mu, bw)
-  dens <- Reduce(`+`, Map(function(mu,w) w * kfun(mu), centers, wd))
-  dens <- dens + floor_eps              # strictly positive
-  dens <- dens / sum(dens)              # renormalize
+#' @importFrom stats dnorm dbeta dbinom dnbinom
+baf_template <- function(c, M = 101, bw = 0.03, floor_eps = 1e-8,
+                         dist = c("gaussian","beta","beta_binomial","negative_binomial"),
+                         reflect = TRUE) {
+
+  dist <- match.arg(dist)
+  stopifnot(length(c) == 1, is.finite(c), c >= 1)
+  c <- as.integer(c)
+  stopifnot(length(M) == 1, M >= 2)
+  M <- as.integer(M)
+
+  x <- seq(0, 1, length.out = M)
+
+  # genotype centers exactly at d/c
+  d <- 0:c
+  centers <- d / c
+
+  # relative heights (user can swap later if desired)
+  wd <- dbinom(d, size = c, prob = 0.5)
+  wd <- wd / sum(wd)
+
+  # --- helper: add reflection for continuous kernels
+  add_reflection <- function(v, mu, kernel_fun) {
+    if (!isTRUE(reflect)) return(kernel_fun(mu))
+    kernel_fun(mu) + kernel_fun(-mu) + kernel_fun(2 - mu)
+  }
+
+  # --- continuous kernels
+  if (dist == "gaussian") {
+    stopifnot(is.finite(bw), bw > 0)
+
+    kern <- function(mu) dnorm(x, mean = mu, sd = bw)
+    dens <- Reduce(`+`, Map(function(mu, w) w * add_reflection(x, mu, kern), centers, wd))
+
+  } else if (dist == "beta") {
+    # Build Beta(a,b) with mode at mu for interior, and handle edges.
+    # Use a "concentration" parameter kappa controlling peakedness.
+    # For mu in (0,1): choose a = 1 + mu*kappa, b = 1 + (1-mu)*kappa
+    # => mode = (a-1)/(a+b-2) = mu
+    # At mu=0 or 1, we use one-sided concentrated Beta.
+    kappa <- max(2, round(1 / max(bw, 1e-6)))  # convert bw-ish to concentration
+    kern <- function(mu) {
+      if (mu <= 0) {
+        a <- 1
+        b <- 1 + kappa
+      } else if (mu >= 1) {
+        a <- 1 + kappa
+        b <- 1
+      } else {
+        a <- 1 + mu * kappa
+        b <- 1 + (1 - mu) * kappa
+      }
+      dbeta(x, shape1 = a, shape2 = b)
+    }
+    # Beta is already bounded; reflection usually not needed (and can distort),
+    # so we ignore reflect here.
+    dens <- Reduce(`+`, Map(function(mu, w) w * kern(mu), centers, wd))
+
+  } else if (dist %in% c("beta_binomial","negative_binomial")) {
+
+    # For discrete kernels, we generate a PMF over counts k=0..c and
+    # place it on the x-grid at k/c (nearest x), then (optionally) smooth.
+
+    # Precompute mapping of each count k to nearest x index
+    grid_idx_for_k <- vapply(0:c, function(k) which.min(abs(x - (k / c))), integer(1))
+
+    # Optional smoothing on x-grid (Gaussian smoothing)
+    smooth_on_grid <- function(p) {
+      if (!is.finite(bw) || bw <= 0) return(p)
+      # bw is in BAF units; convert to grid sd
+      sd_bins <- bw / (1 / (M - 1))
+      # simple discrete convolution with truncated Gaussian
+      r <- max(1L, as.integer(ceiling(4 * sd_bins)))
+      offs <- (-r):r
+      g <- dnorm(offs, mean = 0, sd = sd_bins)
+      g <- g / sum(g)
+      p2 <- numeric(length(p))
+      for (i in seq_along(p)) {
+        j <- i + offs
+        ok <- j >= 1 & j <= length(p)
+        p2[i] <- sum(p[j[ok]] * g[ok])
+      }
+      p2
+    }
+
+    make_spike_pmf <- function(p_k) {
+      p <- numeric(M)
+      for (k in 0:c) {
+        p[grid_idx_for_k[k + 1]] <- p[grid_idx_for_k[k + 1]] + p_k[k + 1]
+      }
+      smooth_on_grid(p)
+    }
+
+    if (dist == "beta_binomial") {
+      # Peak for genotype d should land at k=d (i.e., mu=d/c).
+      # We use a symmetric-ish beta-binomial centered at d by setting
+      # alpha:beta proportional to d:(c-d), with concentration 'phi'.
+      phi <- max(2, round(1 / max(bw, 1e-6)))
+
+      one_kernel <- function(d0) {
+        if (d0 == 0) {
+          alpha <- 1
+          beta  <- 1 + phi
+        } else if (d0 == c) {
+          alpha <- 1 + phi
+          beta  <- 1
+        } else {
+          alpha <- 1 + (d0 / c) * phi
+          beta  <- 1 + (1 - d0 / c) * phi
+        }
+        # Beta-binomial pmf: choose p ~ Beta(alpha,beta), then k ~ Binom(c,p)
+        # pmf(k) = choose(c,k) * B(k+alpha, c-k+beta) / B(alpha,beta)
+        # We'll compute via lbeta for stability.
+        k <- 0:c
+        logpmf <- lchoose(c, k) + lbeta(k + alpha, c - k + beta) - lbeta(alpha, beta)
+        p_k <- exp(logpmf - max(logpmf))
+        p_k <- p_k / sum(p_k)
+        make_spike_pmf(p_k)
+      }
+
+      dens <- Reduce(`+`, Map(function(d0, w) w * one_kernel(d0), d, wd))
+
+    } else { # negative_binomial
+      # Use NB on counts with mean = d0 and moderate dispersion, then truncate to 0..c
+      # and renormalize. This yields a discrete peak around k=d0.
+      size <- max(1, c)  # dispersion control; can be parameterized later
+
+      one_kernel <- function(d0) {
+        k <- 0:c
+        if (d0 == 0) {
+          p_k <- numeric(c + 1); p_k[1] <- 1
+          return(make_spike_pmf(p_k))
+        }
+        # NB parameterization: mean = size*(1-p)/p => p = size/(size+mean)
+        p <- size / (size + d0)
+        p_k <- dnbinom(k, size = size, prob = p)
+        p_k <- p_k / sum(p_k)
+        make_spike_pmf(p_k)
+      }
+
+      dens <- Reduce(`+`, Map(function(d0, w) w * one_kernel(d0), d, wd))
+    }
+  }
+
+  dens <- dens + floor_eps
+  dens <- dens / sum(dens)
   dens
 }
+
 
 #' BAF histogram log-likelihood under a template
 #'
@@ -196,6 +337,11 @@ plot_cn_track <- function(hmm_CN,
   post_mat  <- as.matrix(x[, paste0("post_CN", cn_states), drop = FALSE])
   idx       <- match(x$CN_call, cn_states)
   x$prob_call <- post_mat[cbind(seq_len(nrow(x)), idx)]
+  # Ensure prob_call is numeric and not all NA/constant
+  x$prob_call <- as.numeric(x$prob_call)
+  if (!("prob_call" %in% names(x)) || all(is.na(x$prob_call)) || length(unique(x$prob_call)) == 1) {
+    x$prob_call <- rep(1, nrow(x))
+  }
 
   # coordinates
   x$Start <- as.numeric(x$Start)
@@ -221,29 +367,56 @@ plot_cn_track <- function(hmm_CN,
   # Per-chromosome genomic range (based on BAF; you can also combine with Start/End if you prefer)
   chrom_ghost <- data_sample2 %>%
     group_by(Chr) %>%
-    summarise(Position = range(Position, na.rm = TRUE), .groups = "drop")
+    reframe(Position = range(Position, na.rm = TRUE), .groups = "drop")
   # This gives 2 rows per Chr: min and max Position
 
   # -------- top panel: z dots (fill = w_baf) --------
-  p_z <- ggplot(x, aes(Mid, z)) +
-    # force x scale to span full chromosome range
-    geom_blank(
-      data = chrom_ghost,
-      inherit.aes = FALSE,
-      aes(x = Position, y = 0)
-    ) +
-    # connect points within each chromosome
-    geom_line(aes(group = Chr, alpha = w_baf), color = "grey50", linewidth = 0.6) +
-    scale_alpha(range = c(0.2, 0.9), guide = "none") +
-    # points colored by w_baf
-    geom_point(aes(color = w_baf), size = 1.8, alpha = 0.9) +
+  # Join window w_baf to each marker by region
+  marker_df <- data_sample2
+  # Assign region_id to each marker as in BAF panel
+  if(nrow(x) == 1 || all(table(x$Chr) == 1)) {
+    marker_df <- marker_df %>% group_by(Chr) %>% mutate(region_id = 1) %>% ungroup()
+    w_baf_tbl <- x %>% select(Chr, w_baf) %>% mutate(region_id = 1)
+  } else {
+    marker_df <- marker_df %>%
+      group_by(Chr) %>%
+      group_modify(function(df, key) {
+        chr_starts <- vlines %>%
+          filter(Chr == key$Chr[1]) %>%
+          arrange(Start) %>%
+          pull(Start)
+        brks <- c(-Inf, chr_starts, Inf)
+        df$region_id <- cut(df$Position, breaks = brks, labels = FALSE, right = FALSE)
+        df
+      }) %>%
+      ungroup()
+    # Define regions_tbl and w_baf_tbl for multi-window chromosomes
+    regions_tbl <- vlines %>%
+      arrange(Chr, Start) %>%
+      count(Chr, name = "n_vlines") %>%
+      mutate(n_regions = n_vlines + 1L) %>%
+      select(Chr, n_regions) %>%
+      rowwise() %>%
+      mutate(region_id = list(seq_len(n_regions))) %>%
+      unnest(region_id) %>%
+      ungroup()
+    w_baf_tbl <- regions_tbl %>%
+      group_by(Chr) %>%
+      mutate(w_baf = x$w_baf[region_id]) %>%
+      ungroup()
+  }
+  marker_df <- marker_df %>% left_join(w_baf_tbl, by = c("Chr", "region_id"))
+
+  p_z <- ggplot(marker_df, aes(x = Position, y = z, color = w_baf)) +
+    geom_point(size = 1.2, alpha = 0.8) +
+    geom_smooth(aes(group = Chr), method = "loess", se = FALSE, color = "black", linewidth = 0.7, span = 0.2) +
     { if (show_window_lines)
       geom_vline(data = vlines, aes(xintercept = Start),
                  color = line_color, alpha = line_alpha,
                  linewidth = line_width, linetype = line_linetype)
       else NULL } +
     facet_wrap(~ Chr, scales = "free_x", nrow = 1) +
-    scale_color_distiller(palette = "RdBu", direction = -1, limits = c(0, 1), name = "BAF weight")+
+    scale_color_distiller(palette = "RdBu", direction = -1, limits = c(0, 1), name = "BAF weight") +
     labs(x = NULL, y = "z", title = sample_id) +
     theme_bw(base_size = 12) +
     theme(
@@ -256,11 +429,15 @@ plot_cn_track <- function(hmm_CN,
     )
 
   # -------- bottom panel: CN segments (color = P(CN call)) --------
+  # Ensure prob_call is numeric and present
+  if (!("prob_call" %in% names(x))) stop("prob_call column missing in CN plot data.")
+  x$prob_call <- as.numeric(x$prob_call)
+
   p_cn <- ggplot(x) +
     geom_blank(
       data = chrom_ghost,
       inherit.aes = FALSE,
-      aes(x = Position, y = 0)
+      aes(x = Position, y = min(x$CN_call))
     ) +
     geom_segment(aes(x = Start, xend = End, y = CN_call, yend = CN_call, color = prob_call),
                  linewidth = 2, lineend = "butt") +
@@ -270,7 +447,7 @@ plot_cn_track <- function(hmm_CN,
                  linewidth = line_width, linetype = line_linetype) else NULL } +
     facet_wrap(~ Chr, scales = "free_x", nrow = 1) +
     scale_y_continuous(breaks = seq(cn_min, cn_max, by = 1), minor_breaks = NULL) +
-    scale_color_viridis_c(name = "P(CN call)", limits = c(0, 1)) +
+    scale_color_viridis_c(name = "P(CN call)", limits = c(0, 1), option = "D") +
     labs(x = "Genomic position (bp)", y = "Copy number") +
     theme_bw(base_size = 12) +
     theme(
@@ -283,40 +460,42 @@ plot_cn_track <- function(hmm_CN,
 
   # -------- BAF -----
 
-  data_tagged <- data_sample2 %>%
-    group_by(Chr) %>%
-    group_modify(function(df, key) {
-      chr_starts <- vlines %>%
-        filter(Chr == key$Chr[1]) %>%
-        arrange(Start) %>%
-        pull(Start)
-      # regions: [-Inf, s1), [s1, s2), ..., [sN, +Inf)
-      brks <- c(-Inf, chr_starts, Inf)
-      df$region_id <- cut(df$Position, breaks = brks, labels = FALSE, right = FALSE)
-      df
-    }) %>%
-    ungroup()
+  # Defensive: if only one window per chromosome, region_id should be 1 for all per chromosome
+  if(nrow(x) == 1 || all(table(x$Chr) == 1)) {
+    # Assign region_id = 1 for all points per chromosome
+    data_tagged <- data_sample2 %>% group_by(Chr) %>% mutate(region_id = 1) %>% ungroup()
+    # Build w_baf_tbl for each chromosome
+    w_baf_tbl <- x %>% select(Chr, w_baf) %>% mutate(region_id = 1)
+  } else {
+    data_tagged <- data_sample2 %>%
+      group_by(Chr) %>%
+      group_modify(function(df, key) {
+        chr_starts <- vlines %>%
+          filter(Chr == key$Chr[1]) %>%
+          arrange(Start) %>%
+          pull(Start)
+        brks <- c(-Inf, chr_starts, Inf)
+        df$region_id <- cut(df$Position, breaks = brks, labels = FALSE, right = FALSE)
+        df
+      }) %>%
+      ungroup()
 
-  ## 2) Build a region-to-w_baf table
-  regions_tbl <- vlines %>%
-    arrange(Chr, Start) %>%
-    count(Chr, name = "n_vlines") %>%
-    mutate(n_regions = n_vlines + 1L) %>%
-    select(Chr, n_regions) %>%
-    rowwise() %>%
-    mutate(region_id = list(seq_len(n_regions))) %>%
-    unnest(region_id) %>%
-    ungroup()
+    regions_tbl <- vlines %>%
+      arrange(Chr, Start) %>%
+      count(Chr, name = "n_vlines") %>%
+      mutate(n_regions = n_vlines + 1L) %>%
+      select(Chr, n_regions) %>%
+      rowwise() %>%
+      mutate(region_id = list(seq_len(n_regions))) %>%
+      unnest(region_id) %>%
+      ungroup()
 
-  # If your x$w_baf is for a single chromosome (like chr1) and matches the
-  # region order, attach it like this:
-  # (If you have per-Chr w_baf values already in a data.frame, join that instead.)
-  w_baf_tbl <- regions_tbl %>%
-    group_by(Chr) %>%
-    mutate(w_baf = x$w_baf[region_id]) %>%  # ensure the vector aligns: length == n_regions
-    ungroup()
+    w_baf_tbl <- regions_tbl %>%
+      group_by(Chr) %>%
+      mutate(w_baf = x$w_baf[region_id]) %>%
+      ungroup()
+  }
 
-  ## 3) Join w_baf onto points and plot
   plot_df <- data_tagged %>%
     left_join(w_baf_tbl, by = c("Chr", "region_id"))
 

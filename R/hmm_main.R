@@ -10,7 +10,9 @@
 #' @param qploidy_standarize_result An object of class \code{qploidy_standardization} as returned by \code{standardize()}. Contains standardized SNP-level data for all samples and chromosomes.
 #' @param sample_id Character scalar. Sample identifier to analyze; rows are filtered as \code{SampleName == sample_id}.
 #' @param chr Optional. Character or integer vector specifying chromosomes to include. If \code{NULL}, all chromosomes are used.
+#' @param segment_zscore Logical. If \code{TRUE}, segment z-scores using changepoint detection to define windows instead of fixed SNP counts. Default \code{TRUE}.
 #' @param snps_per_window Integer. Number of SNPs per window when windows are created. Default \code{500}.
+#' @param dist Character. Distribution type for BAF template peaks: "gaussian" (default), "beta", "beta-binomial", or "negative binomial".
 #' @param min_snps_per_window Integer. Minimum SNPs required to keep a window (windows with fewer SNPs are dropped). Default \code{100}.
 #' @param cn_grid Integer vector of copy-number states to consider (e.g., \code{2:8}).
 #' @param M Integer. Number of BAF histogram bins on [0,1]. Default \code{121}.
@@ -88,6 +90,8 @@ hmm_estimate_CN <- function(
     qploidy_standarize_result,
     sample_id,
     chr = NULL,
+    dist= "gaussian",
+    segment_zscore = TRUE,
     snps_per_window = 500,
     min_snps_per_window = 20,
     cn_grid = 2:8,
@@ -138,34 +142,38 @@ hmm_estimate_CN <- function(
   rm <- which(is.na(d[["baf"]]) & is.na(d[["z"]]))
   if(length(rm) > 0) d <- d[-rm, , drop = FALSE]
 
-
   # --- build windows ---
   d <- d[order(d[["Chr"]], d[["Position"]]), ]
 
-  # equal-SNP windows within chromosome
-  d$.__w__ <- with(
-    d,
-    ave(
-      seq_len(nrow(d)),
-      d[["Chr"]],
-      FUN = function(k) {
-        n <- length(k)
 
-        # initial windowing (same idea as before)
-        w <- ceiling(seq_along(k) / snps_per_window)
+  # Segmented z-score
+  if (segment_zscore){
+    d <- add_changepoint_windows(d, minseglen = min_snps_per_window, penalty = "MBIC", verbose = TRUE)
 
-        # if there is a remainder AND we have more than one full window,
-        # merge the last (small) window into the previous one
-        if (n > snps_per_window && n %% snps_per_window != 0L) {
-          last <- max(w)
-          w[w == last] <- last - 1L
+  } else {
+    # equal-SNP windows within chromosome
+    d$.__w__ <- with(
+      d,
+      ave(
+        seq_len(nrow(d)),
+        d[["Chr"]],
+        FUN = function(k) {
+          n <- length(k)
+
+          # initial windowing (same idea as before)
+          w <- ceiling(seq_along(k) / snps_per_window)
+
+          # if there is a remainder AND we have more than one full window,
+          # merge the last (small) window into the previous one
+          if (n > snps_per_window && n %% snps_per_window != 0L) {
+            last <- max(w)
+            w[w == last] <- last - 1L
+          }
+          w
         }
-
-        w
-      }
+      )
     )
-  )
-
+  }
   win_col <- ".__w__"
 
   # summarize per window
@@ -220,7 +228,7 @@ hmm_estimate_CN <- function(
   z <- win_df$z_mean
   if (length(z) == 0 || all(is.na(z))) stop("No valid z values found in any window.")
 
-  # BAF histograms
+  # --- BAF histograms and likelihoods ---
   breaks <- seq(0, 1, length.out = M + 1)
   hist_counts <- matrix(0L, nrow = W, ncol = M)
   for (i in seq_len(W)) {
@@ -231,15 +239,17 @@ hmm_estimate_CN <- function(
     hist_counts[i, ] <- hist(baf_list[[i]], breaks = breaks, plot = FALSE)$counts
   }
 
-  if(verbose) cat("Building BAF distributions templates.\n")
-  # Templates for BAF emissions
-  # This creates a list of BAF templates, one per CN state in cn_grid according
-  # to a multi normal distribution with means on each ploidy peak and sd = bw
-  # The values are spread over M bins
-  templates <- lapply(cn_grid, function(c) baf_template(c, M=M, bw=bw))
-  names(templates) <- as.character(cn_grid)
-  # normalize and floor templates to avoid log(0)
-  templates <- lapply(templates, function(t) { t <- pmax(t, 1e-8); t / sum(t) })
+  # Generate BAF likelihoods and probabilities
+  baf_out <- multi_distribution_BAF(baf_list, cn_grid, M = M, bw = bw, plot = FALSE, dist=dist)
+  ll_baf_matrix <- baf_out$ll_matrix
+  prob_baf_matrix <- baf_out$prob_matrix
+
+  # Identify chromosomes with only one window
+  chr_window_counts <- table(win_df$Chr)
+  single_window_chr <- names(chr_window_counts)[chr_window_counts == 1]
+  single_window_idx <- which(win_df$Chr %in% single_window_chr)
+  multi_window_idx <- setdiff(seq_len(W), single_window_idx)
+  # If no single-window chromosomes, single_window_idx will be integer(0)
 
   if(verbose) cat("Counting heterozygous.\n")
   # BAF weights from heterozygote counts
@@ -317,19 +327,66 @@ hmm_estimate_CN <- function(
   if(verbose) cat("Starting EM.\n")
 
   ll_hist <- numeric(max_iter)
+  # If all windows are single-window chromosomes, skip HMM and assign CN by BAF likelihood only
+  if(length(single_window_idx) == W && W > 0) {
+    # For the single window, assign CN as the state with max BAF likelihood
+    cn_call <- cn_grid[apply(ll_baf_matrix, 1, which.max)]
+    post_max <- apply(prob_baf_matrix, 1, max)
+    post_df <- as.data.frame(prob_baf_matrix)
+    names(post_df) <- paste0("post_CN", cn_grid)
+    result <- cbind(
+      data.frame(
+        Sample    = sample_id,
+        Chr       = win_df$Chr,
+        WindowID  = win_df$WindowID,
+        Start     = win_df$Start,
+        End       = win_df$End,
+        n_snps    = win_df$n_snps,
+        n_het     = win_df$n_het,
+        z         = z,
+        w_baf     = w_baf,
+        CN_call   = cn_call,
+        post_max  = post_max,
+        stringsAsFactors = FALSE
+      ),
+      post_df
+    )
+    params <- list(
+      cn_grid = cn_grid,
+      mu = NA,
+      sigma = NA,
+      A = NA,
+      pi0 = NA,
+      bins = M,
+      bw = bw,
+      loglik = NA
+    )
+    if(verbose) cat("All chromosomes single-window: CN assigned by BAF likelihood only.\n")
+    return(structure(list(result =result, params = params), class = "hmm_CN"))
+  }
+
+  # Otherwise, run EM/HMM as usual, but skip EM for single-window chromosomes
+  if(verbose) cat("Starting EM.\n")
+  ll_hist <- numeric(max_iter)
   for (iter in 1:max_iter) {
     # emissions
     ll_em <- matrix(NA_real_, nrow=W, ncol=K, dimnames=list(NULL, state_ids))
     for (k in seq_len(K)) {
       c <- cn_grid[k]
-      llz <- dnorm(z, mean=mu[as.character(c)], sd=sig, log=TRUE) # Values from a normal distribution for z considering ploidy/state mean
-      if(any(is.nan(llz))) llz[which(is.nan(llz))] <- 0 # if any window don't have z score values, only BAF is considered
+      llz <- dnorm(z, mean=mu[as.character(c)], sd=sig, log=TRUE)
+      if(any(is.nan(llz))) llz[which(is.nan(llz))] <- 0
       if (z_only) {
         ll_em[,k] <- llz
       } else {
-        templ <- templates[[as.character(c)]]
-        llb <- apply(hist_counts, 1, baf_ll, templ=templ)
-        ll_em[,k] <- llz + w_baf * llb # here is how the emission likelihood is being calculated
+        llb <- ll_baf_matrix[,k]
+        # For single-window chromosomes, use only BAF likelihood
+        if(length(single_window_idx) > 0) {
+          ll_em[single_window_idx, k] <- llb[single_window_idx]
+        }
+        # For multi-window chromosomes, use combined likelihood
+        if(length(multi_window_idx) > 0) {
+          ll_em[multi_window_idx, k] <- llz[multi_window_idx] + w_baf[multi_window_idx] * llb[multi_window_idx]
+        }
       }
     }
     if (!all(is.finite(ll_em))) {

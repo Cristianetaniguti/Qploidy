@@ -8,6 +8,7 @@ hmm_estimate_CN(
   qploidy_standarize_result,
   sample_id,
   chr = NULL,
+  segment_zscore = TRUE,
   snps_per_window = 500,
   min_snps_per_window = 20,
   cn_grid = 2:8,
@@ -30,6 +31,8 @@ hmm_estimate_CN(
 \item{sample_id}{Character scalar. Sample identifier to analyze; rows are filtered as \code{SampleName == sample_id}.}
 
 \item{chr}{Optional. Character or integer vector specifying chromosomes to include. If \code{NULL}, all chromosomes are used.}
+
+\item{segment_zscore}{Logical. If \code{TRUE}, segment z-scores using changepoint detection to define windows instead of fixed SNP counts. Default \code{TRUE}.}
 
 \item{snps_per_window}{Integer. Number of SNPs per window when windows are created. Default \code{500}.}
 

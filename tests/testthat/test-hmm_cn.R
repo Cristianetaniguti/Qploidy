@@ -32,7 +32,7 @@ test_that("hmm_estimate_CN, plot_cn_track, and other HMM functions work as expec
   res <- hmm_estimate_CN(
     qploidy_standarize_result = simu_data_standardized,
     sample_id = sample,
-    chr = 1,
+    chr = 1, segment_zscore = TRUE,
     snps_per_window = 10,
     min_snps_per_window = 5,
     cn_grid = c(2, 3, 4),
@@ -47,9 +47,14 @@ test_that("hmm_estimate_CN, plot_cn_track, and other HMM functions work as expec
   expect_true(is.data.frame(res$result))
   expect_true(nrow(res$result) > 0)
   expect_true(all(c("Sample", "Chr", "WindowID", "CN_call") %in% names(res$result)))
+  expect_equal(round(sum(res$result$post_CN2),2), 0)
+  expect_equal(round(sum(res$result$post_CN4),2), 5)
 
   # plot_cn_track test (should return a gg object)
-  p <- plot_cn_track(hmm_CN = res, qploidy_standarize_result = simu_data_standardized, sample_id = sample, show_window_lines = TRUE)
+  p <- plot_cn_track(hmm_CN = res,
+                     qploidy_standarize_result = simu_data_standardized,
+                     sample_id = sample,
+                     show_window_lines = TRUE)
   expect_true("gg" %in% class(p) || "ggarrange" %in% class(p))
 
   # Test hmm_estimate_CN_multi

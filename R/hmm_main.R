@@ -12,7 +12,13 @@
 #' @param chr Optional. Character or integer vector specifying chromosomes to include. If \code{NULL}, all chromosomes are used.
 #' @param segment_zscore Logical. If \code{TRUE}, segment z-scores using changepoint detection to define windows instead of fixed SNP counts. Default \code{TRUE}.
 #' @param snps_per_window Integer. Number of SNPs per window when windows are created. Default \code{500}.
-#' @param dist Character. Distribution type for BAF template peaks: "gaussian" (default), "beta", "beta-binomial", or "negative binomial".
+#' @param dist Character. Distribution type for BAF template peaks: "gaussian" (default), "beta", "beta_binomial", or "negative_binomial".
+#' @param reflect Logical. If TRUE (default), apply reflection for continuous
+#'   kernels to keep mass within [0,1] (useful for gaussian).
+#' @param add_uniform Logical. If TRUE, add a uniform noise component to the
+#'   mixture before renormalization. Default FALSE.
+#' @param uniform_weight Numeric in [0,1]. Mixture weight of the uniform
+#'   component when \code{add_uniform = TRUE}. Default 0.05.
 #' @param min_snps_per_window Integer. Minimum SNPs required to keep a window (windows with fewer SNPs are dropped). Default \code{100}.
 #' @param cn_grid Integer vector of copy-number states to consider (e.g., \code{2:8}).
 #' @param M Integer. Number of BAF histogram bins on [0,1]. Default \code{121}.
@@ -91,6 +97,9 @@ hmm_estimate_CN <- function(
     sample_id,
     chr = NULL,
     dist= "gaussian",
+    reflect = TRUE,
+    add_uniform = FALSE,
+    uniform_weight = 0.05,
     segment_zscore = TRUE,
     snps_per_window = 500,
     min_snps_per_window = 20,
@@ -239,10 +248,15 @@ hmm_estimate_CN <- function(
     hist_counts[i, ] <- hist(baf_list[[i]], breaks = breaks, plot = FALSE)$counts
   }
 
-  # Generate BAF likelihoods and probabilities
-  baf_out <- multi_distribution_BAF(baf_list, cn_grid, M = M, bw = bw, plot = FALSE, dist=dist)
-  ll_baf_matrix <- baf_out$ll_matrix
-  prob_baf_matrix <- baf_out$prob_matrix
+  # Generate BAF likelihoods and probabilities per window
+  baf_results <- lapply(baf_list, function(baf_vec) multi_distribution_BAF(baf_vec, cn_grid, 
+                                                                           M = M, bw = bw, plot = FALSE, 
+                                                                           dist = dist, reflect = reflect,
+                                                                           add_uniform = add_uniform,
+                                                                           uniform_weight = uniform_weight))
+
+  ll_baf_matrix <- do.call(rbind, lapply(baf_results, function(res) res$ll_vec))
+  prob_baf_matrix <- do.call(rbind, lapply(baf_results, function(res) res$prob_vec))
 
   # Identify chromosomes with only one window
   chr_window_counts <- table(win_df$Chr)

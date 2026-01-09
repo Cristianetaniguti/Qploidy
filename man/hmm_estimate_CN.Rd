@@ -8,6 +8,10 @@ hmm_estimate_CN(
   qploidy_standarize_result,
   sample_id,
   chr = NULL,
+  dist = "gaussian",
+  reflect = TRUE,
+  add_uniform = FALSE,
+  uniform_weight = 0.05,
   segment_zscore = TRUE,
   snps_per_window = 500,
   min_snps_per_window = 20,
@@ -31,6 +35,17 @@ hmm_estimate_CN(
 \item{sample_id}{Character scalar. Sample identifier to analyze; rows are filtered as \code{SampleName == sample_id}.}
 
 \item{chr}{Optional. Character or integer vector specifying chromosomes to include. If \code{NULL}, all chromosomes are used.}
+
+\item{dist}{Character. Distribution type for BAF template peaks: "gaussian" (default), "beta", "beta_binomial", or "negative_binomial".}
+
+\item{reflect}{Logical. If TRUE (default), apply reflection for continuous
+kernels to keep mass within [0,1] (useful for gaussian).}
+
+\item{add_uniform}{Logical. If TRUE, add a uniform noise component to the
+mixture before renormalization. Default FALSE.}
+
+\item{uniform_weight}{Numeric in [0,1]. Mixture weight of the uniform
+component when \code{add_uniform = TRUE}. Default 0.05.}
 
 \item{segment_zscore}{Logical. If \code{TRUE}, segment z-scores using changepoint detection to define windows instead of fixed SNP counts. Default \code{TRUE}.}
 

@@ -249,7 +249,7 @@ hmm_estimate_CN <- function(
   }
 
   # Generate BAF likelihoods and probabilities per window
-  baf_results <- lapply(baf_list, function(baf_vec) multi_distribution_BAF(baf_vec, cn_grid, 
+  baf_results <- lapply(baf_list, function(baf_vec) compute_baf_likelihoods(baf_vec, cn_grid, 
                                                                            M = M, bw = bw, plot = FALSE, 
                                                                            dist = dist, reflect = reflect,
                                                                            add_uniform = add_uniform,

@@ -4,52 +4,27 @@
 \alias{add_changepoint_windows}
 \title{Segment ordered genomic z-scores into changepoint-based windows}
 \usage{
-add_changepoint_windows(
-  dat,
-  z_col = "z",
-  chr_col = "Chr",
-  pos_col = "Position",
-  method = c("PELT", "BinSeg"),
-  penalty = c("MBIC", "BIC", "AIC", "Manual"),
-  pen_value = NULL,
-  minseglen = 5,
-  window_col = ".__w__",
-  verbose = TRUE
-)
+add_changepoint_windows(dat, minseglen = 5, verbose = TRUE, plot = FALSE)
 }
 \arguments{
 \item{dat}{A `data.frame` containing marker-level data ordered or unordered.
 Must include z-scores, chromosome labels, and genomic positions.}
 
-\item{z_col}{Character string giving the column name of the numeric z-score
-vector to segment.}
-
-\item{chr_col}{Character string giving the column name identifying chromosomes.}
-
-\item{pos_col}{Character string giving the column name of genomic positions
-(used only for ordering markers).}
-
-\item{method}{Character string specifying the changepoint search method.
-One of `"PELT"` (default) or `"BinSeg"`. Passed to
-\code{\link[changepoint]{cpt.mean}}.}
-
-\item{penalty}{Character string specifying the penalty for adding changepoints.
-One of `"MBIC"` (default), `"BIC"`, `"AIC"`, or `"Manual"`.}
-
-\item{pen_value}{Numeric penalty value used only when `penalty = "Manual"`.}
-
 \item{minseglen}{Integer giving the minimum number of markers allowed per
 segment. Larger values produce fewer, broader segments.}
 
-\item{window_col}{Character string giving the name of the output column
-containing window (segment) indices.}
-
 \item{verbose}{Logical indicating whether to print progress messages.}
+
+\item{plot}{Logical. If TRUE, returns a list with the segmented data and a ggplot object visualizing z-scores, window means, and changepoint boundaries per chromosome. If FALSE (default), returns only the segmented data.}
 }
 \value{
-A `data.frame` identical to `dat` but with an additional integer column
-specified by `window_col` indicating changepoint window membership for
-each marker.
+If `plot = FALSE`, a `data.frame` identical to `dat` but with an additional
+integer column specified by `window_col` indicating changepoint window
+membership for each marker. If `plot = TRUE`, a list with two elements:
+  \describe{
+    \item{windows}{The segmented data.frame as above.}
+    \item{plot}{A ggplot object visualizing z-scores, window means, and changepoint boundaries per chromosome.}
+  }
 }
 \description{
 This function applies 1D changepoint detection on an ordered vector of
@@ -75,6 +50,15 @@ same window index belong to the same changepoint-defined genomic segment.
 This function is commonly used for detecting regional shifts in signal
 intensity such as copy number variation proxies, allele balance deviations,
 or other genome-wide z-score profiles.
+
+
+
+If `plot = TRUE`, the plot shows:
+  - z-score points for each marker (per chromosome)
+  - horizontal lines for the mean z-score in each window
+  - dashed vertical lines at changepoint boundaries
+  - one facet per chromosome
+The plot is suitable for visual inspection of segmentation quality and changepoint locations.
 }
 \examples{
 \dontrun{

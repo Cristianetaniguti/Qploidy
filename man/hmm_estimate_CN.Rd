@@ -17,14 +17,12 @@ hmm_estimate_CN(
   min_snps_per_window = 20,
   cn_grid = 2:8,
   M = 100,
-  bw = 0.03,
   max_iter = 60,
   het_lims = c(0, 1),
   het_quantile = 0.8,
   baf_weight = 1,
   z_range = 0.2,
   transition_jump = 0.995,
-  exp_ploidy = NULL,
   z_only = FALSE,
   verbose = TRUE
 )
@@ -57,8 +55,6 @@ component when \code{add_uniform = TRUE}. Default 0.05.}
 
 \item{M}{Integer. Number of BAF histogram bins on [0,1]. Default \code{121}.}
 
-\item{bw}{Numeric. Bandwidth (SD) of the Gaussian kernels used to generate the BAF comb templates. Default \code{0.03}.}
-
 \item{max_iter}{Integer. Maximum EM iterations. Default \code{60}.}
 
 \item{het_lims}{Numeric vector of length 2. BAF limits to consider a SNP heterozygous. Default \code{c(0,1)}.}
@@ -71,11 +67,11 @@ component when \code{add_uniform = TRUE}. Default 0.05.}
 
 \item{transition_jump}{Numeric. Diagonal value for transition matrix (probability to stay in same CN state). Default \code{0.995}.}
 
-\item{exp_ploidy}{Integer. Expected ploidy for initialization. If \code{NULL}, median of \code{cn_grid} is used.}
-
 \item{z_only}{Logical. If \code{TRUE}, fit the HMM using the z-emission only (ignores BAF). Default \code{FALSE}.}
 
 \item{verbose}{Logical. If \code{TRUE}, print progress messages. Default \code{TRUE}.}
+
+\item{exp_ploidy}{Integer. Expected ploidy for initialization. If \code{NULL}, median of \code{cn_grid} is used.}
 }
 \value{
 An object of class \code{hmm_CN}, a list with two elements:

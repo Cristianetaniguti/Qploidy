@@ -42,6 +42,8 @@
 #' @import tidyr
 #' @importFrom magrittr %>%
 #' @importFrom ggpubr ggarrange
+#' @importFrom scales squish
+#' @importFrom purrr map
 #'
 #' @export
 plot_cn_track <- function(hmm_CN,
@@ -60,6 +62,10 @@ plot_cn_track <- function(hmm_CN,
   stopifnot(inherits(hmm_CN, "hmm_CN"))
   stopifnot(inherits(qploidy_standarize_result, "qploidy_standardization"))
 
+  # packages used
+  # (keep as imports in your pkg / DESCRIPTION; here assumed available)
+  # dplyr, tidyr, purrr, ggplot2, ggpubr, scales
+
   df <- hmm_CN$result
 
   # defaults BEFORE filtering
@@ -75,7 +81,6 @@ plot_cn_track <- function(hmm_CN,
   post_mat  <- as.matrix(x[, paste0("post_CN", cn_states), drop = FALSE])
   idx       <- match(x$CN_call, cn_states)
   x$prob_call <- post_mat[cbind(seq_len(nrow(x)), idx)]
-  # Ensure prob_call is numeric and not all NA/constant
   x$prob_call <- as.numeric(x$prob_call)
   if (!("prob_call" %in% names(x)) || all(is.na(x$prob_call)) || length(unique(x$prob_call)) == 1) {
     x$prob_call <- rep(1, nrow(x))
@@ -86,75 +91,94 @@ plot_cn_track <- function(hmm_CN,
   x$End   <- as.numeric(x$End)
   x$Mid   <- (x$Start + x$End)/2
 
-  # dashed verticals (one per unique Start, per Chr)
-  vlines <- NULL
-  if (show_window_lines) {
-    vlines <- x |>
-      distinct(Chr, Start) |>
-      arrange(Chr, Start)
-    if (!include_first_in_chr) {
-      vlines <- vlines |>
-        group_by(Chr) |>
-        filter(Start != min(Start)) |>
-        ungroup()
-    }
-  }
+  # Pull marker-level data for the sample
+  data_sample2 <- qploidy_standarize_result$data %>%
+    filter(SampleName == sample_id & Chr %in% unique(x$Chr))
 
-  data_sample2 <- qploidy_standarize_result$data %>% filter(SampleName == sample_id & Chr %in% unique(x$Chr))
-
-  # Per-chromosome genomic range (based on BAF; you can also combine with Start/End if you prefer)
+  # Per-chromosome genomic range (based on BAF markers)
   chrom_ghost <- data_sample2 %>%
     group_by(Chr) %>%
     reframe(Position = range(Position, na.rm = TRUE), .groups = "drop")
-  # This gives 2 rows per Chr: min and max Position
 
-  # -------- top panel: z dots (fill = w_baf) --------
-  # Join window w_baf to each marker by region
-  marker_df <- data_sample2
-  # Assign region_id to each marker as in BAF panel
-  if(nrow(x) == 1 || all(table(x$Chr) == 1)) {
-    marker_df <- marker_df %>% group_by(Chr) %>% mutate(region_id = 1) %>% ungroup()
-    w_baf_tbl <- x %>% select(Chr, w_baf) %>% mutate(region_id = 1)
-  } else {
-    marker_df <- marker_df %>%
+  # One row per CN window per chromosome, ordered, with region_id
+  win_tbl <- x %>%
+    distinct(Chr, Start, End, w_baf) %>%
+    arrange(Chr, Start) %>%
+    group_by(Chr) %>%
+    mutate(region_id = row_number()) %>%
+    ungroup()
+
+  # Breakpoints (window starts) per chromosome
+  # Used to assign markers to region_id regardless of show_window_lines
+  break_tbl <- win_tbl %>%
+    group_by(Chr) %>%
+    summarise(starts_all = list(sort(unique(Start))), .groups = "drop") %>%
+    mutate(
+      starts = map(starts_all, ~{
+        s <- .x
+        if (!include_first_in_chr) s <- s[s != min(s)]
+        s
+      })
+    ) %>%
+    select(Chr, starts)
+
+  # vlines for plotting (only used when show_window_lines=TRUE)
+  vlines <- win_tbl %>%
+    distinct(Chr, Start) %>%
+    arrange(Chr, Start)
+
+  if (!include_first_in_chr) {
+    vlines <- vlines %>%
       group_by(Chr) %>%
-      group_modify(function(df, key) {
-        chr_starts <- vlines %>%
-          filter(Chr == key$Chr[1]) %>%
-          arrange(Start) %>%
-          pull(Start)
-        brks <- c(-Inf, chr_starts, Inf)
-        df$region_id <- cut(df$Position, breaks = brks, labels = FALSE, right = FALSE)
-        df
-      }) %>%
-      ungroup()
-    # Define regions_tbl and w_baf_tbl for multi-window chromosomes
-    regions_tbl <- vlines %>%
-      arrange(Chr, Start) %>%
-      count(Chr, name = "n_vlines") %>%
-      mutate(n_regions = n_vlines + 1L) %>%
-      select(Chr, n_regions) %>%
-      rowwise() %>%
-      mutate(region_id = list(seq_len(n_regions))) %>%
-      unnest(region_id) %>%
-      ungroup()
-    w_baf_tbl <- regions_tbl %>%
-      group_by(Chr) %>%
-      mutate(w_baf = x$w_baf[region_id]) %>%
+      filter(Start != min(Start)) %>%
       ungroup()
   }
-  marker_df <- marker_df %>% left_join(w_baf_tbl, by = c("Chr", "region_id"))
 
+  # Helper: tag markers with region_id based on breakpoints
+  tag_markers_with_region <- function(marker_df, break_tbl) {
+    marker_df %>%
+      left_join(break_tbl, by = "Chr") %>%
+      group_by(Chr) %>%
+      mutate(
+        region_id = {
+          s <- starts[[1]]
+          # if NA / missing starts, treat as one region
+          if (length(s) == 0 || all(is.na(s))) {
+            rep(1L, n())
+          } else {
+            brks <- c(-Inf, s, Inf)
+            cut(Position, breaks = brks, labels = FALSE, right = FALSE)
+          }
+        }
+      ) %>%
+      ungroup() %>%
+      select(-starts)
+  }
+
+  # Tag markers and join correct w_baf
+  marker_df <- data_sample2 %>%
+    tag_markers_with_region(break_tbl) %>%
+    left_join(win_tbl %>% select(Chr, region_id, w_baf),
+                     by = c("Chr", "region_id"))
+
+  # OPTIONAL: if any w_baf are slightly out of [0,1], squish for color scaling
+  # marker_df$w_baf <- squish(marker_df$w_baf, range = c(0, 1))
+
+  # -------- top panel: z dots (color = w_baf) --------
   p_z <- ggplot(marker_df, aes(x = Position, y = z, color = w_baf)) +
     geom_point(size = 1.2, alpha = 0.8) +
-    geom_smooth(aes(group = Chr), method = "loess", se = FALSE, color = "black", linewidth = 0.7, span = 0.2) +
+    geom_smooth(aes(group = Chr), method = "loess", se = FALSE,
+                         color = "black", linewidth = 0.7, span = 0.2) +
     { if (show_window_lines)
       geom_vline(data = vlines, aes(xintercept = Start),
-                 color = line_color, alpha = line_alpha,
-                 linewidth = line_width, linetype = line_linetype)
+                          color = line_color, alpha = line_alpha,
+                          linewidth = line_width, linetype = line_linetype)
       else NULL } +
     facet_wrap(~ Chr, scales = "free_x", nrow = 1) +
-    scale_color_distiller(palette = "RdBu", direction = -1, limits = c(0, 1), name = "BAF weight") +
+    scale_color_distiller(palette = "RdBu", direction = -1,
+                                   limits = c(0, 1),
+                                   oob = squish,
+                                   name = "BAF weight") +
     labs(x = NULL, y = "z", title = sample_id) +
     theme_bw(base_size = 12) +
     theme(
@@ -163,11 +187,10 @@ plot_cn_track <- function(hmm_CN,
       strip.background   = element_rect(fill = "grey95"),
       legend.position    = "none",
       axis.title.x       = element_blank(),
-      axis.text.x = element_text(angle = 30, vjust = 1, hjust = 1)
+      axis.text.x        = element_text(angle = 30, vjust = 1, hjust = 1)
     )
 
   # -------- bottom panel: CN segments (color = P(CN call)) --------
-  # Ensure prob_call is numeric and present
   if (!("prob_call" %in% names(x))) stop("prob_call column missing in CN plot data.")
   x$prob_call <- as.numeric(x$prob_call)
 
@@ -178,11 +201,12 @@ plot_cn_track <- function(hmm_CN,
       aes(x = Position, y = min(x$CN_call))
     ) +
     geom_segment(aes(x = Start, xend = End, y = CN_call, yend = CN_call, color = prob_call),
-                 linewidth = 2, lineend = "butt") +
+                          linewidth = 2, lineend = "butt") +
     { if (show_window_lines)
       geom_vline(data = vlines, aes(xintercept = Start),
-                 color = line_color, alpha = line_alpha,
-                 linewidth = line_width, linetype = line_linetype) else NULL } +
+                          color = line_color, alpha = line_alpha,
+                          linewidth = line_width, linetype = line_linetype)
+      else NULL } +
     facet_wrap(~ Chr, scales = "free_x", nrow = 1) +
     scale_y_continuous(breaks = seq(cn_min, cn_max, by = 1), minor_breaks = NULL) +
     scale_color_viridis_c(name = "P(CN call)", limits = c(0, 1), option = "D") +
@@ -193,49 +217,14 @@ plot_cn_track <- function(hmm_CN,
       panel.grid.minor   = element_blank(),
       strip.background   = element_rect(fill = "grey95"),
       legend.position    = "bottom",
-      axis.text.x = element_text(angle = 30, vjust = 1, hjust = 1)
+      axis.text.x        = element_text(angle = 30, vjust = 1, hjust = 1)
     )
 
-  # -------- BAF -----
-
-  # Defensive: if only one window per chromosome, region_id should be 1 for all per chromosome
-  if(nrow(x) == 1 || all(table(x$Chr) == 1)) {
-    # Assign region_id = 1 for all points per chromosome
-    data_tagged <- data_sample2 %>% group_by(Chr) %>% mutate(region_id = 1) %>% ungroup()
-    # Build w_baf_tbl for each chromosome
-    w_baf_tbl <- x %>% select(Chr, w_baf) %>% mutate(region_id = 1)
-  } else {
-    data_tagged <- data_sample2 %>%
-      group_by(Chr) %>%
-      group_modify(function(df, key) {
-        chr_starts <- vlines %>%
-          filter(Chr == key$Chr[1]) %>%
-          arrange(Start) %>%
-          pull(Start)
-        brks <- c(-Inf, chr_starts, Inf)
-        df$region_id <- cut(df$Position, breaks = brks, labels = FALSE, right = FALSE)
-        df
-      }) %>%
-      ungroup()
-
-    regions_tbl <- vlines %>%
-      arrange(Chr, Start) %>%
-      count(Chr, name = "n_vlines") %>%
-      mutate(n_regions = n_vlines + 1L) %>%
-      select(Chr, n_regions) %>%
-      rowwise() %>%
-      mutate(region_id = list(seq_len(n_regions))) %>%
-      unnest(region_id) %>%
-      ungroup()
-
-    w_baf_tbl <- regions_tbl %>%
-      group_by(Chr) %>%
-      mutate(w_baf = x$w_baf[region_id]) %>%
-      ungroup()
-  }
-
-  plot_df <- data_tagged %>%
-    left_join(w_baf_tbl, by = c("Chr", "region_id"))
+  # -------- BAF panel (color = w_baf; uses SAME tagging/join as z panel) --------
+  plot_df <- data_sample2 %>%
+    tag_markers_with_region(break_tbl) %>%
+    left_join(win_tbl %>% select(Chr, region_id, w_baf),
+                     by = c("Chr", "region_id"))
 
   p_baf <- ggplot(plot_df, aes(x = Position, y = baf, color = w_baf)) +
     geom_blank(
@@ -246,21 +235,24 @@ plot_cn_track <- function(hmm_CN,
     geom_point(alpha = 0.7, size = 1) +
     { if (show_window_lines)
       geom_vline(data = vlines, aes(xintercept = Start),
-                 color = line_color, alpha = line_alpha,
-                 linewidth = line_width, linetype = line_linetype) else NULL } +
-    facet_wrap(~Chr, scales = "free_x", nrow=1) +
+                          color = line_color, alpha = line_alpha,
+                          linewidth = line_width, linetype = line_linetype)
+      else NULL } +
+    facet_wrap(~Chr, scales = "free_x", nrow = 1) +
     theme_bw() +
     ylab("BAF") +
-    scale_color_distiller(palette = "RdBu", direction = -1, limits = c(0, 1), name = "BAF weight")+
+    scale_color_distiller(palette = "RdBu", direction = -1,
+                                   limits = c(0, 1),
+                                   oob = squish,
+                                   name = "BAF weight") +
     theme(
-      axis.text.x = element_text(angle = 30, vjust = 1, hjust = 1),
-      legend.position = "top",
-      text = element_text(size = 12),
+      axis.text.x        = element_text(angle = 30, vjust = 1, hjust = 1),
+      legend.position    = "top",
+      text               = element_text(size = 12),
       axis.title.x       = element_blank()
     )
 
   # -------- stack with ggpubr (no patchwork needed) --------
-  # align = "v" keeps x-axes aligned; widths are matched automatically
   ggarrange(
     p_baf, p_z, p_cn,
     ncol = 1, nrow = 3,

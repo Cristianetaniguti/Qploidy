@@ -214,7 +214,7 @@ compute_baf_likelihoods <- function(baf_vec, cn_grid, M = 100, bw = 0.03,
     names(legend_labels) <- c("Observed", paste0("CN", cn_grid))
     plot_obj <- ggplot(df_long, aes(x = BAF, y = Density)) +
       geom_area(data = subset(df_long, Type != "Observed"), aes(fill = Type), position = "identity", alpha = 0.4) +
-      geom_line(data = subset(df_long, Type == "Observed"), aes(color = "Observed", linetype = "Observed"), size = 1) +
+      geom_line(data = subset(df_long, Type == "Observed"), aes(color = "Observed", linetype = "Observed"), linewidth = 1) +
       scale_fill_manual(
         values = setNames(RColorBrewer::brewer.pal(min(8, K), "Set1"), paste0("CN", cn_grid)),
         breaks = paste0("CN", cn_grid),

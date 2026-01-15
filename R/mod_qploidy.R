@@ -278,14 +278,30 @@ mod_qploidy_ui <- function(id){
                                    search = TRUE,
                                    multiple = TRUE
                                  ),
+                                 # make a check input for this argument
+                                  checkboxInput(ns("show_window_lines"), "Show Window Lines", value = TRUE)
                           ),
                           column(width = 6,
-                                 textInput(ns("ploidy_range_hmm"), "Ploidies to be tested", placeholder = "2,3,4", value = "2,3,4"), 
+                                 textInput(ns("ploidy_range_hmm"), "Ploidies to be tested", placeholder = "2,3,4", value = "2,3,4"),
                                  actionButton(ns("advanced_options_hmm"),
                                               label = HTML(paste(icon("cog", style = "color: #007bff;"), "Advanced Options")),
                                               style = "background-color: transparent; border: none; color: #007bff; font-size: smaller; text-decoration: underline; padding: 0;"
                                  ), hr(),
-                                 actionButton(ns("est_ploidy_hmm"), "Run HMM"), br(),
+                                 actionButton(ns("est_ploidy_hmm"), "Run HMM"),
+                                 div(style="float:right",dropdownButton(
+                                   tags$h3("Save Image"),
+                                   selectInput(inputId = ns('image_type'), label = 'File Type', choices = c("jpeg","tiff","png","svg"), selected = "jpeg"),
+                                   sliderInput(inputId = ns('image_res'), label = 'Resolution', value = 300, min = 50, max = 1000, step=50),
+                                   sliderInput(inputId = ns('image_width'), label = 'Width', value = 9, min = 1, max = 20, step=0.5),
+                                   sliderInput(inputId = ns('image_height'), label = 'Height', value = 5, min = 1, max = 20, step = 0.5),
+                                   fluidRow(
+                                     downloadButton(ns("download_figure_hmm"), "Save Image"), br()),
+                                   circle = FALSE,
+                                   status = "danger",
+                                   icon = icon("floppy-disk"), width = "300px", label = "Save",
+                                   tooltip = tooltipOptions(title = "Click to see inputs!")
+                                 )
+                                 )
 
                           )
                         ),
@@ -314,20 +330,20 @@ mod_qploidy_ui <- function(id){
                         hr(),
                         fluidRow(
                           column(width = 6,
-                          textInput(ns("ploidy_range"), "Ploidies to be tested", placeholder = "2,3,4", value = "2,3,4")
+                                 textInput(ns("ploidy_range"), "Ploidies to be tested", placeholder = "2,3,4", value = "2,3,4")
                           ),
                           column(width = 6,
-                            selectInput(ns('res_lvl'),
-                                        label = 'Select Resolution Level',
-                                        choices = c("Sample" = "sample",
-                                                    "Chromosome" = "chromosome",
-                                                    "Chromosome-arm" = "chromosome-arm"),
-                                        selected = "Chromosome"),
-                            conditionalPanel(condition = "input.res_lvl == 'chromosome-arm'",
-                                            ns = ns,
-                                            fileInput(ns("centromeres_file2"),
-                                                      "Centromere positions file (CSV format with columns: Chromosome, Centromere Start Position)", accept = ".csv")
-                            )
+                                 selectInput(ns('res_lvl'),
+                                             label = 'Select Resolution Level',
+                                             choices = c("Sample" = "sample",
+                                                         "Chromosome" = "chromosome",
+                                                         "Chromosome-arm" = "chromosome-arm"),
+                                             selected = "Chromosome"),
+                                 conditionalPanel(condition = "input.res_lvl == 'chromosome-arm'",
+                                                  ns = ns,
+                                                  fileInput(ns("centromeres_file2"),
+                                                            "Centromere positions file (CSV format with columns: Chromosome, Centromere Start Position)", accept = ".csv")
+                                 )
                           )
                         ),
                         checkboxInput(ns("all_hmm"), "Run HMM CN estimations (beta)", value = FALSE),
@@ -1093,7 +1109,7 @@ mod_qploidy_server <- function(input, output, session, parent_session){
     p <- plot_cn_track(hmm_CN = ploidies_hmm(),
                        qploidy_standarize_result= data_standardized(),
                        sample_id = input$sample_hmm,
-                       show_window_lines = TRUE)
+                       show_window_lines = input$show_window_lines)
 
     updateProgressBar(session = session, id = "pb_qploidy", value = 100)
     p
@@ -1143,6 +1159,45 @@ mod_qploidy_server <- function(input, output, session, parent_session){
       # draw!
       p <- built_plot()         # ggplot object (or similar)
       print(p)                  # crucial for ggplot2
+    }
+  )
+
+    output$download_figure_hmm <- downloadHandler(
+    filename = function() {
+      ext <- switch(input$image_type,
+                    "jpeg" = "jpg",
+                    "png"  = "png",
+                    "tiff" = "tiff",
+                    "svg"  = "svg")  # assume UI sends one of these
+      paste0("Qploidy-", Sys.Date(), ".", ext)
+    },
+    content = function(file) {
+      # open the right device
+      switch(input$image_type,
+             "jpeg" = jpeg(file,
+                           width  = as.numeric(input$image_width),
+                           height = as.numeric(input$image_height),
+                           units  = "in", res = as.numeric(input$image_res)),
+             "png"  = png(file,
+                          width  = as.numeric(input$image_width),
+                          height = as.numeric(input$image_height),
+                          units  = "in", res = as.numeric(input$image_res)),
+             "tiff" = tiff(file,
+                           width  = as.numeric(input$image_width),
+                           height = as.numeric(input$image_height),
+                           units  = "in", res = as.numeric(input$image_res)),
+             "svg"  = svg(file,
+                          width  = as.numeric(input$image_width),
+                          height = as.numeric(input$image_height))
+      )
+      on.exit(dev.off(), add = TRUE)
+
+      # draw!
+      p <- plot_cn_track(hmm_CN = ploidies_hmm(),
+                       qploidy_standarize_result= data_standardized(),
+                       sample_id = input$sample_hmm,
+                       show_window_lines = input$show_window_lines)
+      print(p)                  
     }
   )
 

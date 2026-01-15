@@ -373,7 +373,7 @@ hmm_estimate_CN <- function(
     # --- EM loop ---
     ll_hist_chr <- numeric(max_iter)
     # If there is only one window, skip HMM and assign CN by BAF likelihood only
-    if(length(chr_idx) == 1 && W_chr > 0) {
+    if (W_chr == 1) {
       if(verbose) cat("  Only one window found for this chromosome. Skipping EM and assigning CN by BAF likelihood only.\n")
       cn_call_chr <- cn_grid[apply(ll_baf_matrix_chr, 1, which.max)]
       post_max_chr <- apply(prob_baf_matrix_chr, 1, max)

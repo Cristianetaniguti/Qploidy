@@ -70,8 +70,6 @@ component when \code{add_uniform = TRUE}. Default 0.05.}
 \item{z_only}{Logical. If \code{TRUE}, fit the HMM using the z-emission only (ignores BAF). Default \code{FALSE}.}
 
 \item{verbose}{Logical. If \code{TRUE}, print progress messages. Default \code{TRUE}.}
-
-\item{exp_ploidy}{Integer. Expected ploidy for initialization. If \code{NULL}, median of \code{cn_grid} is used.}
 }
 \value{
 An object of class \code{hmm_CN}, a list with two elements:

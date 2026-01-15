@@ -12,7 +12,6 @@
 #' @param chr Optional. Character or integer vector specifying chromosomes to include. If \code{NULL}, all chromosomes are used.
 #' @param segment_zscore Logical. If \code{TRUE}, segment z-scores using changepoint detection to define windows instead of fixed SNP counts. Default \code{TRUE}.
 #' @param snps_per_window Integer. Number of SNPs per window when windows are created. Default \code{500}.
-#' @param dist Character. Distribution type for BAF template peaks: "gaussian" (default), "beta", "beta_binomial", or "negative_binomial".
 #' @param reflect Logical. If TRUE (default), apply reflection for continuous
 #'   kernels to keep mass within [0,1] (useful for gaussian).
 #' @param add_uniform Logical. If TRUE, add a uniform noise component to the
@@ -95,7 +94,6 @@ hmm_estimate_CN <- function(
     qploidy_standarize_result,
     sample_id,
     chr = NULL,
-    dist= "gaussian",
     reflect = TRUE,
     add_uniform = FALSE,
     uniform_weight = 0.05,
@@ -108,7 +106,7 @@ hmm_estimate_CN <- function(
     het_lims = c(0,1), # baf limits to consider a SNP heterozygous
     het_quantile = 0.8, # increase this value to reduce the weight of baf when few hets
     baf_weight = 1,
-    z_range = 0.2, # increase this value if you think that extreme ploidy tested are unlikely
+    z_range = NULL, 
     transition_jump = 0.995, # decrease this value if you think there changes in CN is likely
     z_only = FALSE,
     verbose = TRUE
@@ -145,6 +143,12 @@ hmm_estimate_CN <- function(
   # Remove markers with missing baf and z
   rm <- which(is.na(d[["baf"]]) & is.na(d[["z"]]))
   if(length(rm) > 0) d <- d[-rm, , drop = FALSE]
+
+  # If z_range is not provided, estimate from data
+  if (is.null(z_range) || (length(z_range) == 1 && is.na(z_range))) {
+    z_range <- (1/length(cn_grid)) * (max(d$z, na.rm = TRUE) - min(d$z, na.rm = TRUE))
+    if (verbose) cat(sprintf("    Estimated z_range from data: %f\n", z_range))
+  }
 
   # --- set expected ploidy ---
   # Calculate expected ploidy using sample-level BAF distribution
@@ -257,35 +261,41 @@ hmm_estimate_CN <- function(
 
   # Generate BAF likelihoods and probabilities per window
   # Uses parameters from selected_model
-  if(verbose) cat("Generating BAF likelihoods per window...\n")
-  baf_results <- lapply(baf_list, function(baf_vec) compute_baf_likelihoods(baf_vec,
-                                                                            cn_grid,
-                                                                            M = M,
-                                                                            bw = selected_model$best$bw,
-                                                                            plot = FALSE,
-                                                                            dist = selected_model$best$dist,
-                                                                            reflect = reflect,
-                                                                            add_uniform = selected_model$best$add_uniform,
-                                                                            uniform_weight = selected_model$best$uniform_weight))
+  if(!z_only){
+    if(verbose) cat("Generating BAF likelihoods per window...\n")
+    baf_results <- lapply(baf_list, function(baf_vec) compute_baf_likelihoods(baf_vec,
+                                                                              cn_grid,
+                                                                              M = M,
+                                                                              bw = selected_model$best$bw,
+                                                                              plot = FALSE,
+                                                                              dist = selected_model$best$dist,
+                                                                              reflect = reflect,
+                                                                              add_uniform = selected_model$best$add_uniform,
+                                                                              uniform_weight = selected_model$best$uniform_weight))
 
-  ll_baf_matrix <- do.call(rbind, lapply(baf_results, function(res) res$ll_vec))
-  prob_baf_matrix <- do.call(rbind, lapply(baf_results, function(res) res$prob_vec))
+    ll_baf_matrix <- do.call(rbind, lapply(baf_results, function(res) res$ll_vec))
+    prob_baf_matrix <- do.call(rbind, lapply(baf_results, function(res) res$prob_vec))
 
-  if(verbose) cat("Counting heterozygous to determine BAF weights...\n")
-  # BAF weights from heterozygote counts
-  # Lower the number of heterozygotes in the window, lower the weight of the BAF emission
-  # If there are no heterozygous, only z-score will be considered
-  HET_N <- win_df$n_het
-  if (any(HET_N > 0)) {
-    ref_q <- suppressWarnings(quantile(HET_N[HET_N>0], het_quantile, na.rm=TRUE))
-    if (!is.finite(ref_q) || ref_q <= 0) ref_q <- max(HET_N, na.rm=TRUE)
-    if (!is.finite(ref_q) || ref_q <= 0) ref_q <- 1
-    w_baf <- sqrt(pmin(1, HET_N / ref_q))  # sqrt: temper influence
+    if(verbose) cat("Counting heterozygous to determine BAF weights...\n")
+    # BAF weights from heterozygote counts
+    # Lower the number of heterozygotes in the window, lower the weight of the BAF emission
+    # If there are no heterozygous, only z-score will be considered
+    HET_N <- win_df$n_het
+    if (any(HET_N > 0)) {
+      ref_q <- suppressWarnings(quantile(HET_N[HET_N>0], het_quantile, na.rm=TRUE))
+      if (!is.finite(ref_q) || ref_q <= 0) ref_q <- max(HET_N, na.rm=TRUE)
+      if (!is.finite(ref_q) || ref_q <= 0) ref_q <- 1
+      w_baf <- sqrt(pmin(1, HET_N / ref_q))  # sqrt: temper influence
+    } else {
+      w_baf <- rep(0, W)
+    }
+    w_baf[!is.finite(w_baf)] <- 0
+    w_baf <- w_baf * baf_weight
   } else {
+    ll_baf_matrix <- matrix(0, nrow = W, ncol = length(cn_grid))
+    prob_baf_matrix <- matrix(0, nrow = W, ncol = length(cn_grid))
     w_baf <- rep(0, W)
   }
-  w_baf[!is.finite(w_baf)] <- 0
-  w_baf <- w_baf * baf_weight
 
   # --- HMM by chromosome ---
   results_list <- list()
@@ -332,17 +342,17 @@ hmm_estimate_CN <- function(
     cmax_chr <- max(cn_grid)
 
     # Recompute chromosome-level expected ploidy
-    chromosome_level_ploidy <- compute_baf_likelihoods(unlist(baf_list_chr),
-                                                       cn_grid,
-                                                       M = M,
-                                                       bw = selected_model$best$bw,
-                                                       plot = FALSE,
-                                                       dist = selected_model$best$dist,
-                                                       reflect = reflect,
-                                                       add_uniform = selected_model$best$add_uniform,
-                                                       uniform_weight = selected_model$best$uniform_weight)
+    chromosome_level_ploidy <- select_best_baf_model(unlist(baf_list_chr)[-which(is.na(unlist(baf_list_chr)))],
+                                                     cn_grid,
+                                                     M = M,
+                                                     bw = selected_model$best$bw,
+                                                     plot = FALSE,
+                                                     dist = selected_model$best$dist,
+                                                     reflect = reflect,
+                                                     add_uniform = selected_model$best$add_uniform,
+                                                     uniform_weight = selected_model$best$uniform_weight)
 
-    exp_ploidy_chr <- chromosome_level_ploidy$best_cn
+    exp_ploidy_chr <- chromosome_level_ploidy$best$best_cn
     # If for some reason exp_ploidy_chr is NULL or non-finite, fall back to sample-level exp_ploidy
     if (is.null(exp_ploidy_chr) || !is.finite(exp_ploidy_chr)) {
       exp_ploidy_chr <- exp_ploidy
@@ -429,7 +439,7 @@ hmm_estimate_CN <- function(
         bad_w <- which(!is.finite(rowSums(ll_em_chr)))[1]
         bad_k <- which(!is.finite(ll_em_chr[bad_w, ]))
         stop(sprintf("Non-finite emission at window %d, states: %s.",
-                      bad_w, paste(colnames(ll_em_chr)[bad_k], collapse=", ")))
+                     bad_w, paste(colnames(ll_em_chr)[bad_k], collapse=", ")))
       }
 
       logA <- log(A_chr); logpi0 <- log(pi0_chr)

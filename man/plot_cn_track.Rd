@@ -16,7 +16,8 @@ plot_cn_track(
   line_alpha = 0.6,
   line_width = 0.3,
   line_linetype = "dashed",
-  heights = c(2, 2.5)
+  heights = c(2, 2.5),
+  z_by_mean = TRUE
 )
 }
 \arguments{
@@ -35,6 +36,8 @@ plot_cn_track(
 \item{line_color, line_alpha, line_width, line_linetype}{Appearance settings for window boundary lines.}
 
 \item{heights}{Numeric vector of length 2 or 3. Relative heights of the BAF, z, and CN panels.}
+
+\item{z_by_mean}{Logical. If TRUE, plot horizontal black lines for mean z per window using geom_segment; otherwise, use geom_smooth as before.}
 }
 \value{
 A \code{ggplot} object (from ggpubr::ggarrange). Print to render, or add layers/scales as needed.

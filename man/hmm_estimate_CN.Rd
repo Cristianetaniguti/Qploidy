@@ -8,7 +8,6 @@ hmm_estimate_CN(
   qploidy_standarize_result,
   sample_id,
   chr = NULL,
-  dist = "gaussian",
   reflect = TRUE,
   add_uniform = FALSE,
   uniform_weight = 0.05,
@@ -21,7 +20,7 @@ hmm_estimate_CN(
   het_lims = c(0, 1),
   het_quantile = 0.8,
   baf_weight = 1,
-  z_range = 0.2,
+  z_range = NULL,
   transition_jump = 0.995,
   z_only = FALSE,
   verbose = TRUE
@@ -33,8 +32,6 @@ hmm_estimate_CN(
 \item{sample_id}{Character scalar. Sample identifier to analyze; rows are filtered as \code{SampleName == sample_id}.}
 
 \item{chr}{Optional. Character or integer vector specifying chromosomes to include. If \code{NULL}, all chromosomes are used.}
-
-\item{dist}{Character. Distribution type for BAF template peaks: "gaussian" (default), "beta", "beta_binomial", or "negative_binomial".}
 
 \item{reflect}{Logical. If TRUE (default), apply reflection for continuous
 kernels to keep mass within [0,1] (useful for gaussian).}
@@ -70,6 +67,8 @@ component when \code{add_uniform = TRUE}. Default 0.05.}
 \item{z_only}{Logical. If \code{TRUE}, fit the HMM using the z-emission only (ignores BAF). Default \code{FALSE}.}
 
 \item{verbose}{Logical. If \code{TRUE}, print progress messages. Default \code{TRUE}.}
+
+\item{exp_ploidy}{Integer. Expected ploidy for initialization. If \code{NULL}, median of \code{cn_grid} is used.}
 }
 \value{
 An object of class \code{hmm_CN}, a list with two elements:
@@ -117,7 +116,7 @@ chromosomes/batches.
 }
 \section{Required helpers}{
 
-This function calls \code{\link{baf_template}}, \code{\link{baf_ll}}, \code{\link{logsumexp}}, and \code{\link{viterbi}} which must be available in your package/namespace.
+This function calls \code{\link{generate_baf_template}}, \code{\link{baf_log_likelihood}}, \code{\link{logsumexp}}, and \code{\link{viterbi}} which must be available in your package/namespace.
 }
 
 \examples{
@@ -137,6 +136,6 @@ res$params
 
 }
 \seealso{
-\code{\link{baf_template}}, \code{\link{baf_ll}},
+\code{\link{generate_baf_template}}, \code{\link{baf_log_likelihood}},
   \code{\link{viterbi}}, \code{\link{plot_cn_track}}
 }

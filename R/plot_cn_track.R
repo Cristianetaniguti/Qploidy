@@ -10,6 +10,7 @@
 #' @param include_first_in_chr Logical. If TRUE, include the first window line in each chromosome.
 #' @param line_color,line_alpha,line_width,line_linetype Appearance settings for window boundary lines.
 #' @param heights Numeric vector of length 2 or 3. Relative heights of the BAF, z, and CN panels.
+#' @param z_by_mean Logical. If TRUE, plot horizontal black lines for mean z per window using geom_segment; otherwise, use geom_smooth as before.
 #'
 #' @return A \code{ggplot} object (from ggpubr::ggarrange). Print to render, or add layers/scales as needed.
 #'
@@ -57,7 +58,8 @@ plot_cn_track <- function(hmm_CN,
                           line_alpha = 0.6,
                           line_width = 0.3,
                           line_linetype = "dashed",
-                          heights = c(2, 2.5)) {
+                          heights = c(2, 2.5),
+                          z_by_mean = TRUE) {
 
   stopifnot(inherits(hmm_CN, "hmm_CN"))
   stopifnot(inherits(qploidy_standarize_result, "qploidy_standardization"))
@@ -165,34 +167,74 @@ plot_cn_track <- function(hmm_CN,
   # marker_df$w_baf <- squish(marker_df$w_baf, range = c(0, 1))
 
   # -------- top panel: z dots (color = w_baf) --------
-  p_z <- ggplot(marker_df, aes(x = Position, y = z, color = w_baf)) +
-    geom_point(size = 1.2, alpha = 0.8) +
-    geom_smooth(aes(group = Chr), method = "loess", se = FALSE,
-                         color = "black", linewidth = 0.7, span = 0.2) +
-    { if (show_window_lines)
-      geom_vline(data = vlines, aes(xintercept = Start),
-                          color = line_color, alpha = line_alpha,
-                          linewidth = line_width, linetype = line_linetype)
-      else NULL } +
-    facet_wrap(~ Chr, scales = "free_x", nrow = 1) +
-    scale_color_distiller(palette = "RdBu", direction = -1,
-                                   limits = c(0, 1),
-                                   oob = squish,
-                                   name = "BAF weight") +
-    labs(x = NULL, y = "z", title = sample_id) +
-    theme_bw(base_size = 12) +
-    theme(
-      panel.grid.major.x = element_blank(),
-      panel.grid.minor   = element_blank(),
-      strip.background   = element_rect(fill = "grey95"),
-      legend.position    = "none",
-      axis.title.x       = element_blank(),
-      axis.text.x        = element_text(angle = 30, vjust = 1, hjust = 1)
-    )
+  if (z_by_mean) {
+    # Calculate mean z by WindowID using hmm_CN$result
+    z_means <- hmm_CN$result %>%
+      filter(Sample == sample_id) %>%
+      select(Chr, WindowID, Start, End, w_baf, z_mean = z) %>%
+      arrange(Chr, Start)
+    p_z <- ggplot(marker_df, aes(x = Position, y = z, color = w_baf)) +
+      geom_point(size = 1.2, alpha = 0.8) +
+      geom_segment(
+        data = z_means,
+        aes(x = Start, xend = End, y = z_mean, yend = z_mean, group = WindowID),
+        inherit.aes = FALSE,
+        color = "black", linewidth = 0.7
+      ) +
+      { if (show_window_lines)
+        geom_vline(data = vlines, aes(xintercept = Start),
+                   color = line_color, alpha = line_alpha,
+                   linewidth = line_width, linetype = line_linetype)
+        else NULL } +
+      facet_wrap(~ Chr, scales = "free_x", nrow = 1) +
+      scale_color_distiller(palette = "Spectral", direction = -1,
+                            limits = c(0, 1),
+                            oob = squish,
+                            name = "BAF weight") +
+      labs(x = NULL, y = "z", title = sample_id) +
+      theme_bw(base_size = 12) +
+      theme(
+        panel.grid.major.x = element_blank(),
+        panel.grid.minor   = element_blank(),
+        strip.background   = element_rect(fill = "grey95"),
+        legend.position    = "none",
+        axis.title.x       = element_blank(),
+        axis.text.x        = element_text(angle = 30, vjust = 1, hjust = 1)
+      )
+  } else {
+    p_z <- ggplot(marker_df, aes(x = Position, y = z, color = w_baf)) +
+      geom_point(size = 1.2, alpha = 0.8) +
+      geom_smooth(aes(group = Chr), method = "loess", se = FALSE,
+                  color = "black", linewidth = 0.7, span = 0.2) +
+      { if (show_window_lines)
+        geom_vline(data = vlines, aes(xintercept = Start),
+                   color = line_color, alpha = line_alpha,
+                   linewidth = line_width, linetype = line_linetype)
+        else NULL } +
+      facet_wrap(~ Chr, scales = "free_x", nrow = 1) +
+      scale_color_distiller(palette = "Spectral", direction = -1,
+                            limits = c(0, 1),
+                            oob = squish,
+                            name = "BAF weight") +
+      labs(x = NULL, y = "z", title = sample_id) +
+      theme_bw(base_size = 12) +
+      theme(
+        panel.grid.major.x = element_blank(),
+        panel.grid.minor   = element_blank(),
+        strip.background   = element_rect(fill = "grey95"),
+        legend.position    = "none",
+        axis.title.x       = element_blank(),
+        axis.text.x        = element_text(angle = 30, vjust = 1, hjust = 1)
+      )
+  }
 
   # -------- bottom panel: CN segments (color = P(CN call)) --------
   if (!("prob_call" %in% names(x))) stop("prob_call column missing in CN plot data.")
   x$prob_call <- as.numeric(x$prob_call)
+
+  # Split x into single-marker and multi-marker windows
+  x_seg <- x[x$Start != x$End, ]
+  x_pt  <- x[x$Start == x$End, ]
 
   p_cn <- ggplot(x) +
     geom_blank(
@@ -200,8 +242,18 @@ plot_cn_track <- function(hmm_CN,
       inherit.aes = FALSE,
       aes(x = Position, y = min(x$CN_call))
     ) +
-    geom_segment(aes(x = Start, xend = End, y = CN_call, yend = CN_call, color = prob_call),
-                          linewidth = 2, lineend = "butt") +
+    # Segments for multi-marker windows
+    geom_segment(
+      data = x_seg,
+      aes(x = Start, xend = End, y = CN_call, yend = CN_call, color = prob_call),
+      linewidth = 2, lineend = "butt"
+    ) +
+    # Points for single-marker windows
+    geom_point(
+      data = x_pt,
+      aes(x = Start, y = CN_call, color = prob_call),
+      size = 2
+    ) +
     { if (show_window_lines)
       geom_vline(data = vlines, aes(xintercept = Start),
                           color = line_color, alpha = line_alpha,
@@ -241,7 +293,7 @@ plot_cn_track <- function(hmm_CN,
     facet_wrap(~Chr, scales = "free_x", nrow = 1) +
     theme_bw() +
     ylab("BAF") +
-    scale_color_distiller(palette = "RdBu", direction = -1,
+    scale_color_distiller(palette = "Spectral", direction = -1,
                                    limits = c(0, 1),
                                    oob = squish,
                                    name = "BAF weight") +

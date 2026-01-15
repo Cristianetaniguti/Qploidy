@@ -157,7 +157,22 @@ hmm_estimate_CN <- function(
                                           cn_grid= cn_grid,
                                           M = M,
                                           reflect = reflect)
-  exp_ploidy <- selected_model$best$best_cn
+
+  if(verbose) {
+    cat("  Best BAF model summary:\n")
+    cat(sprintf(
+      "    CN: %s\n    Distribution: %s\n    Bandwidth: %.4f\n    Uniform noise: %s (weight: %.2f)\n    Log-likelihood: %.2f\n    BIC: %.2f\n    Probability: %.3f\n    Observations: %d\n",
+      selected_model$best$best_cn,
+      selected_model$best$dist,
+      selected_model$best$bw,
+      ifelse(selected_model$best$add_uniform, "yes", "no"),
+      selected_model$best$uniform_weight,
+      selected_model$best$logLik,
+      selected_model$best$BIC,
+      selected_model$best$prob,
+      selected_model$best$n_obs
+    ))
+  }
 
   # --- build windows ---
   if (verbose) cat("Building windows...\n")

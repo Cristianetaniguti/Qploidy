@@ -302,8 +302,6 @@ hmm_estimate_CN <- function(
     ll_baf_matrix_chr <- ll_baf_matrix[chr_idx, , drop = FALSE]
     prob_baf_matrix_chr <- prob_baf_matrix[chr_idx, , drop = FALSE]
     w_baf_chr <- w_baf[chr_idx]
-    single_window_idx_chr <- which(win_df_chr$Chr %in% chr_name & table(win_df_chr$Chr)[chr_name] == 1)
-    multi_window_idx_chr <- setdiff(seq_len(W_chr), single_window_idx_chr)
 
     # HMM setup for this chromosome
     K_chr <- length(cn_grid) # The number of HMM states are the number of ploidies tested

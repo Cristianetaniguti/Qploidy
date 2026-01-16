@@ -216,7 +216,7 @@ compute_baf_likelihoods <- function(baf_vec, cn_grid, M = 100, bw = 0.03,
       geom_area(data = subset(df_long, Type != "Observed"), aes(fill = Type), position = "identity", alpha = 0.4) +
       geom_line(data = subset(df_long, Type == "Observed"), aes(color = "Observed", linetype = "Observed"), linewidth = 1) +
       scale_fill_manual(
-        values = setNames(RColorBrewer::brewer.pal(min(8, K), "Set1"), paste0("CN", cn_grid)),
+        values = setNames(c("#E41A1C", "#377EB8", "#4DAF4A", "#984EA3", "#FF7F00", "#FFFF33", "#A65628", "#F781BF")[seq_len(min(8, K))], paste0("CN", cn_grid)),
         breaks = paste0("CN", cn_grid),
         labels = legend_labels[paste0("CN", cn_grid)],
         drop = FALSE
@@ -248,33 +248,50 @@ compute_baf_likelihoods <- function(baf_vec, cn_grid, M = 100, bw = 0.03,
   return(out)
 }
 
-#' Select Best BAF Template Model Across Distributions + bw/uniform grids Using BIC
+#' Select the Best BAF Template Model via Grid Search and BIC
 #'
-#' Extends `select_best_baf_model()` by grid-searching over `bw` and (optionally)
-#' a uniform-noise component weight. For each configuration, it runs
-#' `compute_baf_likelihoods()` and computes BIC, then selects the best model.
+#' This function performs a grid search over candidate BAF template models, varying distribution 
+#' family, kernel bandwidth, and optional uniform noise component, to select the best model for a 
+#' given BAF vector. For each configuration, it computes the BAF likelihoods across candidate copy 
+#' number (CN) states, selects the best CN, and evaluates model fit using the Bayesian Information 
+#' Criterion (BIC). The function returns the best model configuration, a summary of all grid results,
+#' and (optionally) a plot for the best model.
 #'
-#' @param baf_vec Numeric vector of BAF values for a single window.
-#' @param cn_grid Integer vector of copy-number states to test (e.g., 2:6).
-#' @param dists Character vector of distributions to test.
-#' @param reflect Logical. Passed to `generate_baf_template()` via `compute_baf_likelihoods()`.
-#' @param bw_grid Numeric vector of bw values to try. Default is c(0.02,0.03,0.04).
-#' @param add_uniform_grid Logical vector: whether to include uniform component.
-#'   Default is c(FALSE, TRUE).
-#' @param uniform_weight_grid Numeric vector of uniform mixture weights to try when
-#'   add_uniform = TRUE. Default is c(0.01, 0.03, 0.05, 0.10, 0.15).
+#' @param baf_vec Numeric vector. BAF values for a single window (should be in [0,1]).
+#' @param cn_grid Integer vector. Copy-number states to test (e.g., 2:6).
+#' @param dists Character vector. Distribution families to test (e.g., c("gaussian", "beta", ...)).
+#' @param reflect Logical. If TRUE (default), applies reflection for continuous kernels to keep mass within [0,1]. Passed to `generate_baf_template()`.
+#' @param bw_grid Numeric vector. Bandwidth (SD or concentration) values to try for kernel smoothing. Default: c(0.02, 0.03, 0.04).
+#' @param add_uniform_grid Logical vector. Whether to include a uniform noise component in the template. Default: c(FALSE, TRUE).
+#' @param uniform_weight_grid Numeric vector. Mixture weights for the uniform component (when enabled). Default: c(0.01, 0.03, 0.05, 0.10, 0.15).
+#' @param M Integer. Number of histogram bins for BAF (default 100).
+#' @param plot Logical. If TRUE, returns a ggplot object for the best model only (default FALSE).
+#' @param param_count Optional named integer vector. Number of free parameters per distribution (for BIC penalty). If NULL, defaults to 0 for all.
+#' @param count_grid_as_params Logical. If TRUE (default), adds +1 to BIC penalty for each hyperparameter tuned by grid search (bw, and uniform_weight if used).
 #'
-#' @param M Integer. Number of histogram bins.
-#' @param plot Logical. If TRUE, returns the plot for the best model only.
+#' @return A list with the following elements:
+#'   \item{n_obs}{Number of usable BAF observations (after filtering NA/out-of-range).}
+#'   \item{best}{A list describing the best model configuration (distribution, bw, uniform settings, best CN, log-likelihood, probability, BIC, n_obs).}
+#'   \item{grid_results}{A data.frame summarizing all grid search results (one row per configuration).}
+#'   \item{plot}{(If plot=TRUE) ggplot object for the best model.}
+#'   \item{note}{(If no usable data or all models fail) diagnostic message.}
 #'
-#' @param param_count Optional named integer vector giving # free params per distribution.
-#' @param count_grid_as_params Logical. If TRUE, adds to BIC penalty the number of
-#'   tuned hyperparameters selected by grid-search:
-#'   - +1 for bw (because you're effectively fitting it)
-#'   - +1 for uniform_weight if add_uniform=TRUE
-#'   Default TRUE.
+#' @details
+#' For each combination of distribution, bandwidth, and uniform noise settings, the function:
+#'   - Builds BAF templates for each CN state using `generate_baf_template()`.
+#'   - Computes the multinomial log-likelihood of the observed BAF histogram under each template using `baf_log_likelihood()`.
+#'   - Selects the best CN (highest log-likelihood) for that configuration.
+#'   - Computes the BIC for the configuration: \eqn{\mathrm{BIC} = -2 \log L + p \log n}, where \eqn{p} is the number of free parameters (including grid-tuned ones if `count_grid_as_params=TRUE`), and \eqn{n} is the number of usable BAF values.
+#'   - Returns a summary table of all configurations and highlights the best (lowest BIC).
+#'   - If `plot=TRUE`, only the best model's plot is generated and returned.
 #'
-#' @return List with best model info and diagnostics.
+#' This approach is inspired by the model selection strategy in the nQuack package (Gaynor et al. 2024), but uses fixed templates and grid search for efficiency.
+#'
+#' @seealso \code{compute_baf_likelihoods}, \code{generate_baf_template}, \code{baf_log_likelihood}
+#'
+#' @references
+#' Gaynor, M., Landis, J., O'Connor, T., Laport, R., Doyle, J., Soltis, D., Ponciano, J., & Soltis, P. (2024). "nQuack: An R package for predicting ploidal level from sequence data using site-based heterozygosity." Applications in Plant Sciences, 12(4), e11606. doi:10.1002/aps3.11606
+#'
 #' @export
 #' @author Cristiane Taniguti
 select_best_baf_model <- function(
@@ -579,7 +596,7 @@ generate_baf_template <- function(c, M = 101, bw = 0.03, floor_eps = 1e-8,
           alpha <- 1 + phi; beta <- 1
         } else {
           alpha <- 1 + (d0 / c) * phi
-          beta  <- 1 + (1 - d0 / c) * phi
+          beta <- 1 + (1 - d0 / c) * phi
         }
         k <- 0:c
         logpmf <- lchoose(c, k) + lbeta(k + alpha, c - k + beta) - lbeta(alpha, beta)

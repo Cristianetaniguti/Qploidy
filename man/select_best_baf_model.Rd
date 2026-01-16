@@ -2,7 +2,7 @@
 % Please edit documentation in R/BAF_distributions.R
 \name{select_best_baf_model}
 \alias{select_best_baf_model}
-\title{Select Best BAF Template Model Across Distributions + bw/uniform grids Using BIC}
+\title{Select the Best BAF Template Model via Grid Search and BIC}
 \usage{
 select_best_baf_model(
   baf_vec,
@@ -19,41 +19,60 @@ select_best_baf_model(
 )
 }
 \arguments{
-\item{baf_vec}{Numeric vector of BAF values for a single window.}
+\item{baf_vec}{Numeric vector. BAF values for a single window (should be in [0,1]).}
 
-\item{cn_grid}{Integer vector of copy-number states to test (e.g., 2:6).}
+\item{cn_grid}{Integer vector. Copy-number states to test (e.g., 2:6).}
 
-\item{dists}{Character vector of distributions to test.}
+\item{dists}{Character vector. Distribution families to test (e.g., c("gaussian", "beta", ...)).}
 
-\item{reflect}{Logical. Passed to `generate_baf_template()` via `compute_baf_likelihoods()`.}
+\item{reflect}{Logical. If TRUE (default), applies reflection for continuous kernels to keep mass within [0,1]. Passed to `generate_baf_template()`.}
 
-\item{bw_grid}{Numeric vector of bw values to try. Default is c(0.02,0.03,0.04).}
+\item{bw_grid}{Numeric vector. Bandwidth (SD or concentration) values to try for kernel smoothing. Default: c(0.02, 0.03, 0.04).}
 
-\item{add_uniform_grid}{Logical vector: whether to include uniform component.
-Default is c(FALSE, TRUE).}
+\item{add_uniform_grid}{Logical vector. Whether to include a uniform noise component in the template. Default: c(FALSE, TRUE).}
 
-\item{uniform_weight_grid}{Numeric vector of uniform mixture weights to try when
-add_uniform = TRUE. Default is c(0.01, 0.03, 0.05, 0.10, 0.15).}
+\item{uniform_weight_grid}{Numeric vector. Mixture weights for the uniform component (when enabled). Default: c(0.01, 0.03, 0.05, 0.10, 0.15).}
 
-\item{M}{Integer. Number of histogram bins.}
+\item{M}{Integer. Number of histogram bins for BAF (default 100).}
 
-\item{plot}{Logical. If TRUE, returns the plot for the best model only.}
+\item{plot}{Logical. If TRUE, returns a ggplot object for the best model only (default FALSE).}
 
-\item{param_count}{Optional named integer vector giving # free params per distribution.}
+\item{param_count}{Optional named integer vector. Number of free parameters per distribution (for BIC penalty). If NULL, defaults to 0 for all.}
 
-\item{count_grid_as_params}{Logical. If TRUE, adds to BIC penalty the number of
-tuned hyperparameters selected by grid-search:
-- +1 for bw (because you're effectively fitting it)
-- +1 for uniform_weight if add_uniform=TRUE
-Default TRUE.}
+\item{count_grid_as_params}{Logical. If TRUE (default), adds +1 to BIC penalty for each hyperparameter tuned by grid search (bw, and uniform_weight if used).}
 }
 \value{
-List with best model info and diagnostics.
+A list with the following elements:
+  \item{n_obs}{Number of usable BAF observations (after filtering NA/out-of-range).}
+  \item{best}{A list describing the best model configuration (distribution, bw, uniform settings, best CN, log-likelihood, probability, BIC, n_obs).}
+  \item{grid_results}{A data.frame summarizing all grid search results (one row per configuration).}
+  \item{plot}{(If plot=TRUE) ggplot object for the best model.}
+  \item{note}{(If no usable data or all models fail) diagnostic message.}
 }
 \description{
-Extends `select_best_baf_model()` by grid-searching over `bw` and (optionally)
-a uniform-noise component weight. For each configuration, it runs
-`compute_baf_likelihoods()` and computes BIC, then selects the best model.
+This function performs a grid search over candidate BAF template models, varying distribution 
+family, kernel bandwidth, and optional uniform noise component, to select the best model for a 
+given BAF vector. For each configuration, it computes the BAF likelihoods across candidate copy 
+number (CN) states, selects the best CN, and evaluates model fit using the Bayesian Information 
+Criterion (BIC). The function returns the best model configuration, a summary of all grid results,
+and (optionally) a plot for the best model.
+}
+\details{
+For each combination of distribution, bandwidth, and uniform noise settings, the function:
+  - Builds BAF templates for each CN state using `generate_baf_template()`.
+  - Computes the multinomial log-likelihood of the observed BAF histogram under each template using `baf_log_likelihood()`.
+  - Selects the best CN (highest log-likelihood) for that configuration.
+  - Computes the BIC for the configuration: \eqn{\mathrm{BIC} = -2 \log L + p \log n}, where \eqn{p} is the number of free parameters (including grid-tuned ones if `count_grid_as_params=TRUE`), and \eqn{n} is the number of usable BAF values.
+  - Returns a summary table of all configurations and highlights the best (lowest BIC).
+  - If `plot=TRUE`, only the best model's plot is generated and returned.
+
+This approach is inspired by the model selection strategy in the nQuack package (Gaynor et al. 2024), but uses fixed templates and grid search for efficiency.
+}
+\references{
+Gaynor, M., Landis, J., O'Connor, T., Laport, R., Doyle, J., Soltis, D., Ponciano, J., & Soltis, P. (2024). "nQuack: An R package for predicting ploidal level from sequence data using site-based heterozygosity." Applications in Plant Sciences, 12(4), e11606. doi:10.1002/aps3.11606
+}
+\seealso{
+\code{compute_baf_likelihoods}, \code{generate_baf_template}, \code{baf_log_likelihood}
 }
 \author{
 Cristiane Taniguti

@@ -12,7 +12,7 @@ hmm_estimate_CN(
   add_uniform = FALSE,
   uniform_weight = 0.05,
   segment_zscore = TRUE,
-  snps_per_window = 500,
+  snps_per_window = 50,
   min_snps_per_window = 20,
   cn_grid = 2:8,
   M = 100,

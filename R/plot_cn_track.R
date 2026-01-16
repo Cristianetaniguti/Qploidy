@@ -191,7 +191,7 @@ plot_cn_track <- function(hmm_CN,
                             limits = c(0, 1),
                             oob = squish,
                             name = "BAF weight") +
-      labs(x = NULL, y = "z", title = sample_id) +
+      labs(x = NULL, y = "z") +
       theme_bw(base_size = 12) +
       theme(
         panel.grid.major.x = element_blank(),
@@ -216,7 +216,7 @@ plot_cn_track <- function(hmm_CN,
                             limits = c(0, 1),
                             oob = squish,
                             name = "BAF weight") +
-      labs(x = NULL, y = "z", title = sample_id) +
+      labs(x = NULL, y = "z") +
       theme_bw(base_size = 12) +
       theme(
         panel.grid.major.x = element_blank(),

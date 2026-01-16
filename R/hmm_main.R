@@ -174,6 +174,10 @@ hmm_estimate_CN <- function(
     ))
   }
 
+  if(is.null(exp_ploidy)){
+    exp_ploidy <- selected_model$best$best_cn
+  }
+  
   # --- build windows ---
   if (verbose) cat("Building windows...\n")
   d <- d[order(d[["Chr"]], d[["Position"]]), ]

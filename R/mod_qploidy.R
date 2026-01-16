@@ -306,7 +306,12 @@ mod_qploidy_ui <- function(id){
                           )
                         ),
                         br(), hr(),
-                        plotOutput(ns("plot_hmm"), height = 800), br(),
+                        box(title="Sample-level BAF mixture models fitting", collapsed = FALSE, width = 12,
+                            plotOutput(ns("plot_mixbaf"), height = 300)
+                        ), br(),
+                        box(title="HMM results", collapsed = FALSE, width = 12,
+                            plotOutput(ns("plot_hmm"), height = 800)
+                        ), br(),
                         box(title="HMM results", collapsed = TRUE, width = 12,
                             DTOutput(ns("ploidy_table_hmm")),br(),
                             downloadButton(ns("download_ploidy_table_hmm"), "Download HMM CN Estimations Table")
@@ -1056,11 +1061,6 @@ mod_qploidy_server <- function(input, output, session, parent_session){
 
     ploidies <- as.numeric(unlist(strsplit(input$ploidy_range_hmm, ",")))
 
-    print("debug")
-    print(advanced_options_hmm$z_range)
-    value <- if(is.null(advanced_options_hmm$z_range)) NULL else advanced_options_hmm$z_range
-    print(value)
-
     esti <- hmm_estimate_CN(
       qploidy_standarize_result = data_standardized(),
       sample_id = input$sample_hmm,
@@ -1101,6 +1101,20 @@ mod_qploidy_server <- function(input, output, session, parent_session){
       ),
       rownames = FALSE
     )
+  })
+
+  output$plot_mixbaf <- renderPlot({
+    req(ploidies_hmm())
+
+    ploidies <- as.numeric(unlist(strsplit(input$ploidy_range_hmm, ",")))
+    baf_sample <- data_standardized()$data %>%
+                  filter(SampleName == input$sample_hmm)
+
+    res <- select_best_baf_model(baf_vec = baf_sample$baf,
+                               cn_grid =  ploidies, plot = TRUE)
+
+    p <- res$plot  
+    p
   })
 
   output$plot_hmm <- renderPlot({

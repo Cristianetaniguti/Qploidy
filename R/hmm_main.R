@@ -27,7 +27,6 @@
 #' @param baf_weight Numeric. Overall weight applied to BAF emission (0–1). Default \code{1}.
 #' @param z_range Numeric. Padding added to min/max z for initial mean estimation. Default \code{0.2}.
 #' @param transition_jump Numeric. Diagonal value for transition matrix (probability to stay in same CN state). Default \code{0.995}.
-#' @param exp_ploidy Integer. Expected ploidy for initialization. If \code{NULL}, median of \code{cn_grid} is used.
 #' @param z_only Logical. If \code{TRUE}, fit the HMM using the z-emission only (ignores BAF). Default \code{FALSE}.
 #' @param verbose Logical. If \code{TRUE}, print progress messages. Default \code{TRUE}.
 #'
@@ -174,9 +173,7 @@ hmm_estimate_CN <- function(
     ))
   }
 
-  if(is.null(exp_ploidy)){
-    exp_ploidy <- selected_model$best$best_cn
-  }
+  exp_ploidy <- selected_model$best$best_cn
   
   # --- build windows ---
   if (verbose) cat("Building windows...\n")

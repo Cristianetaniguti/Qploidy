@@ -243,6 +243,55 @@ hmm_estimate_CN <- function(
   keep <- win_df$n_snps >= min_snps_per_window
   if (!any(keep)) stop("All windows dropped by min_snps_per_window filter. Try lowering min_snps_per_window or check input data.")
 
+  # Handle single-window case: assign CN by BAF likelihood only, skip HMM/EM
+  if (sum(keep) == 1) {
+    if (verbose) cat("Only one window remains after filtering. Assigning CN by BAF likelihood only.\n")
+    # Use BAF likelihoods to assign CN
+    ll_baf_matrix <- do.call(rbind, lapply(baf_list, function(baf_vec) compute_baf_likelihoods(baf_vec,
+                                                                              cn_grid,
+                                                                              M = M,
+                                                                              bw = selected_model$best$bw,
+                                                                              plot = FALSE,
+                                                                              dist = selected_model$best$dist,
+                                                                              reflect = reflect,
+                                                                              add_uniform = selected_model$best$add_uniform,
+                                                                              uniform_weight = selected_model$best$uniform_weight)))[keep,,drop=FALSE]
+    cn_call <- cn_grid[apply(ll_baf_matrix, 1, which.max)]
+    post_max <- rep(1, 1)
+    post_df <- as.data.frame(matrix(0, nrow=1, ncol=length(cn_grid)))
+    names(post_df) <- paste0("post_CN", cn_grid)
+    post_df[1, which.max(ll_baf_matrix[1, ])] <- 1
+    result <- cbind(
+      data.frame(
+        Sample    = sample_id,
+        Chr       = win_df$Chr[keep],
+        WindowID  = win_df$WindowID[keep],
+        Start     = win_df$Start[keep],
+        End       = win_df$End[keep],
+        n_snps    = win_df$n_snps[keep],
+        n_het     = win_df$n_het[keep],
+        z         = win_df$z_mean[keep],
+        w_baf     = 1,
+        CN_call   = cn_call,
+        post_max  = post_max,
+        stringsAsFactors = FALSE
+      ),
+      post_df
+    )
+    params <- list(
+      cn_grid = cn_grid,
+      mu = NA,
+      sigma = NA,
+      A = NA,
+      pi0 = NA,
+      bins = M,
+      bw = selected_model$best$bw,
+      loglik = NA
+    )
+    if(verbose) cat("Done!\n")
+    return(structure(list(result = result, params = params), class = "hmm_CN"))
+  }
+
   # order windows first by chr then start
   o <- order(win_df$Chr, win_df$Start)
   win_df <- win_df[o, ]
@@ -290,7 +339,6 @@ hmm_estimate_CN <- function(
                                                                               uniform_weight = selected_model$best$uniform_weight))
 
     ll_baf_matrix <- do.call(rbind, lapply(baf_results, function(res) res$ll_vec))
-    prob_baf_matrix <- do.call(rbind, lapply(baf_results, function(res) res$prob_vec))
 
     if(verbose) cat("Counting heterozygous to determine BAF weights...\n")
     # BAF weights from heterozygote counts
@@ -313,257 +361,183 @@ hmm_estimate_CN <- function(
     w_baf <- rep(0, W)
   }
 
-  # --- HMM by chromosome ---
-  results_list <- list()
-  params_list <- list()
-  for (chr_name in unique(win_df$Chr)) {
-    if (verbose) cat(sprintf("\nFitting HMM for chromosome %s\n", chr_name))
+  # --- HMM for all chromosomes together ---
+  # fit a single HMM across all windows (all chromosomes)
+  if (verbose) cat("\nFitting HMM for all chromosomes together\n")
 
-    # Split by chromosome
-    chr_idx <- which(win_df$Chr == chr_name)
-    W_chr <- length(chr_idx)
-    win_df_chr <- win_df[chr_idx, ]
-    z_chr <- z[chr_idx]
-    baf_list_chr <- baf_list[chr_idx]
-    ll_baf_matrix_chr <- ll_baf_matrix[chr_idx, , drop = FALSE]
-    prob_baf_matrix_chr <- prob_baf_matrix[chr_idx, , drop = FALSE]
-    w_baf_chr <- w_baf[chr_idx]
+  # Setup for all windows
+  K <- length(cn_grid)
+  state_ids <- as.character(cn_grid)
 
-    # HMM setup for this chromosome
-    K_chr <- length(cn_grid) # The number of HMM states are the number of ploidies tested
-    state_ids_chr <- as.character(cn_grid)
+  # Transition matrix and initial state distribution
+  if(verbose) cat("  Setting transition matrices.\n")
+  # A is K×K. Before normalizing, every off-diagonal entry is 0.001 (rare jumps), and the diagonal is 0.995 (strong tendency to stay in the same CN state).
+  A <- matrix(1e-3, K, K); diag(A) <- transition_jump
+  # A <- A / rowSums(A) makes each row sum to 1 (a valid Markov matrix). After this, values are almost unchanged (just scaled so each row sums exactly to 1).
+  A <- A / rowSums(A)
+  # To consider: If is possible to change this matrix to favor specific small jumps, like if changing from 2->4 is more likely than 2->6
+  # pi0 is the initial state distribution at the first window; here it’s uniform (no prior preference for any CN at the start).
+  pi0 <- rep(1/K, K)
 
-    # transitions
-    # A is K×K. Before normalizing, every off-diagonal entry is 0.001 (rare jumps), and the diagonal is 0.995 (strong tendency to stay in the same CN state).
-    if(verbose) cat("  Setting transition matrices.\n")
-    A_chr <- matrix(1e-3, K_chr, K_chr); diag(A_chr) <- transition_jump
-    # A <- A / rowSums(A) makes each row sum to 1 (a valid Markov matrix). After this, values are almost unchanged (just scaled so each row sums exactly to 1).
-    A_chr <- A_chr / rowSums(A_chr)
-    # To consider: If is possible to change this matrix to favor specific small jumps, like if changing from 2->4 is more likely than 2->6
-    # pi0 is the initial state distribution at the first window; here it’s uniform (no prior preference for any CN at the start).
-    pi0_chr <- rep(1/K_chr, K_chr)
+  if(verbose) cat("  Defining z-score distribution templates.\n")
+  # z mean init (monotone ramp)
+  # z where is the mean z per window
+  # this subtracts 0.2 and add 0.2 to the min and max of z, and splits it in K values
+  # The small padding ±0.2 keeps edge states from starting exactly at the extremes, which helps EM avoid collapsing to boundary values.
+  # Because CN is ordered (2 < 3 < 4 …) and z increases with CN, this guarantees an ordered starting guess for means.
+  # the maximum value + 0.2 will be referring to the highest CN state - what I am not sure if it is a correct assumption
+  # the mean z value will reffer to the expected ploidy provided
+  z_mean <- mean(z, na.rm = TRUE)
+  z_lo   <- min(z, na.rm = TRUE) - z_range
+  z_hi   <- max(z, na.rm = TRUE) + z_range
+  cmin <- min(cn_grid)
+  cmax <- max(cn_grid)
 
-    if(verbose) cat("  Defining z-score distribution templates.\n")
-    # z mean init (monotone ramp)
-    # z where is the mean z per window
-    # this subtracts 0.2 and add 0.2 to the min and max of z, and splits it in K values
-    # The small padding ±0.2 keeps edge states from starting exactly at the extremes, which helps EM avoid collapsing to boundary values.
-    # Because CN is ordered (2 < 3 < 4 …) and z increases with CN, this guarantees an ordered starting guess for means.
-    # the maximum value + 0.2 will be referring to the highest CN state - what I am not sure if it is a correct assumption
-    # the mean z value will reffer to the expected ploidy provided
-    z_mean_chr  <- mean(z_chr, na.rm = TRUE)
-    z_lo_chr    <- min(z_chr, na.rm = TRUE) - z_range
-    z_hi_chr    <- max(z_chr, na.rm = TRUE) + z_range
-    cmin_chr <- min(cn_grid)
-    cmax_chr <- max(cn_grid)
+  # Choose a single linear step so extremes fit within [z_lo, z_hi]
+  # We need:
+  #   z_mean + step*(cmin - exp_ploidy) <= z_lo
+  #   z_mean + step*(cmax - exp_ploidy) >= z_hi
+  # Solve for step and take the max magnitude to satisfy both.
+  step_lo <- if (exp_ploidy > cmin) (z_mean - z_lo) / (exp_ploidy - cmin) else 0
+  step_hi <- if (exp_ploidy < cmax) (z_hi  - z_mean) / (cmax - exp_ploidy) else 0
+  step    <- max(step_lo, step_hi, 1e-6)
 
-    # Recompute chromosome-level expected ploidy
-    chromosome_level_ploidy <- select_best_baf_model(unlist(baf_list_chr)[-which(is.na(unlist(baf_list_chr)))],
-                                                     cn_grid,
-                                                     M = M,
-                                                     bw = selected_model$best$bw,
-                                                     plot = FALSE,
-                                                     dist = selected_model$best$dist,
-                                                     reflect = reflect,
-                                                     add_uniform = selected_model$best$add_uniform,
-                                                     uniform_weight = selected_model$best$uniform_weight)
+  # Monotone, baseline-centered initialization:
+  mu_vec <- z_mean + step * (as.numeric(cn_grid) - exp_ploidy)
+  mu     <- setNames(mu_vec, as.character(cn_grid))
+  # If state_ids are strings of cn_grid, this aligns. If not, reorder:
+  mu <- mu[state_ids]
 
-    exp_ploidy_chr <- chromosome_level_ploidy$best$best_cn
-    # If for some reason exp_ploidy_chr is NULL or non-finite, fall back to sample-level exp_ploidy
-    if (is.null(exp_ploidy_chr) || !is.finite(exp_ploidy_chr)) {
-      exp_ploidy_chr <- exp_ploidy
+  # sig is the (shared) standard deviation of the z emission across states.
+  # It starts at the sample SD of z, with a safety floor of 0.1 to avoid zero/near-zero variance that would blow up log-likelihoods.
+  sig <- sd(z, na.rm = TRUE); if (!is.finite(sig) || sig <= 1e-6) sig <- 0.1
+
+  ll_hist <- numeric(max_iter)
+  W <- length(z)
+  # --- EM loop ---
+  if(verbose) cat("  Starting EM.\n")
+  for (iter in 1:max_iter) {
+    # Emissions
+    ll_em <- matrix(NA_real_, nrow=W, ncol=K, dimnames=list(NULL, state_ids))
+    for (k in seq_len(K)) {
+      c <- cn_grid[k]
+      llz <- dnorm(z, mean=mu[as.character(c)], sd=sig, log=TRUE)
+      if(any(is.nan(llz))) llz[which(is.nan(llz))] <- 0
+      if (z_only) {
+        ll_em[,k] <- llz
+      } else {
+        llb <- ll_baf_matrix[,k]
+        ll_em[, k] <- llz + w_baf * llb
+      }
     }
 
-    # Choose a single linear step so extremes fit within [z_lo, z_hi]
-    # We need:
-    #   z_mean + step*(cmin - exp_ploidy) <= z_lo
-    #   z_mean + step*(cmax - exp_ploidy) >= z_hi
-    # Solve for step and take the max magnitude to satisfy both.
-    step_lo_chr <- if (exp_ploidy_chr > cmin_chr) (z_mean_chr - z_lo_chr) / (exp_ploidy_chr - cmin_chr) else 0
-    step_hi_chr <- if (exp_ploidy_chr < cmax_chr) (z_hi_chr  - z_mean_chr) / (cmax_chr - exp_ploidy_chr) else 0
-    step_chr    <- max(step_lo_chr, step_hi_chr, 1e-6)
-
-    # Monotone, baseline-centered initialization:
-    mu_vec_chr <- z_mean_chr + step_chr * (as.numeric(cn_grid) - exp_ploidy_chr)
-    mu_chr     <- setNames(mu_vec_chr, as.character(cn_grid))
-    # If state_ids are strings of cn_grid, this aligns. If not, reorder:
-    mu_chr <- mu_chr[state_ids_chr]
-
-    # sig is the (shared) standard deviation of the z emission across states.
-    # It starts at the sample SD of z, with a safety floor of 0.1 to avoid zero/near-zero variance that would blow up log-likelihoods.
-    sig_chr <- sd(z_chr, na.rm = TRUE); if (!is.finite(sig_chr) || sig_chr <= 1e-6) sig_chr <- 0.1
-
-    # EM loop for this chromosome
-    # --- EM loop ---
-    ll_hist_chr <- numeric(max_iter)
-    # If there is only one window, skip HMM and assign CN by BAF likelihood only
-    if (W_chr == 1) {
-      if(verbose) cat("  Only one window found for this chromosome. Skipping EM and assigning CN by BAF likelihood only.\n")
-      cn_call_chr <- cn_grid[apply(ll_baf_matrix_chr, 1, which.max)]
-      post_max_chr <- apply(prob_baf_matrix_chr, 1, max)
-      post_df_chr <- as.data.frame(prob_baf_matrix_chr)
-      names(post_df_chr) <- paste0("post_CN", cn_grid)
-      result_chr <- cbind(
-        data.frame(
-          Sample    = sample_id,
-          Chr       = win_df_chr$Chr,
-          WindowID  = win_df_chr$WindowID,
-          Start     = win_df_chr$Start,
-          End       = win_df_chr$End,
-          n_snps    = win_df_chr$n_snps,
-          n_het     = win_df_chr$n_het,
-          z         = z_chr,
-          w_baf     = if(z_only) 0 else 1,  # when only one window, baf weight is always 1
-          CN_call   = cn_call_chr,
-          post_max  = post_max_chr,
-          stringsAsFactors = FALSE
-        ),
-        post_df_chr
-      )
-      params_chr <- list(
-        cn_grid = cn_grid,
-        mu = NA,
-        sigma = NA,
-        A = NA,
-        pi0 = NA,
-        bins = M,
-        bw = selected_model$best$bw,
-        loglik = NA
-      )
-      results_list[[chr_name]] <- result_chr
-      params_list[[chr_name]] <- params_chr
-      next
-    }
-    # Otherwise, run EM/HMM as usual
-    if(verbose) cat("  Starting EM.\n")
-    for (iter in 1:max_iter) {
-      # Emissions
-      ll_em_chr <- matrix(NA_real_, nrow=W_chr, ncol=K_chr, dimnames=list(NULL, state_ids_chr))
-      for (k in seq_len(K_chr)) {
-        c <- cn_grid[k]
-        llz <- dnorm(z_chr, mean=mu_chr[as.character(c)], sd=sig_chr, log=TRUE)
-        if(any(is.nan(llz))) llz[which(is.nan(llz))] <- 0
-        if (z_only) {
-          ll_em_chr[,k] <- llz
-        } else {
-          llb <- ll_baf_matrix_chr[,k]
-          ll_em_chr[, k] <- llz + w_baf_chr * llb
-        }
-      }
-
-      if (!all(is.finite(ll_em_chr))) {
-        bad_w <- which(!is.finite(rowSums(ll_em_chr)))[1]
-        bad_k <- which(!is.finite(ll_em_chr[bad_w, ]))
-        stop(sprintf("Non-finite emission at window %d, states: %s.",
-                     bad_w, paste(colnames(ll_em_chr)[bad_k], collapse=", ")))
-      }
-
-      logA <- log(A_chr); logpi0 <- log(pi0_chr)
-      log_alpha <- matrix(-Inf, W_chr, K_chr); log_beta <- matrix(0, W_chr, K_chr)
-
-      # forward
-      log_alpha[1, ] <- logpi0 + ll_em_chr[1, ]
-      for (i in 2:W_chr) {
-        for (k in 1:K_chr) {
-          log_alpha[i,k] <- ll_em_chr[i,k] + logsumexp(log_alpha[i-1, ] + logA[,k])
-        }
-      }
-      # backward
-      for (i in (W_chr-1):1) {
-        for (k in 1:K_chr) {
-          log_beta[i,k] <- logsumexp(logA[k, ] + ll_em_chr[i+1, ] + log_beta[i+1, ])
-        }
-      }
-      loglik <- logsumexp(log_alpha[W_chr, ])
-      ll_hist_chr[iter] <- loglik
-
-      # E-step: posteriors
-      log_gamma <- log_alpha + log_beta
-      log_gamma <- sweep(log_gamma, 1, apply(log_gamma, 1, logsumexp), "-")
-      gamma <- exp(log_gamma)
-
-      # pairwise
-      xi_sum <- matrix(0, K_chr, K_chr)
-      for (i in 1:(W_chr-1)) {
-        M_ij <- outer(log_alpha[i, ], log_beta[i+1, ], "+") +
-          logA + matrix(ll_em_chr[i+1, ], K_chr, K_chr, byrow=TRUE)
-        M_ij <- M_ij - logsumexp(as.vector(M_ij))
-        xi_sum <- xi_sum + exp(M_ij)
-      }
-
-      # M-step: update parameters
-      pi0_chr <- gamma[1, ] / sum(gamma[1, ])
-      A_chr <- xi_sum / pmax(rowSums(xi_sum), 1e-12)
-      A_chr[!is.finite(A_chr)] <- 0
-      A_chr <- sweep(A_chr, 1, pmax(rowSums(A_chr), 1e-12), "/")
-      A_chr <- pmax(A_chr, 1e-12); A_chr <- sweep(A_chr, 1, rowSums(A_chr), "/")
-
-      # update mu and sigma
-      mu_chr <- numeric(K_chr)
-      for (k in 1:K_chr) {
-        w <- gamma[,k]
-        mu_chr[k] <- sum(w * z_chr) / pmax(sum(w), 1e-12)
-      }
-      mu_chr <- setNames(mu_chr, as.character(cn_grid))
-
-      # update shared sigma
-      sig_chr <- sqrt(sum(gamma * (matrix(z_chr, W_chr, K_chr) - rep(mu_chr, each=W_chr))^2) /
-                        pmax(sum(gamma), 1e-12))
-      sig_chr <- max(sig_chr, 1e-3)
-
-      # Convergence check
-      if (iter > 4 && is.finite(ll_hist_chr[iter]) && is.finite(ll_hist_chr[iter-1]) &&
-          abs(ll_hist_chr[iter] - ll_hist_chr[iter-1]) < 1e-4) break
+    if (!all(is.finite(ll_em))) {
+      bad_w <- which(!is.finite(rowSums(ll_em)))[1]
+      bad_k <- which(!is.finite(ll_em[bad_w, ]))
+      stop(sprintf("Non-finite emission at window %d, states: %s.",
+                   bad_w, paste(colnames(ll_em)[bad_k], collapse=", ")))
     }
 
-    if(verbose) cat(sprintf("  EM converged in %d iterations. Final log-likelihood: %.2f\n", iter, ll_hist_chr[iter]))
+    logA <- log(A); logpi0 <- log(pi0)
+    log_alpha <- matrix(-Inf, W, K); log_beta <- matrix(0, W, K)
 
-    # Decode Viterbi path
-    vit_path_chr <- viterbi(ll_em_chr, log(A_chr), log(pi0_chr))
-    cn_call_chr <- cn_grid[vit_path_chr]
+    # forward
+    log_alpha[1, ] <- logpi0 + ll_em[1, ]
+    for (i in 2:W) {
+      for (k in 1:K) {
+        log_alpha[i,k] <- ll_em[i,k] + logsumexp(log_alpha[i-1, ] + logA[,k])
+      }
+    }
+    # backward
+    for (i in (W-1):1) {
+      for (k in 1:K) {
+        log_beta[i,k] <- logsumexp(logA[k, ] + ll_em[i+1, ] + log_beta[i+1, ])
+      }
+    }
+    loglik <- logsumexp(log_alpha[W, ])
+    ll_hist[iter] <- loglik
 
-    # max posterior per window
-    post_max_chr <- apply(gamma, 1, max)
+    # E-step: posteriors
+    log_gamma <- log_alpha + log_beta
+    log_gamma <- sweep(log_gamma, 1, apply(log_gamma, 1, logsumexp), "-")
+    gamma <- exp(log_gamma)
 
-    # Prepare output
-    post_df_chr <- as.data.frame(gamma)
-    names(post_df_chr) <- paste0("post_CN", cn_grid)
-    result_chr <- cbind(
-      data.frame(
-        Sample    = sample_id,
-        Chr       = win_df_chr$Chr,
-        WindowID  = win_df_chr$WindowID,
-        Start     = win_df_chr$Start,
-        End       = win_df_chr$End,
-        n_snps    = win_df_chr$n_snps,
-        n_het     = win_df_chr$n_het,
-        z         = z_chr,
-        w_baf     = if(z_only) 0 else w_baf_chr,
-        CN_call   = cn_call_chr,
-        post_max  = post_max_chr,
-        stringsAsFactors = FALSE
-      ),
-      post_df_chr
-    )
-    params_chr <- list(
-      cn_grid = cn_grid,
-      mu = mu_chr,
-      sigma = sig_chr,
-      A = A_chr,
-      pi0 = pi0_chr,
-      bins = M,
-      bw = selected_model$best$bw,
-      loglik = tail(ll_hist_chr[is.finite(ll_hist_chr)], 1)
-    )
-    results_list[[chr_name]] <- result_chr
-    params_list[[chr_name]] <- params_chr
+    # pairwise
+    xi_sum <- matrix(0, K, K)
+    for (i in 1:(W-1)) {
+      M_ij <- outer(log_alpha[i, ], log_beta[i+1, ], "+") +
+        logA + matrix(ll_em[i+1, ], K, K, byrow=TRUE)
+      M_ij <- M_ij - logsumexp(as.vector(M_ij))
+      xi_sum <- xi_sum + exp(M_ij)
+    }
+
+    # M-step: update parameters
+    pi0 <- gamma[1, ] / sum(gamma[1, ])
+    A <- xi_sum / pmax(rowSums(xi_sum), 1e-12)
+    A[!is.finite(A)] <- 0
+    A <- sweep(A, 1, pmax(rowSums(A), 1e-12), "/")
+    A <- pmax(A, 1e-12); A <- sweep(A, 1, rowSums(A), "/")
+
+    # update mu and sigma
+    mu <- numeric(K)
+    for (k in 1:K) {
+      w <- gamma[,k]
+      mu[k] <- sum(w * z) / pmax(sum(w), 1e-12)
+    }
+    mu <- setNames(mu, as.character(cn_grid))
+    mu <- mu[state_ids]
+
+    # update shared sigma
+    sig <- sqrt(sum(gamma * (matrix(z, W, K) - rep(mu, each=W))^2) /
+                  pmax(sum(gamma), 1e-12))
+    sig <- max(sig, 1e-3)
+
+    # Convergence check
+    if (iter > 4 && is.finite(ll_hist[iter]) && is.finite(ll_hist[iter-1]) &&
+        abs(ll_hist[iter] - ll_hist[iter-1]) < 1e-4) break
   }
-  # Combine results
-  combined_result <- do.call(rbind, results_list)
-  rownames(combined_result) <- NULL
-  combined_params <- params_list
+
+  if(verbose) cat(sprintf("  EM converged in %d iterations. Final log-likelihood: %.2f\n", iter, ll_hist[iter]))
+
+  # Decode Viterbi path
+  vit_path <- viterbi(ll_em, log(A), log(pi0))
+  cn_call <- cn_grid[vit_path]
+
+  # max posterior per window
+  post_max <- apply(gamma, 1, max)
+
+  # Prepare output
+  post_df <- as.data.frame(gamma)
+  names(post_df) <- paste0("post_CN", cn_grid)
+  result <- cbind(
+    data.frame(
+      Sample    = sample_id,
+      Chr       = win_df$Chr,
+      WindowID  = win_df$WindowID,
+      Start     = win_df$Start,
+      End       = win_df$End,
+      n_snps    = win_df$n_snps,
+      n_het     = win_df$n_het,
+      z         = z,
+      w_baf     = if(z_only) 0 else w_baf,
+      CN_call   = cn_call,
+      post_max  = post_max,
+      stringsAsFactors = FALSE
+    ),
+    post_df
+  )
+  params <- list(
+    cn_grid = cn_grid,
+    mu = mu,
+    sigma = sig,
+    A = A,
+    pi0 = pi0,
+    bins = M,
+    bw = selected_model$best$bw,
+    loglik = tail(ll_hist[is.finite(ll_hist)], 1)
+  )
   if(verbose) cat("\nDone!\n")
-  return(structure(list(result = combined_result, params = combined_params), class = "hmm_CN"))
+  return(structure(list(result = result, params = params), class = "hmm_CN"))
 }
 
 #' Run hmm_estimate_CN in parallel for multiple samples (using parLapply)

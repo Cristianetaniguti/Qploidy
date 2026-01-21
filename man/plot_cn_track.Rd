@@ -17,7 +17,8 @@ plot_cn_track(
   line_width = 0.3,
   line_linetype = "dashed",
   heights = c(2, 2.5),
-  z_by_mean = TRUE
+  z_by_mean = TRUE,
+  chr = NULL
 )
 }
 \arguments{
@@ -38,6 +39,8 @@ plot_cn_track(
 \item{heights}{Numeric vector of length 2 or 3. Relative heights of the BAF, z, and CN panels.}
 
 \item{z_by_mean}{Logical. If TRUE, plot horizontal black lines for mean z per window using geom_segment; otherwise, use geom_smooth as before.}
+
+\item{chr}{Character vector. If provided, only these chromosomes are displayed in the plots.}
 }
 \value{
 A \code{ggplot} object (from ggpubr::ggarrange). Print to render, or add layers/scales as needed.

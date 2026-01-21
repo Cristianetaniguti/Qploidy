@@ -1132,7 +1132,7 @@ mod_qploidy_server <- function(input, output, session, parent_session){
                        show_window_lines = input$show_window_lines)
 
     updateProgressBar(session = session, id = "pb_qploidy", value = 100)
-    p
+    p$arranged
   })
 
   output$download_stand <- downloadHandler(
@@ -1217,7 +1217,7 @@ mod_qploidy_server <- function(input, output, session, parent_session){
                        qploidy_standarize_result= data_standardized(),
                        sample_id = input$sample_hmm,
                        show_window_lines = input$show_window_lines)
-      print(p)                  
+      print(p$arranged)                  
     }
   )
 

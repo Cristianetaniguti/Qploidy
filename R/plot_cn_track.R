@@ -11,6 +11,7 @@
 #' @param line_color,line_alpha,line_width,line_linetype Appearance settings for window boundary lines.
 #' @param heights Numeric vector of length 2 or 3. Relative heights of the BAF, z, and CN panels.
 #' @param z_by_mean Logical. If TRUE, plot horizontal black lines for mean z per window using geom_segment; otherwise, use geom_smooth as before.
+#' @param chr Character vector. If provided, only these chromosomes are displayed in the plots.
 #'
 #' @return A \code{ggplot} object (from ggpubr::ggarrange). Print to render, or add layers/scales as needed.
 #'
@@ -59,7 +60,8 @@ plot_cn_track <- function(hmm_CN,
                           line_width = 0.3,
                           line_linetype = "dashed",
                           heights = c(2, 2.5),
-                          z_by_mean = TRUE) {
+                          z_by_mean = TRUE,
+                          chr = NULL) {  # NEW ARGUMENT
 
   stopifnot(inherits(hmm_CN, "hmm_CN"))
   stopifnot(inherits(qploidy_standarize_result, "qploidy_standardization"))
@@ -74,6 +76,12 @@ plot_cn_track <- function(hmm_CN,
   if (is.null(sample_id)) sample_id <- unique(df$Sample)[1]
   x <- filter(df, Sample == sample_id)
   if (nrow(x) == 0) stop("No rows for sample_id = ", sample_id)
+
+  # Filter chromosomes if chr argument is provided
+  if (!is.null(chr)) {
+    x <- x[x$Chr %in% chr, ]
+    if (nrow(x) == 0) stop("No rows for selected chromosomes: ", paste(chr, collapse=", "))
+  }
 
   # Sort chromosomes in natural order (e.g., chr1e, chr2e, chr10e) without extra dependencies
   chr_order <- sort(unique(x$Chr), method = "radix")
@@ -322,10 +330,15 @@ plot_cn_track <- function(hmm_CN,
     )
 
   # -------- stack with ggpubr (no patchwork needed) --------
-  ggarrange(
-    p_baf, p_z, p_cn,
-    ncol = 1, nrow = 3,
-    heights = heights,
-    align = "v"
-  )
+  return(list(
+    baf = p_baf,
+    z   = p_z,
+    cn  = p_cn,
+    arranged = ggarrange(
+      p_baf, p_z, p_cn,
+      ncol = 1, nrow = 3,
+      heights = heights,
+      align = "v"
+    )
+  ))
 }

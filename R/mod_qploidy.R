@@ -491,7 +491,8 @@ mod_qploidy_server <- function(input, output, session, parent_session){
     baf_weight = 1,
     z_range = NA,
     transition_jump =0.995,
-    z_only = FALSE
+    z_only = FALSE,
+    exp_ploidy = NA
   )
 
   #UI popup window for input
@@ -530,6 +531,7 @@ mod_qploidy_server <- function(input, output, session, parent_session){
       numericInput(ns("transition_jump_hmm"), "Diagonal value for transition matrix (probability to stay in same CN state)",
                    min = 0, max = 1,value = advanced_options_hmm$transition_jump),
       checkboxInput(ns("z_only_hmm"), "Fit the HMM using the z-emission only (ignores BAF)", value = advanced_options_hmm$z_only),
+      numericInput(ns("exp_ploidy_hmm"), "Expected ploidy (override BAF model, optional)", min = 1, value = NA),
       footer = tagList(
         modalButton("Close"),
         actionButton(ns("save_advanced_options_hmm"), "Save")
@@ -557,6 +559,7 @@ mod_qploidy_server <- function(input, output, session, parent_session){
       numericInput(ns("transition_jump_all"), "Diagonal value for transition matrix (probability to stay in same CN state)",
                    min = 0, max = 1,value = advanced_options_hmm$transition_jump),
       checkboxInput(ns("z_only_all"), "Fit the HMM using the z-emission only (ignores BAF)", value = advanced_options_hmm$z_only),
+      numericInput(ns("exp_ploidy_all"), "Expected ploidy (override BAF model, optional)", min = 1, value = NA),
       footer = tagList(
         modalButton("Close"),
         actionButton(ns("save_advanced_options_hmm_all"), "Save")
@@ -584,7 +587,7 @@ mod_qploidy_server <- function(input, output, session, parent_session){
     advanced_options_hmm$z_range <- input$z_range_hmm
     advanced_options_hmm$transition_jump <- input$transition_jump_hmm
     advanced_options_hmm$z_only <- input$z_only_hmm
-
+    advanced_options_hmm$exp_ploidy <- input$exp_ploidy_hmm
     removeModal() # Close the modal after saving
   })
 
@@ -599,6 +602,7 @@ mod_qploidy_server <- function(input, output, session, parent_session){
     advanced_options_hmm$z_range <- input$z_range_all
     advanced_options_hmm$transition_jump <- input$transition_jump_all
     advanced_options_hmm$z_only <- input$z_only_all
+    advanced_options_hmm$exp_ploidy <- input$exp_ploidy_all
 
     removeModal() # Close the modal after saving
   })
@@ -897,7 +901,8 @@ mod_qploidy_server <- function(input, output, session, parent_session){
                                           z_range = advanced_options_hmm$z_range,
                                           transition_jump = if(is.null(advanced_options_hmm$transition_jump)) 0.995 else advanced_options_hmm$transition_jump,
                                           max_iter = 60,
-                                          z_only = if(is.null(advanced_options_hmm$z_only)) FALSE else advanced_options_hmm$z_only)
+                                          z_only = if(is.null(advanced_options_hmm$z_only)) FALSE else advanced_options_hmm$z_only,
+                                          exp_ploidy = if(is.null(advanced_options_hmm$exp_ploidy)) NA else advanced_options_hmm$exp_ploidy)
 
       print("ended multi_esti")
       updateProgressBar(session = session, id = "pb_qploidy", value = 60)
@@ -1076,7 +1081,8 @@ mod_qploidy_server <- function(input, output, session, parent_session){
       z_range = advanced_options_hmm$z_range,
       transition_jump = if(is.null(advanced_options_hmm$transition_jump)) 0.995 else advanced_options_hmm$transition_jump,
       max_iter = 60,
-      z_only = if(is.null(advanced_options_hmm$z_only)) FALSE else advanced_options_hmm$z_only
+      z_only = if(is.null(advanced_options_hmm$z_only)) FALSE else advanced_options_hmm$z_only,
+      exp_ploidy = if(is.null(advanced_options_hmm$exp_ploidy)) NA else advanced_options_hmm$exp_ploidy
     )
 
     updateProgressBar(session = session, id = "pb_qploidy", value = 75)

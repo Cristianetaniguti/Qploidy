@@ -23,7 +23,8 @@ hmm_estimate_CN(
   z_range = NULL,
   transition_jump = 0.995,
   z_only = FALSE,
-  verbose = TRUE
+  verbose = TRUE,
+  exp_ploidy = NA
 )
 }
 \arguments{
@@ -67,6 +68,8 @@ component when \code{add_uniform = TRUE}. Default 0.05.}
 \item{z_only}{Logical. If \code{TRUE}, fit the HMM using the z-emission only (ignores BAF). Default \code{FALSE}.}
 
 \item{verbose}{Logical. If \code{TRUE}, print progress messages. Default \code{TRUE}.}
+
+\item{exp_ploidy}{Numeric. Expected ploidy value. If \code{NA} or \code{NULL}, it is set to the best CN from the BAF model. Default \code{NA}.}
 }
 \value{
 An object of class \code{hmm_CN}, a list with two elements:

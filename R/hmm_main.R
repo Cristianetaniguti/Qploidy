@@ -29,6 +29,7 @@
 #' @param transition_jump Numeric. Diagonal value for transition matrix (probability to stay in same CN state). Default \code{0.995}.
 #' @param z_only Logical. If \code{TRUE}, fit the HMM using the z-emission only (ignores BAF). Default \code{FALSE}.
 #' @param verbose Logical. If \code{TRUE}, print progress messages. Default \code{TRUE}.
+#' @param exp_ploidy Numeric. Expected ploidy value. If \code{NA} or \code{NULL}, it is set to the best CN from the BAF model. Default \code{NA}.
 #'
 #' @return An object of class \code{hmm_CN}, a list with two elements:
 #'   \describe{
@@ -108,7 +109,8 @@ hmm_estimate_CN <- function(
     z_range = NULL, 
     transition_jump = 0.995, # decrease this value if you think there changes in CN is likely
     z_only = FALSE,
-    verbose = TRUE
+    verbose = TRUE,
+    exp_ploidy = NA
 ) {
 
   # --- input checks ---
@@ -157,24 +159,14 @@ hmm_estimate_CN <- function(
                                           M = M,
                                           reflect = reflect)
 
-  if(verbose) {
-    cat("  Best BAF model summary:\n")
-    cat(sprintf(
-      "    CN: %s\n    Distribution: %s\n    Bandwidth: %.4f\n    Uniform noise: %s (weight: %.2f)\n    Log-likelihood: %.2f\n    BIC: %.2f\n    Probability: %.3f\n    Observations: %d\n",
-      selected_model$best$best_cn,
-      selected_model$best$dist,
-      selected_model$best$bw,
-      ifelse(selected_model$best$add_uniform, "yes", "no"),
-      selected_model$best$uniform_weight,
-      selected_model$best$logLik,
-      selected_model$best$BIC,
-      selected_model$best$prob,
-      selected_model$best$n_obs
-    ))
+  # Use exp_ploidy argument if provided, otherwise use selected_model$best$best_cn
+  if (is.null(exp_ploidy) || (length(exp_ploidy) == 1 && is.na(exp_ploidy))) {
+    exp_ploidy <- selected_model$best$best_cn
+    if(verbose) cat(sprintf("  exp_ploidy not provided, using best CN from BAF model: %s\n", exp_ploidy))
+  } else {
+    if(verbose) cat(sprintf("  exp_ploidy provided by user: %s\n", exp_ploidy))
   }
 
-  exp_ploidy <- selected_model$best$best_cn
-  
   # --- build windows ---
   if (verbose) cat("Building windows...\n")
   d <- d[order(d[["Chr"]], d[["Position"]]), ]

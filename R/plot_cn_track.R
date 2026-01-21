@@ -75,6 +75,11 @@ plot_cn_track <- function(hmm_CN,
   x <- filter(df, Sample == sample_id)
   if (nrow(x) == 0) stop("No rows for sample_id = ", sample_id)
 
+  # Sort chromosomes in natural order (e.g., chr1e, chr2e, chr10e) without extra dependencies
+  chr_order <- sort(unique(x$Chr), method = "radix")
+  chr_order <- chr_order[order(as.numeric(gsub("[^0-9]+", "", chr_order)), chr_order)]
+  x$Chr <- factor(x$Chr, levels = chr_order)
+
   if (is.null(cn_min)) cn_min <- min(x$CN_call, na.rm = TRUE)
   if (is.null(cn_max)) cn_max <- max(x$CN_call, na.rm = TRUE)
 
@@ -96,6 +101,7 @@ plot_cn_track <- function(hmm_CN,
   # Pull marker-level data for the sample
   data_sample2 <- qploidy_standarize_result$data %>%
     filter(SampleName == sample_id & Chr %in% unique(x$Chr))
+  data_sample2$Chr <- factor(data_sample2$Chr, levels = chr_order)
 
   # Per-chromosome genomic range (based on BAF markers)
   chrom_ghost <- data_sample2 %>%
@@ -172,14 +178,20 @@ plot_cn_track <- function(hmm_CN,
     z_means <- hmm_CN$result %>%
       filter(Sample == sample_id) %>%
       select(Chr, WindowID, Start, End, w_baf, z_mean = z) %>%
-      arrange(Chr, Start)
+      arrange(factor(Chr, levels = chr_order), Start)
+    z_means$Chr <- factor(z_means$Chr, levels = chr_order)
     p_z <- ggplot(marker_df, aes(x = Position, y = z, color = w_baf)) +
       geom_point(size = 1.2, alpha = 0.8) +
       geom_segment(
         data = z_means,
-        aes(x = Start, xend = End, y = z_mean, yend = z_mean, group = WindowID),
+        aes(x = Start, xend = End, y = z_mean, yend = z_mean, group = WindowID, color = NULL),
         inherit.aes = FALSE,
         color = "black", linewidth = 0.7
+      ) +
+      geom_blank(
+        data = chrom_ghost,
+        inherit.aes = FALSE,
+        aes(x = Position, y = min(marker_df$z, na.rm = TRUE))
       ) +
       { if (show_window_lines)
         geom_vline(data = vlines, aes(xintercept = Start),
@@ -206,6 +218,11 @@ plot_cn_track <- function(hmm_CN,
       geom_point(size = 1.2, alpha = 0.8) +
       geom_smooth(aes(group = Chr), method = "loess", se = FALSE,
                   color = "black", linewidth = 0.7, span = 0.2) +
+      geom_blank(
+        data = chrom_ghost,
+        inherit.aes = FALSE,
+        aes(x = Position, y = min(marker_df$z, na.rm = TRUE))
+      ) +
       { if (show_window_lines)
         geom_vline(data = vlines, aes(xintercept = Start),
                    color = line_color, alpha = line_alpha,
@@ -261,7 +278,7 @@ plot_cn_track <- function(hmm_CN,
       else NULL } +
     facet_wrap(~ Chr, scales = "free_x", nrow = 1) +
     scale_y_continuous(breaks = seq(cn_min, cn_max, by = 1), minor_breaks = NULL) +
-    scale_color_viridis_c(name = "P(CN call)", limits = c(0, 1), option = "D") +
+    scale_color_viridis_c(name = "P(CN call)", limits = c(0, 1), option = "D", direction = -1) +
     labs(x = "Genomic position (bp)", y = "Copy number") +
     theme_bw(base_size = 12) +
     theme(

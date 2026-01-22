@@ -448,9 +448,9 @@ compare_cn_track <- function(hmm_CN,
 
     vals <- setNames(rep(NA_character_, length(cn_num)), cn_chr)
 
-    # baseline: black
+    # baseline: gray
     if (as.character(baseline) %in% cn_chr) {
-      vals[as.character(baseline)] <- "#000000"
+      vals[as.character(baseline)] <- "#888888"  # gray
     }
 
     # predefined dark ramps (long enough for typical CN ranges; saturates beyond)

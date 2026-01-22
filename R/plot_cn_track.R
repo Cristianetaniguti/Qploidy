@@ -83,10 +83,17 @@ plot_cn_track <- function(hmm_CN,
     if (nrow(x) == 0) stop("No rows for selected chromosomes: ", paste(chr, collapse=", "))
   }
 
-  # Sort chromosomes in natural order (e.g., chr1e, chr2e, chr10e) without extra dependencies
+  # Remove NA chromosomes from all relevant data frames before plotting
+  x <- x[!is.na(x$Chr), ]
+  if (nrow(x) == 0) stop("No non-NA chromosomes left after filtering.")
   chr_order <- sort(unique(x$Chr), method = "radix")
   chr_order <- chr_order[order(as.numeric(gsub("[^0-9]+", "", chr_order)), chr_order)]
   x$Chr <- factor(x$Chr, levels = chr_order)
+
+  data_sample2 <- qploidy_standarize_result$data %>%
+    filter(SampleName == sample_id & Chr %in% unique(x$Chr))
+  data_sample2 <- data_sample2[!is.na(data_sample2$Chr), ]
+  data_sample2$Chr <- factor(data_sample2$Chr, levels = chr_order)
 
   if (is.null(cn_min)) cn_min <- min(x$CN_call, na.rm = TRUE)
   if (is.null(cn_max)) cn_max <- max(x$CN_call, na.rm = TRUE)
@@ -109,6 +116,7 @@ plot_cn_track <- function(hmm_CN,
   # Pull marker-level data for the sample
   data_sample2 <- qploidy_standarize_result$data %>%
     filter(SampleName == sample_id & Chr %in% unique(x$Chr))
+  data_sample2 <- data_sample2[!is.na(data_sample2$Chr), ]
   data_sample2$Chr <- factor(data_sample2$Chr, levels = chr_order)
 
   # Per-chromosome genomic range (based on BAF markers)
@@ -184,7 +192,7 @@ plot_cn_track <- function(hmm_CN,
   if (z_by_mean) {
     # Calculate mean z by WindowID using hmm_CN$result
     z_means <- hmm_CN$result %>%
-      filter(Sample == sample_id) %>%
+      filter(Sample == sample_id & !is.na(Chr) & Chr %in% chr_order) %>%
       select(Chr, WindowID, Start, End, w_baf, z_mean = z) %>%
       arrange(factor(Chr, levels = chr_order), Start)
     z_means$Chr <- factor(z_means$Chr, levels = chr_order)

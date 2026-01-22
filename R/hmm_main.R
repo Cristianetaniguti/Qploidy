@@ -147,13 +147,18 @@ hmm_estimate_CN <- function(
 
   # If z_range is not provided, estimate from data
   if (is.null(z_range) || (length(z_range) == 1 && is.na(z_range))) {
-    z_range <- (1/length(cn_grid)) * (max(d$z, na.rm = TRUE) - min(d$z, na.rm = TRUE))
+    fake_dt <- data.frame(theta = d$z)
+    z_no_out <- rm_outlier(fake_dt)
+    # Extract numeric vector for quantile calculation
+    if (is.data.frame(z_no_out)) z_no_out <- z_no_out$theta
+    #z_range <- (1/length(cn_grid)) * (max(z_no_out) - min(z_no_out))
+    # Room for improvement here
+    z_range <- (1/length(cn_grid)) * (as.numeric(quantile(z_no_out, probs = 0.75)) - as.numeric(quantile(z_no_out, probs = 0.25)))
     if (verbose) cat(sprintf("    Estimated z_range from data: %f\n", z_range))
   }
 
   # --- set expected ploidy ---
   # Calculate expected ploidy using sample-level BAF distribution
-  if(verbose) cat("Selecting best BAF model to set expected ploidy based on sample-level BAF distribution...\n")
   selected_model <- select_best_baf_model(d$baf,
                                           cn_grid= cn_grid,
                                           M = M,

@@ -310,6 +310,14 @@ mod_qploidy_ui <- function(id){
                             plotOutput(ns("plot_mixbaf"), height = 300)
                         ), br(),
                         box(title="HMM results", collapsed = FALSE, width = 12,
+                              virtualSelectInput(
+                                   inputId = ns("chr_cn_track"),
+                                   label = "Select Chromosome(s)*:",
+                                   choices = NULL,
+                                   showValueAsTags = TRUE,
+                                   search = TRUE,
+                                   multiple = TRUE
+                                 ),
                             plotOutput(ns("plot_hmm"), height = 800)
                         ), br(),
                         box(title="HMM results", collapsed = TRUE, width = 12,
@@ -853,6 +861,13 @@ mod_qploidy_server <- function(input, output, session, parent_session){
 
     updateVirtualSelect(
       session = session,
+      inputId = "chr_cn_track",
+      choices = chrs,
+      selected = sel
+    )
+
+    updateVirtualSelect(
+      session = session,
       inputId = "sele_chr_all",
       choices = chrs,
       selected = sel
@@ -1129,7 +1144,8 @@ mod_qploidy_server <- function(input, output, session, parent_session){
     p <- plot_cn_track(hmm_CN = ploidies_hmm(),
                        qploidy_standarize_result= data_standardized(),
                        sample_id = input$sample_hmm,
-                       show_window_lines = input$show_window_lines)
+                       show_window_lines = input$show_window_lines,
+                       chr = input$chr_cn_track)
 
     updateProgressBar(session = session, id = "pb_qploidy", value = 100)
     p$arranged

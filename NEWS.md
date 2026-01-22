@@ -1,3 +1,31 @@
+# Qploidy 1.6.0 
+
+* Major refactor and improvements to BAF likelihood/model selection workflow and plotting 
+* Added support for testing different emission distributions for BAF (nQuack idea), including negative binomial, with automated model selection via BIC
+* Refactoring of BAF template generation and likelihood computation into dedicated functions
+* Improved plotting functions:
+    - plot_cn_track has now a fallback to hmm_CN$updated_data if qploidy_standarize_result is NULL
+    - function compare_cn_track added
+    - Improved color palette for CN plots
+    - Chromosome sorting and x-axis labeling improved for clarity
+    - Legends and color mapping clarified and improved
+    - Subsetting chromosomes on plot - not only on hmm
+* HMM segmentation and CN calling:
+    - Implementation of changepoint-based z-score segmentation as an alternative to fixed-window approaches
+    - Single HMM across all chromosomes (not per-chromosome)
+    - Robust outlier handling for z-scores (rm_outlier supports z argument and outlier column)
+    - Exception handling for single-window case (assigns CN by BAF likelihood only)
+    - exp_ploidy argument added and integrated throughout (including Shiny UI)
+    - Improved verbose output and summary messages
+    - By default, z_range is now automatically calculated based on the inter-quantile range of z-scores and the number of CN states tested, for more robust and adaptive HMM initialization
+* User experience and error handling:
+    - Improved error messages and fallback logic in plotting and HMM functions
+    - Documentation expanded and clarified for all major functions
+* Shiny UI:
+    - Sample-level BAF distributions plot added 
+    - exp_ploidy is now an advanced option for z_only=TRUE
+    - Argument passing and advanced options printing improved
+
 # Qploidy 1.5.2
 
 * Z-score calculation is now only applied to markers not filtered by genotype probabilities and missing data
@@ -29,7 +57,6 @@
 * Vignette with functional simulated example
 * Testthat tests included
 * CRAN submission
-
 
 # Qploidy 0.0.0.9000
 

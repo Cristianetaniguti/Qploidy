@@ -362,6 +362,9 @@ get_zscore <- function(data = NULL,
 #' @param alpha Significance level for identifying outliers (default is `0.05`).
 #'   Observations with adjusted p-values below this threshold will be removed.
 #'
+#' @param z Logical; if `TRUE`, evaluates outliers in the `z` column and sets outlier `z` values to `NA`,
+#'   returning the full data.frame. Otherwise, original behavior is preserved.
+#'
 #' @return A data.frame containing only the non-outlier observations from the input.
 #'   If fewer than two non-NA `theta` values are present or if all values are identical,
 #'   the input is returned unmodified.
@@ -372,42 +375,44 @@ get_zscore <- function(data = NULL,
 #' @import multtest
 #'
 #' @export
-rm_outlier <- function(data, alpha=0.05){
-  # Produce externally standardized residuals
-  theta <- data$theta
-  rm.na <- which(is.na(theta))
-  if(length(rm.na) > 0) theta <- theta[-rm.na]
-  if(length(theta) < 2 || length(unique(theta)) == 1) {
+rm_outlier <- function(data, alpha=0.05, z=FALSE){
+  # If z=TRUE, operate on z column; else, on theta
+  col <- if (z) "z" else "theta"
+  vec <- data[[col]]
+  rm.na <- which(is.na(vec))
+  if(length(rm.na) > 0) vec <- vec[-rm.na]
+  if(length(vec) < 2 || length(unique(vec)) == 1) {
+    if(z) {
+      data$outlier <- FALSE
+    }
     return(data)
   } else {
-    lm.object <- lm(theta ~ 1)
+    lm.object <- lm(vec ~ 1)
     resid <- lm.object$residuals
     studresid <- resid/sd(resid, na.rm=TRUE)
-    # Calculate adjusted p-values
     rawp.BHStud = 2 * (1 - pnorm(abs(studresid)))
-    #Produce a Bonferroni-Holm tests for the adjusted p-values
-    #The output is a list
     test.BHStud <- multtest::mt.rawp2adjp(rawp.BHStud,proc=c("Holm"),alpha = alpha)
-    #Create vectors/matrices out of the list of the BH tests
     adjp = cbind(test.BHStud[[1]][,1])
     bholm = cbind(test.BHStud[[1]][,2])
     index = test.BHStud$index
-    # Condition to flag outliers according to the BH test
     out_flag = ifelse(bholm<alpha, "OUTLIER ", ".")
-    #Create a matrix with all the output of the BH test
     BHStud_test = cbind(adjp,bholm,index,out_flag)
-    #Order the file by index
     BHStud_test2 = BHStud_test[order(index),]
-    #Label colums
     names = c("rawp","bholm","index","out_flag")
     colnames(BHStud_test2) <- names
-    #Create a final file, with the data and the test and the labels for the outliers
-
-    # Take a look at the outliers
     outliers_BH <- as.numeric(BHStud_test2[which(BHStud_test2[,"out_flag"]!="."),"index"])
-    if(length(outliers_BH) >0) new.theta <- data[-outliers_BH,] else new.theta <- data
-
-    return(new.theta)
+    if(z) {
+      # Add outlier column: TRUE for outliers, FALSE otherwise
+      data$outlier <- FALSE
+      if(length(outliers_BH) > 0) {
+        data[["z"]][outliers_BH] <- NA
+        data$outlier[outliers_BH] <- TRUE
+      }
+      return(data)
+    } else {
+      if(length(outliers_BH) >0) new.vec <- data[-outliers_BH,] else new.vec <- data
+      return(new.vec)
+    }
   }
 }
 

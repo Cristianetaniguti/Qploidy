@@ -30,6 +30,8 @@
 #' @param z_only Logical. If \code{TRUE}, fit the HMM using the z-emission only (ignores BAF). Default \code{FALSE}.
 #' @param verbose Logical. If \code{TRUE}, print progress messages. Default \code{TRUE}.
 #' @param exp_ploidy Numeric. Expected ploidy value. If \code{NA} or \code{NULL}, it is set to the best CN from the BAF model. Default \code{NA}.
+#' @param rm_outliers Logical. If \code{TRUE}, remove outliers from z-scores before HMM fitting. Default \code{TRUE}.
+#' @param outlier_alpha Numeric. Alpha threshold for outlier removal in z-scores. Default 0.05.
 #'
 #' @return An object of class \code{hmm_CN}, a list with two elements:
 #'   \describe{
@@ -89,6 +91,8 @@
 #' @importFrom stats dnorm quantile sd
 #' @importFrom graphics hist
 #' @importFrom utils tail
+#' @importFrom dplyr filter
+#'
 #' @export
 hmm_estimate_CN <- function(
     qploidy_standarize_result,
@@ -106,11 +110,13 @@ hmm_estimate_CN <- function(
     het_lims = c(0,1), # baf limits to consider a SNP heterozygous
     het_quantile = 0.8, # increase this value to reduce the weight of baf when few hets
     baf_weight = 1,
-    z_range = NULL, 
+    z_range = NULL,
     transition_jump = 0.995, # decrease this value if you think there changes in CN is likely
     z_only = FALSE,
     verbose = TRUE,
-    exp_ploidy = NA
+    exp_ploidy = NA,
+    rm_outliers = TRUE,
+    outlier_alpha = 0.05
 ) {
 
   # --- input checks ---
@@ -126,34 +132,32 @@ hmm_estimate_CN <- function(
   if (nrow(df) == 0) stop("Input data is empty. No SNPs found for any sample.")
 
   # subset to one sample
-  if (verbose) cat("\nSubsetting by sample and chromosomes...\n")
-  d <- df[df[["SampleName"]] == sample_id, , drop = FALSE]
+  d <- filter(df, SampleName == sample_id)
   if (nrow(d) == 0) stop(sprintf("No data found for sample '%s'.", sample_id))
 
   # subset to chromosomes
   if (!is.null(chr)) {
-    if (is.numeric(chr)) {
-      chrs <- unique(d[["Chr"]])[chr]
-      d <- d[which(d[["Chr"]] %in% chrs), , drop = FALSE]
-    } else {
-      d <- d[which(d[["Chr"]] %in% chr), , drop = FALSE]
-    }
+    chrs <- if (is.numeric(chr)) unique(d$Chr)[chr] else chr
+    d <- filter(d, Chr %in% chrs)
     if (nrow(d) == 0) stop("No data found for specified chromosomes after filtering.")
   }
 
+  # Remove outliers from z-scores
+  if(rm_outliers){
+    n_na <- sum(is.na(d$z))
+    d <- rm_outlier(d, z = TRUE, alpha= outlier_alpha)
+    if(verbose) cat("  Outliers removed from z-scores:", sum(is.na(d$z)) - n_na, "\n")
+  }
+
   # Remove markers with missing baf and z
-  rm <- which(is.na(d[["baf"]]) & is.na(d[["z"]]))
+  rm <- which(is.na(d[["z"]]))
   if(length(rm) > 0) d <- d[-rm, , drop = FALSE]
 
   # If z_range is not provided, estimate from data
   if (is.null(z_range) || (length(z_range) == 1 && is.na(z_range))) {
-    fake_dt <- data.frame(theta = d$z)
-    z_no_out <- rm_outlier(fake_dt)
-    # Extract numeric vector for quantile calculation
-    if (is.data.frame(z_no_out)) z_no_out <- z_no_out$theta
-    #z_range <- (1/length(cn_grid)) * (max(z_no_out) - min(z_no_out))
+    #z_range <- (1/length(cn_grid)) * (max(d$z) - min(d$z))
     # Room for improvement here
-    z_range <- (1/length(cn_grid)) * (as.numeric(quantile(z_no_out, probs = 0.75)) - as.numeric(quantile(z_no_out, probs = 0.25)))
+    z_range <- (1/length(cn_grid)) * (as.numeric(quantile(d$z, probs = 0.75)) - as.numeric(quantile(d$z, probs = 0.25)))
     if (verbose) cat(sprintf("    Estimated z_range from data: %f\n", z_range))
   }
 
@@ -286,7 +290,7 @@ hmm_estimate_CN <- function(
       loglik = NA
     )
     if(verbose) cat("Done!\n")
-    return(structure(list(result = result, params = params), class = "hmm_CN"))
+    return(structure(list(result = result, params = params, updated_data = d), class = "hmm_CN"))
   }
 
   # order windows first by chr then start
@@ -534,7 +538,7 @@ hmm_estimate_CN <- function(
     loglik = tail(ll_hist[is.finite(ll_hist)], 1)
   )
   if(verbose) cat("\nDone!\n")
-  return(structure(list(result = result, params = params), class = "hmm_CN"))
+  return(structure(list(result = result, params = params, updated_data = d), class = "hmm_CN"))
 }
 
 #' Run hmm_estimate_CN in parallel for multiple samples (using parLapply)

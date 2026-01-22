@@ -4,7 +4,7 @@
 \alias{rm_outlier}
 \title{Identify and Remove Outliers Based on Bonferroni-Holm Adjusted P-values}
 \usage{
-rm_outlier(data, alpha = 0.05)
+rm_outlier(data, alpha = 0.05, z = FALSE)
 }
 \arguments{
 \item{data}{A data.frame containing a `theta` column.
@@ -12,6 +12,9 @@ This is usually a subset of the full dataset, representing samples within a sing
 
 \item{alpha}{Significance level for identifying outliers (default is `0.05`).
 Observations with adjusted p-values below this threshold will be removed.}
+
+\item{z}{Logical; if `TRUE`, evaluates outliers in the `z` column and sets outlier `z` values to `NA`,
+returning the full data.frame. Otherwise, original behavior is preserved.}
 }
 \value{
 A data.frame containing only the non-outlier observations from the input.

@@ -24,7 +24,9 @@ hmm_estimate_CN(
   transition_jump = 0.995,
   z_only = FALSE,
   verbose = TRUE,
-  exp_ploidy = NA
+  exp_ploidy = NA,
+  rm_outliers = TRUE,
+  outlier_alpha = 0.05
 )
 }
 \arguments{
@@ -70,6 +72,10 @@ component when \code{add_uniform = TRUE}. Default 0.05.}
 \item{verbose}{Logical. If \code{TRUE}, print progress messages. Default \code{TRUE}.}
 
 \item{exp_ploidy}{Numeric. Expected ploidy value. If \code{NA} or \code{NULL}, it is set to the best CN from the BAF model. Default \code{NA}.}
+
+\item{rm_outliers}{Logical. If \code{TRUE}, remove outliers from z-scores before HMM fitting. Default \code{TRUE}.}
+
+\item{outlier_alpha}{Numeric. Alpha threshold for outlier removal in z-scores. Default 0.05.}
 }
 \value{
 An object of class \code{hmm_CN}, a list with two elements:

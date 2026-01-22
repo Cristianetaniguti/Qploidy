@@ -6,7 +6,7 @@
 \usage{
 plot_cn_track(
   hmm_CN,
-  qploidy_standarize_result,
+  qploidy_standarize_result = NULL,
   sample_id = NULL,
   cn_min = NULL,
   cn_max = NULL,
@@ -22,9 +22,9 @@ plot_cn_track(
 )
 }
 \arguments{
-\item{hmm_CN}{An object of class \code{hmm_CN} (output from \code{hmm_estimate_CN}), containing a \code{result} data frame with one row per window and columns: \code{Sample}, \code{Chr}, \code{Start}, \code{End}, \code{CN_call}, \code{post_CN*}, etc.}
+\item{hmm_CN}{An object of class \code{hmm_CN} (output from \code{hmm_estimate_CN}), containing a \code{result} data frame with one row per window and columns: \code{Sample}, \code{Chr}, \code{Start}, \code{End}, \code{CN_call}, \code{post_CN*}, etc. Optionally, may contain \code{updated_data} for marker-level fallback.}
 
-\item{qploidy_standarize_result}{An object of class \code{qploidy_standardization} (output from \code{standardize}), used to extract BAF values for the BAF panel.}
+\item{qploidy_standarize_result}{An object of class \code{qploidy_standardization} (output from \code{standardize}), used to extract BAF values for the BAF panel. If NULL, marker-level data is taken from \code{hmm_CN$updated_data}.}
 
 \item{sample_id}{Character scalar. Which sample from \code{hmm_CN$Sample} to display. Defaults to the first unique value in \code{hmm_CN$Sample}.}
 
@@ -46,10 +46,10 @@ plot_cn_track(
 A \code{ggplot} object (from ggpubr::ggarrange). Print to render, or add layers/scales as needed.
 }
 \description{
-Plots a genome track for each window, showing the called copy number (CN) as a horizontal segment and coloring by the posterior probability of that call. Facets are split by chromosome. The top panel shows z-scores per window, colored by BAF weight; the bottom panel shows CN segments colored by posterior probability. The new top panel shows BAF values per SNP, colored by BAF weight, for the selected sample and chromosomes.
+Plots a genome track for each window, showing the called copy number (CN) as a horizontal segment and coloring by the posterior probability of that call. Facets are split by chromosome. The top panel shows z-scores per window, colored by BAF weight; the bottom panel shows CN segments colored by posterior probability. The new top panel shows BAF values per SNP, colored by BAF weight, for the selected sample and chromosomes. If `qploidy_standarize_result` is NULL, marker-level data is taken from `hmm_CN$updated_data` (if available).
 }
 \details{
-Posterior columns are detected by the prefix "post_CN" and matched to \code{CN_call} values, so the function is agnostic to the specific CN grid. The BAF panel shows per-SNP BAF values for the selected sample and chromosomes, colored by the BAF weight for the corresponding region. The z panel shows window z-scores, colored by BAF weight. The CN panel shows copy number segments colored by posterior probability.
+Posterior columns are detected by the prefix "post_CN" and matched to \code{CN_call} values, so the function is agnostic to the specific CN grid. The BAF panel shows per-SNP BAF values for the selected sample and chromosomes, colored by the BAF weight for the corresponding region. The z panel shows window z-scores, colored by BAF weight. The CN panel shows copy number segments colored by posterior probability. If marker-level data is unavailable in \code{qploidy_standarize_result}, the function will use \code{hmm_CN$updated_data} if present, otherwise an error is thrown.
 }
 \section{Expected columns}{
 

@@ -1,9 +1,9 @@
 #' Plot copy-number segments per window with posterior shading and BAF
 #'
-#' Plots a genome track for each window, showing the called copy number (CN) as a horizontal segment and coloring by the posterior probability of that call. Facets are split by chromosome. The top panel shows z-scores per window, colored by BAF weight; the bottom panel shows CN segments colored by posterior probability. The new top panel shows BAF values per SNP, colored by BAF weight, for the selected sample and chromosomes.
+#' Plots a genome track for each window, showing the called copy number (CN) as a horizontal segment and coloring by the posterior probability of that call. Facets are split by chromosome. The top panel shows z-scores per window, colored by BAF weight; the bottom panel shows CN segments colored by posterior probability. The new top panel shows BAF values per SNP, colored by BAF weight, for the selected sample and chromosomes. If `qploidy_standarize_result` is NULL, marker-level data is taken from `hmm_CN$updated_data` (if available).
 #'
-#' @param hmm_CN An object of class \code{hmm_CN} (output from \code{hmm_estimate_CN}), containing a \code{result} data frame with one row per window and columns: \code{Sample}, \code{Chr}, \code{Start}, \code{End}, \code{CN_call}, \code{post_CN*}, etc.
-#' @param qploidy_standarize_result An object of class \code{qploidy_standardization} (output from \code{standardize}), used to extract BAF values for the BAF panel.
+#' @param hmm_CN An object of class \code{hmm_CN} (output from \code{hmm_estimate_CN}), containing a \code{result} data frame with one row per window and columns: \code{Sample}, \code{Chr}, \code{Start}, \code{End}, \code{CN_call}, \code{post_CN*}, etc. Optionally, may contain \code{updated_data} for marker-level fallback.
+#' @param qploidy_standarize_result An object of class \code{qploidy_standardization} (output from \code{standardize}), used to extract BAF values for the BAF panel. If NULL, marker-level data is taken from \code{hmm_CN$updated_data}.
 #' @param sample_id Character scalar. Which sample from \code{hmm_CN$Sample} to display. Defaults to the first unique value in \code{hmm_CN$Sample}.
 #' @param cn_min,cn_max Numeric scalars. Y-axis limits for CN. Defaults span the min/max of \code{CN_call}.
 #' @param show_window_lines Logical. If TRUE, show dashed vertical lines at window boundaries.
@@ -16,7 +16,7 @@
 #' @return A \code{ggplot} object (from ggpubr::ggarrange). Print to render, or add layers/scales as needed.
 #'
 #' @details
-#' Posterior columns are detected by the prefix "post_CN" and matched to \code{CN_call} values, so the function is agnostic to the specific CN grid. The BAF panel shows per-SNP BAF values for the selected sample and chromosomes, colored by the BAF weight for the corresponding region. The z panel shows window z-scores, colored by BAF weight. The CN panel shows copy number segments colored by posterior probability.
+#' Posterior columns are detected by the prefix "post_CN" and matched to \code{CN_call} values, so the function is agnostic to the specific CN grid. The BAF panel shows per-SNP BAF values for the selected sample and chromosomes, colored by the BAF weight for the corresponding region. The z panel shows window z-scores, colored by BAF weight. The CN panel shows copy number segments colored by posterior probability. If marker-level data is unavailable in \code{qploidy_standarize_result}, the function will use \code{hmm_CN$updated_data} if present, otherwise an error is thrown.
 #'
 #' @section Expected columns:
 #' The function assumes posterior columns named exactly \code{post_CN<k>} for each copy-number state \code{k}. If your column naming differs, rename them before calling this function.
@@ -49,7 +49,7 @@
 #'
 #' @export
 plot_cn_track <- function(hmm_CN,
-                          qploidy_standarize_result,  # for BAF plot
+                          qploidy_standarize_result = NULL, 
                           sample_id = NULL,
                           cn_min = NULL,
                           cn_max = NULL,
@@ -64,7 +64,7 @@ plot_cn_track <- function(hmm_CN,
                           chr = NULL) {  # NEW ARGUMENT
 
   stopifnot(inherits(hmm_CN, "hmm_CN"))
-  stopifnot(inherits(qploidy_standarize_result, "qploidy_standardization"))
+  stopifnot(inherits(qploidy_standarize_result, "qploidy_standardization") || is.null(qploidy_standarize_result))
 
   # packages used
   # (keep as imports in your pkg / DESCRIPTION; here assumed available)
@@ -90,10 +90,30 @@ plot_cn_track <- function(hmm_CN,
   chr_order <- chr_order[order(as.numeric(gsub("[^0-9]+", "", chr_order)), chr_order)]
   x$Chr <- factor(x$Chr, levels = chr_order)
 
-  data_sample2 <- qploidy_standarize_result$data %>%
-    filter(SampleName == sample_id & Chr %in% unique(x$Chr))
-  data_sample2 <- data_sample2[!is.na(data_sample2$Chr), ]
-  data_sample2$Chr <- factor(data_sample2$Chr, levels = chr_order)
+  # If qploidy_standarize_result is NULL, use hmm_CN$updated_data as marker-level data
+  if (is.null(qploidy_standarize_result)) {
+    if (!is.null(hmm_CN$updated_data)) {
+      data_sample2 <- hmm_CN$updated_data
+      if (!is.null(data_sample2) && is.data.frame(data_sample2)) {
+        data_sample2 <- filter(data_sample2, SampleName == sample_id & Chr %in% unique(x$Chr))
+        data_sample2 <- data_sample2[!is.na(data_sample2$Chr), ]
+        data_sample2$Chr <- factor(data_sample2$Chr, levels = chr_order)
+      } else {
+        stop("hmm_CN$updated_data is not a valid data.frame.")
+      }
+    } else {
+      stop("Both qploidy_standarize_result and hmm_CN$updated_data are NULL. Cannot plot marker-level data.")
+    }
+  } else {
+    data_sample2 <- qploidy_standarize_result$data
+    if (!is.null(data_sample2) && is.data.frame(data_sample2)) {
+      data_sample2 <- filter(data_sample2, SampleName == sample_id & Chr %in% unique(x$Chr))
+      data_sample2 <- data_sample2[!is.na(data_sample2$Chr), ]
+      data_sample2$Chr <- factor(data_sample2$Chr, levels = chr_order)
+    } else {
+      stop("qploidy_standarize_result$data is not a valid data.frame.")
+    }
+  }
 
   if (is.null(cn_min)) cn_min <- min(x$CN_call, na.rm = TRUE)
   if (is.null(cn_max)) cn_max <- max(x$CN_call, na.rm = TRUE)
@@ -114,10 +134,30 @@ plot_cn_track <- function(hmm_CN,
   x$Mid   <- (x$Start + x$End)/2
 
   # Pull marker-level data for the sample
-  data_sample2 <- qploidy_standarize_result$data %>%
-    filter(SampleName == sample_id & Chr %in% unique(x$Chr))
-  data_sample2 <- data_sample2[!is.na(data_sample2$Chr), ]
-  data_sample2$Chr <- factor(data_sample2$Chr, levels = chr_order)
+  # Use hmm_CN$updated_data if qploidy_standarize_result is NULL
+  if (is.null(qploidy_standarize_result)) {
+    if (!is.null(hmm_CN$updated_data)) {
+      data_sample2 <- hmm_CN$updated_data
+      if (!is.null(data_sample2) && is.data.frame(data_sample2)) {
+        data_sample2 <- filter(data_sample2, SampleName == sample_id & Chr %in% unique(x$Chr))
+        data_sample2 <- data_sample2[!is.na(data_sample2$Chr), ]
+        data_sample2$Chr <- factor(data_sample2$Chr, levels = chr_order)
+      } else {
+        stop("hmm_CN$updated_data is not a valid data.frame.")
+      }
+    } else {
+      stop("Both qploidy_standarize_result and hmm_CN$updated_data are NULL. Cannot plot marker-level data.")
+    }
+  } else {
+    data_sample2 <- qploidy_standarize_result$data
+    if (!is.null(data_sample2) && is.data.frame(data_sample2)) {
+      data_sample2 <- filter(data_sample2, SampleName == sample_id & Chr %in% unique(x$Chr))
+      data_sample2 <- data_sample2[!is.na(data_sample2$Chr), ]
+      data_sample2$Chr <- factor(data_sample2$Chr, levels = chr_order)
+    } else {
+      stop("qploidy_standarize_result$data is not a valid data.frame.")
+    }
+  }
 
   # Per-chromosome genomic range (based on BAF markers)
   chrom_ghost <- data_sample2 %>%
@@ -188,16 +228,17 @@ plot_cn_track <- function(hmm_CN,
   # OPTIONAL: if any w_baf are slightly out of [0,1], squish for color scaling
   # marker_df$w_baf <- squish(marker_df$w_baf, range = c(0, 1))
 
-  # -------- top panel: z dots (color = w_baf) --------
+  # -------- top panel: z dots (color = w_baf, shape = outlier if present) --------
+  shape_aes <- if ("outlier" %in% colnames(marker_df)) aes(shape = outlier) else NULL
+
   if (z_by_mean) {
-    # Calculate mean z by WindowID using hmm_CN$result
     z_means <- hmm_CN$result %>%
       filter(Sample == sample_id & !is.na(Chr) & Chr %in% chr_order) %>%
       select(Chr, WindowID, Start, End, w_baf, z_mean = z) %>%
       arrange(factor(Chr, levels = chr_order), Start)
     z_means$Chr <- factor(z_means$Chr, levels = chr_order)
     p_z <- ggplot(marker_df, aes(x = Position, y = z, color = w_baf)) +
-      geom_point(size = 1.2, alpha = 0.8) +
+      geom_point(size = 1.2, alpha = 0.8, mapping = shape_aes) +
       geom_segment(
         data = z_means,
         aes(x = Start, xend = End, y = z_mean, yend = z_mean, group = WindowID, color = NULL),
@@ -219,6 +260,7 @@ plot_cn_track <- function(hmm_CN,
                             limits = c(0, 1),
                             oob = squish,
                             name = "BAF weight") +
+      { if ("outlier" %in% colnames(marker_df)) scale_shape_manual(values = c("FALSE" = 16, "TRUE" = 4), name = "Outlier") else NULL } +
       labs(x = NULL, y = "z") +
       theme_bw(base_size = 12) +
       theme(
@@ -231,7 +273,7 @@ plot_cn_track <- function(hmm_CN,
       )
   } else {
     p_z <- ggplot(marker_df, aes(x = Position, y = z, color = w_baf)) +
-      geom_point(size = 1.2, alpha = 0.8) +
+      geom_point(size = 1.2, alpha = 0.8, mapping = shape_aes) +
       geom_smooth(aes(group = Chr), method = "loess", se = FALSE,
                   color = "black", linewidth = 0.7, span = 0.2) +
       geom_blank(
@@ -249,6 +291,7 @@ plot_cn_track <- function(hmm_CN,
                             limits = c(0, 1),
                             oob = squish,
                             name = "BAF weight") +
+      { if ("outlier" %in% colnames(marker_df)) scale_shape_manual(values = c("FALSE" = 16, "TRUE" = 4), name = "Outlier") else NULL } +
       labs(x = NULL, y = "z") +
       theme_bw(base_size = 12) +
       theme(
@@ -349,4 +392,172 @@ plot_cn_track <- function(hmm_CN,
       align = "v"
     )
   ))
+}
+
+
+#' Compare CNV tracks across samples
+#'
+#' Plots CNV windows as horizontal segments for multiple samples, faceted by chromosome.
+#' Segments are colored by copy number (CN_call) using a high-contrast palette:
+#' baseline CN (most frequent, weighted by window length) is black; losses are blue;
+#' gains are red. Transparency reflects posterior confidence (post_max).
+#'
+#' @param hmm_CN An object of class hmm_CN (output from hmm_estimate_CN), containing a result data frame with columns: Sample, Chr, Start, End, CN_call, post_max, etc.
+#' @param samples_to_plot Character vector of sample IDs to include. If NULL, the first sample in the data is plotted.
+#' @param chromosomes Optional character vector of chromosomes to include (matching result$Chr). If NULL, plots all chromosomes present after sample filtering.
+#' @param facet_ncol Number of columns for facet_wrap. If NULL, will be determined automatically unless facet_nrow is set.
+#' @param facet_nrow Number of rows for facet_wrap. If set, facet_ncol will be determined automatically unless both are set.
+#'
+#' @return A ggplot object.
+#'
+#' @importFrom dplyr filter group_by summarise arrange desc
+#' @importFrom ggplot2 ggplot geom_segment facet_wrap
+#' @importFrom ggplot2 scale_x_continuous scale_color_manual scale_alpha
+#' @importFrom ggplot2 labs theme_bw theme
+#' @importFrom ggplot2 element_blank element_rect element_text
+#'
+#' @export
+compare_cn_track <- function(hmm_CN,
+                             samples_to_plot = NULL,
+                             chromosomes = NULL,
+                             facet_ncol = NULL,
+                             facet_nrow = NULL) {
+
+  stopifnot(inherits(hmm_CN, "hmm_CN"))
+  cnv_df <- hmm_CN$result
+
+  req_cols <- c("Sample", "Chr", "Start", "End", "CN_call", "post_max")
+  missing_cols <- setdiff(req_cols, colnames(cnv_df))
+  if (length(missing_cols) > 0) {
+    stop("hmm_CN$result is missing required columns: ", paste(missing_cols, collapse = ", "))
+  }
+
+  # If samples_to_plot is NULL, use the first sample found
+  if (is.null(samples_to_plot) || length(samples_to_plot) == 0) {
+    samples_to_plot <- unique(cnv_df$Sample)[1]
+  }
+
+  # ---- local helper: dependency-free, dark, high-contrast palette with black baseline ----
+  make_cn_palette_dark <- function(cn_levels, baseline) {
+
+    cn_num <- sort(unique(as.integer(as.character(cn_levels))))
+    cn_chr <- as.character(cn_num)
+
+    below <- cn_num[cn_num < baseline]
+    above <- cn_num[cn_num > baseline]
+
+    vals <- setNames(rep(NA_character_, length(cn_num)), cn_chr)
+
+    # baseline: black
+    if (as.character(baseline) %in% cn_chr) {
+      vals[as.character(baseline)] <- "#000000"
+    }
+
+    # predefined dark ramps (long enough for typical CN ranges; saturates beyond)
+    blues <- c(
+      "#08306b", "#2171b5", "#6baed6"  # dark, medium, light blue
+    )
+    reds <- c(
+      "#67000d", "#cb181d", "#fc9272"  # dark, medium, light red
+    )
+    # If more levels, interpolate with greater color jumps
+    if (length(below) > length(blues)) {
+      blues <- colorRampPalette(blues, space = "Lab")(length(below))
+    } else {
+      blues <- blues[seq_len(length(below))]
+    }
+    if (length(above) > length(reds)) {
+      reds <- colorRampPalette(reds, space = "Lab")(length(above))
+    } else {
+      reds <- reds[seq_len(length(above))]
+    }
+    if (length(below) > 0) {
+      vals[as.character(below)] <- blues
+    }
+    if (length(above) > 0) {
+      vals[as.character(above)] <- reds
+    }
+    vals
+  }
+
+  # ---- filter data ----
+  plot_df <- cnv_df |>
+    filter(.data$Sample %in% samples_to_plot)
+
+  if (!is.null(chromosomes)) {
+    plot_df <- plot_df |>
+      filter(.data$Chr %in% chromosomes)
+  }
+
+  if (nrow(plot_df) == 0) {
+    stop("No rows left after filtering. Check samples_to_plot and chromosomes.")
+  }
+
+  # order samples top-to-bottom in the user-provided order (first listed = top)
+  samples_present <- intersect(samples_to_plot, unique(plot_df$Sample))
+  plot_df$Sample <- factor(plot_df$Sample, levels = rev(samples_present))
+
+  # CN_call as integer -> ordered factor
+  plot_df$CN_call <- as.integer(as.character(plot_df$CN_call))
+
+  # baseline CN = most frequent CN, weighted by window length (End-Start)
+  plot_df$w <- pmax(0, plot_df$End - plot_df$Start)
+  cn_totals <- plot_df |>
+    group_by(.data$CN_call) |>
+    summarise(total_bp = sum(.data$w, na.rm = TRUE), .groups = "drop") |>
+    arrange(desc(.data$total_bp))
+
+  baseline_cn <- cn_totals$CN_call[1]
+
+  cn_levels <- sort(unique(plot_df$CN_call))
+  plot_df$CN_call <- factor(plot_df$CN_call, levels = cn_levels)
+
+  # palette
+  cn_pal <- make_cn_palette_dark(levels(plot_df$CN_call), baseline_cn)
+
+  # Order chromosomes by extracting the numeric part and sorting accordingly
+  chr_levels <- unique(plot_df$Chr)
+  chr_nums <- suppressWarnings(as.numeric(gsub("[^0-9]+", "", chr_levels)))
+  chr_order <- chr_levels[order(chr_nums, chr_levels)]
+  plot_df$Chr <- factor(plot_df$Chr, levels = chr_order)
+
+  # ---- build plot ----
+  n_facets <- length(unique(plot_df$Chr))
+  ncol_final <- facet_ncol
+  nrow_final <- facet_nrow
+  if (!is.null(facet_nrow) && is.null(facet_ncol)) {
+    ncol_final <- ceiling(n_facets / facet_nrow)
+  }
+  if (!is.null(facet_ncol) && is.null(facet_nrow)) {
+    nrow_final <- NULL
+  }
+  ggplot(plot_df) +
+    geom_segment(
+      aes(
+        x = .data$Start, xend = .data$End,
+        y = .data$Sample, yend = .data$Sample,
+        color = .data$CN_call, alpha = .data$post_max
+      ),
+      linewidth = 4,
+      lineend = "butt"
+    ) +
+    facet_wrap(~ Chr, scales = "free_x", ncol = ncol_final, nrow = nrow_final) +
+    scale_x_continuous(
+      labels = function(x) paste0(format(x / 1e6, trim = TRUE), " Mb")
+    ) +
+    scale_color_manual(
+      values = cn_pal,
+      drop = FALSE,
+      name = "CN"
+    ) +
+    scale_alpha(range = c(0.35, 1), guide = "none") +
+    labs(x = "Position", y = NULL) +
+    theme_bw() +
+    theme(
+      panel.grid.major.y = element_blank(),
+      panel.grid.minor = element_blank(),
+      strip.background = element_rect(fill = NA),
+      strip.text = element_text(face = "bold"),
+      axis.text.y = element_text(size = 9)
+    )
 }

@@ -543,7 +543,8 @@ compare_cn_track <- function(hmm_CN,
     ) +
     facet_wrap(~ Chr, scales = "free_x", ncol = ncol_final, nrow = nrow_final) +
     scale_x_continuous(
-      labels = function(x) paste0(format(x / 1e6, trim = TRUE), " Mb")
+      labels = function(x) format(x / 1e6, trim = TRUE),
+      name = "Position (Mb)"
     ) +
     scale_color_manual(
       values = cn_pal,
@@ -551,7 +552,7 @@ compare_cn_track <- function(hmm_CN,
       name = "CN"
     ) +
     scale_alpha(range = c(0.35, 1), guide = "none") +
-    labs(x = "Position", y = NULL) +
+    labs(y = NULL) +
     theme_bw() +
     theme(
       panel.grid.major.y = element_blank(),

@@ -85,7 +85,7 @@
 #     - nQuack: flexible but iterative; potentially slower and init-sensitive.
 #
 # ------------------------------------------------------------------------------
-# 4) Why Qploidy DO NOT fully reproduce the nQuack EM approach, despite admiring it
+# 4) Why Qploidy DOES NOT fully reproduce the nQuack EM approach, despite admiring it
 # ------------------------------------------------------------------------------
 #
 # We admire nQuack’s EM-based model fitting and its principled model-selection

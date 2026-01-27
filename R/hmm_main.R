@@ -643,16 +643,16 @@ hmm_estimate_CN_multi <- function(qploidy_standarize_result,
 
   parameters <- lapply(results_list, function(x) x$params)
   names(parameters) <- sample_ids
-  results_list <- lapply(results_list, function(x) x$by_window)
-  d <- lapply(results_list, function(x) x$by_marker)
+  by_window <- lapply(results_list, function(x) x$by_window)
+  by_marker <- lapply(results_list, function(x) x$by_marker)
 
-  results_list <- Filter(Negate(is.null), results_list)
-  if (length(results_list) == 0) stop("No results returned for any sample.")
+  by_window <- Filter(Negate(is.null), by_window)
+  if (length(by_window) == 0) stop("No results returned for any sample.")
 
-  combined <- do.call(rbind, results_list)
-  updated_data <- do.call(rbind, d)
-  rownames(combined) <- NULL
-  return(structure(list(by_window =combined, by_marker = updated_data, params_samples = parameters), class = "hmm_CN"))
+  by_window <- do.call(rbind, by_window)
+  by_marker <- do.call(rbind, by_marker)
+  rownames(by_window) <- NULL
+  return(structure(list(by_window =by_window, by_marker = by_marker, params_samples = parameters), class = "hmm_CN"))
 }
 
 
@@ -664,9 +664,9 @@ hmm_estimate_CN_multi <- function(qploidy_standarize_result,
 #'
 #' @param x An object of class 'hmm_CN'.
 #' @param ... Additional arguments (ignored).
-#' 
+#'
 #' @method print hmm_CN
-#' 
+#'
 #' @export
 print.hmm_CN <- function(x, ...) {
   if (!inherits(x, "hmm_CN")) {

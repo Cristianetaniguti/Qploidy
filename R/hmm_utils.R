@@ -110,9 +110,9 @@ summarize_cn_mode <- function(df,
                               post_col = "post_max") {
   level <- match.arg(level)
 
-  # unwrap if hmm_CN-like object with $result
-  dat <- if (is.data.frame(df)) df else if (!is.null(df$result) && is.data.frame(df$result)) df$result else
-    stop("Input must be a data.frame or an hmm_CN-like object with a data.frame at `$result`.")
+  # unwrap if hmm_CN-like object with $by_window
+  dat <- if (is.data.frame(df)) df else if (!is.null(df$by_window) && is.data.frame(df$by_window)) df$by_window else
+    stop("Input must be a data.frame or an hmm_CN-like object with a data.frame at `$by_window`.")
 
   # required columns
   req_cols <- c("Sample", "Chr", "Start", "End", cn_col, post_col)

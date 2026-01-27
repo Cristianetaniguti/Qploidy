@@ -874,6 +874,7 @@ all_resolutions_plots <- function(
 #'   `sample != "all"`. Default: `"tomato"`.
 #' @param other_color Color used for non-highlighted samples when
 #'   `sample != "all"`. Default: `"grey75"`.
+#' @param color_by_geno Logical. If TRUE and a 'geno' column is present in df, color points by genotype. Default is FALSE.
 #'
 #' @return A **ggplot** object.
 #'
@@ -885,7 +886,8 @@ all_resolutions_plots <- function(
 plot_xy_with_ploidy_guides <- function(df, ploidy = 2,
                                        sample = NULL,
                                        highlight_color = "tomato",
-                                       other_color = "grey75") {
+                                       other_color = "grey75",
+                                       color_by_geno = FALSE) {
   stopifnot(all(c("X","Y") %in% names(df)))
   if (!"SampleName" %in% names(df) && identical(sample, "all")) {
     stop("Column 'SampleName' is required when sample='all'.")
@@ -917,7 +919,12 @@ plot_xy_with_ploidy_guides <- function(df, ploidy = 2,
   guides <- data.frame(dosage, ratio, slope, type)
 
   # Base plot (legend reflects only samples present in df_plot)
-  if(is.null(sample)){
+  if (color_by_geno && "geno" %in% names(df_plot)) {
+    p <- ggplot(df_plot, aes(X, Y, color = as.factor(geno))) +
+      geom_point(alpha = 0.85, size = 2, na.rm = TRUE) +
+      guides(color = guide_legend(override.aes = list(alpha = 1))) +
+      labs(color = "geno")
+  } else if(is.null(sample)){
     p <- ggplot(df_plot, aes(X, Y)) +
       geom_point(alpha = 0.85, size = 2, na.rm = TRUE) +
       guides(color = guide_legend(override.aes = list(alpha = 1)))

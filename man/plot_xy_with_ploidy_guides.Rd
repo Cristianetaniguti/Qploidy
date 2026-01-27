@@ -9,7 +9,8 @@ plot_xy_with_ploidy_guides(
   ploidy = 2,
   sample = NULL,
   highlight_color = "tomato",
-  other_color = "grey75"
+  other_color = "grey75",
+  color_by_geno = FALSE
 )
 }
 \arguments{
@@ -27,6 +28,8 @@ or the name of a single sample to highlight. Default: `"all"`.}
 
 \item{other_color}{Color used for non-highlighted samples when
 `sample != "all"`. Default: `"grey75"`.}
+
+\item{color_by_geno}{Logical. If TRUE and a 'geno' column is present in df, color points by genotype. Default is FALSE.}
 }
 \value{
 A **ggplot** object.

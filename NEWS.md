@@ -1,3 +1,10 @@
+# Qploidy 1.6.1
+
+* write and read function for hmm_CN object
+* print function summarizing estimated paramters in hmm_CN object
+* hmm now return two data.frames, one with information by window and another by marker
+* hmm returns list of parameters defined by user and estimated by function for reproducibility
+
 # Qploidy 1.6.0 
 
 * Major refactor and improvements to BAF likelihood/model selection workflow and plotting 

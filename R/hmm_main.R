@@ -16,8 +16,6 @@
 #'   kernels to keep mass within [0,1] (useful for gaussian).
 #' @param add_uniform Logical. If TRUE, add a uniform noise component to the
 #'   mixture before renormalization. Default FALSE.
-#' @param uniform_weight Numeric in [0,1]. Mixture weight of the uniform
-#'   component when \code{add_uniform = TRUE}. Default 0.05.
 #' @param min_snps_per_window Integer. Minimum SNPs required to keep a window (windows with fewer SNPs are dropped). Default \code{100}.
 #' @param cn_grid Integer vector of copy-number states to consider (e.g., \code{2:8}).
 #' @param M Integer. Number of BAF histogram bins on [0,1]. Default \code{121}.
@@ -100,7 +98,6 @@ hmm_estimate_CN <- function(
     chr = NULL,
     reflect = TRUE,
     add_uniform = FALSE,
-    uniform_weight = 0.05,
     segment_zscore = TRUE,
     snps_per_window = 50,
     min_snps_per_window = 20,
@@ -281,16 +278,36 @@ hmm_estimate_CN <- function(
     )
     params <- list(
       cn_grid = cn_grid,
+      distribution = selected_model$best$dist,
       mu = NA,
       sigma = NA,
       A = NA,
       pi0 = NA,
       bins = M,
       bw = selected_model$best$bw,
-      loglik = NA
+      loglik = NA,
+      z_range = z_range,
+      het_lims = het_lims,
+      het_quantile = het_quantile,
+      baf_weight = baf_weight,
+      transition_jump = transition_jump,
+      z_only = z_only,
+      exp_ploidy = exp_ploidy,
+      rm_outliers = rm_outliers,
+      outlier_alpha = outlier_alpha,
+      segment_zscore = segment_zscore,
+      snps_per_window = snps_per_window,
+      min_snps_per_window = min_snps_per_window,
+      add_uniform = add_uniform,
+      uniform_weight = selected_model$best$uniform_weight
     )
+
+    window_map <- match(d$.__w__, result$WindowID)
+    d$w_baf    <- result$w_baf[window_map]
+    d$CN_call  <- result$CN_call[window_map]
+    d$post_max <- result$post_max[window_map]
     if(verbose) cat("Done!\n")
-    return(structure(list(result = result, params = params, updated_data = d), class = "hmm_CN"))
+    return(structure(list(by_window = result, by_marker = d, params = params), class = "hmm_CN"))
   }
 
   # order windows first by chr then start
@@ -529,16 +546,40 @@ hmm_estimate_CN <- function(
   )
   params <- list(
     cn_grid = cn_grid,
+    distribution = selected_model$best$dist,
     mu = mu,
     sigma = sig,
     A = A,
     pi0 = pi0,
     bins = M,
     bw = selected_model$best$bw,
-    loglik = tail(ll_hist[is.finite(ll_hist)], 1)
+    loglik = ll_hist[iter],
+    z_range = z_range,
+    het_lims = het_lims,
+    het_quantile = het_quantile,
+    baf_weight = baf_weight,
+    transition_jump = transition_jump,
+    z_only = z_only,
+    exp_ploidy = exp_ploidy,
+    rm_outliers = rm_outliers,
+    outlier_alpha = outlier_alpha,
+    segment_zscore = segment_zscore,
+    snps_per_window = snps_per_window,
+    min_snps_per_window = min_snps_per_window,
+    add_uniform = add_uniform,
+    uniform_weight = selected_model$best$uniform_weight
   )
   if(verbose) cat("\nDone!\n")
-  return(structure(list(result = result, params = params, updated_data = d), class = "hmm_CN"))
+
+  if (!is.null(result) && !is.null(d)) {
+    map_df <- result[, c("Chr", "WindowID", "w_baf", "CN_call", "post_max")]
+    names(map_df)[names(map_df) == "WindowID"] <- ".__w__"
+    d <- merge(d, map_df, by = c("Chr", ".__w__"), all.x = TRUE, sort = FALSE)
+    d <- d[order(match(seq_len(nrow(d)), as.integer(rownames(d)))), ]
+    rownames(d) <- NULL
+  }
+
+  return(structure(list(by_window = result, by_marker = d, params = params), class = "hmm_CN"))
 }
 
 #' Run hmm_estimate_CN in parallel for multiple samples (using parLapply)
@@ -601,13 +642,102 @@ hmm_estimate_CN_multi <- function(qploidy_standarize_result,
                             qploidy_standarize_result, dots)
 
   parameters <- lapply(results_list, function(x) x$params)
-  results_list <- lapply(results_list, function(x) x$result)
+  names(parameters) <- sample_ids
+  results_list <- lapply(results_list, function(x) x$by_window)
+  d <- lapply(results_list, function(x) x$by_marker)
+
   results_list <- Filter(Negate(is.null), results_list)
   if (length(results_list) == 0) stop("No results returned for any sample.")
 
   combined <- do.call(rbind, results_list)
+  updated_data <- do.call(rbind, d)
   rownames(combined) <- NULL
-  return(structure(list(result =combined, params = parameters[[1]]), class = "hmm_CN"))
+  return(structure(list(by_window =combined, by_marker = updated_data, params_samples = parameters), class = "hmm_CN"))
 }
 
 
+#' Print method for hmm_CN objects
+#'
+#' Prints a summary of the HMM copy-number estimation results, including key parameters.
+#' If the object contains a params_samples list (multi-sample), prints the number of samples.
+#' Otherwise, prints details from the params list.
+#'
+#' @param x An object of class 'hmm_CN'.
+#' @param ... Additional arguments (ignored).
+#' 
+#' @method print hmm_CN
+#' 
+#' @export
+print.hmm_CN <- function(x, ...) {
+  if (!inherits(x, "hmm_CN")) {
+    stop("Object is not of class 'hmm_CN'.")
+  }
+  if (!is.null(x$params_samples)) {
+    cat("hmm_CN multi-sample result\n")
+    cat("  Number of samples:", length(x$params_samples), "\n")
+    invisible(x)
+    return()
+  }
+  params <- x$params
+  cat("hmm_CN result\n")
+  cat("  Copy-number grid:", paste(params$cn_grid, collapse=", "), "\n")
+  cat("  Expected ploidy:", params$exp_ploidy, "\n")
+  cat("  Initial state probabilities (pi0):", paste(round(params$pi0, 3), collapse=", "), "\n")
+  cat("  Estimated z means per CN:", paste(round(sort(params$mu), 3), collapse=", "), "\n")
+  cat("  Estimated z mean:", mean(x$by_window$z , na.rm=TRUE), "\n")
+  cat("  Estimated z sigma:", round(params$sigma, 3), "\n")
+  cat("  BAF Emission distribution:", if(!is.null(params$distribution)) params$distribution else "(not specified)", "\n")
+  cat("  Final log-likelihood:", params$loglik, "\n")
+  # Print range of CN_call values
+  if (!is.null(x$by_window) && !is.null(x$by_window$CN_call)) {
+    cn_vals <- x$by_window$CN_call
+    cat("  Range of CN_call (window-level):", paste(range(as.numeric(cn_vals), na.rm=TRUE), collapse=" - "), "\n")
+  }
+  invisible(x)
+}
+
+#' Write hmm_CN object to three CSV files
+#'
+#' Writes the three main components of an hmm_CN object (by_window, by_marker, params) to CSV files.
+#' The user must provide a file prefix; files will be named <prefix>_by_window.csv, <prefix>_by_marker.csv, <prefix>_params.csv.
+#' @param hmm_CN An object of class 'hmm_CN'.
+#' @param prefix File prefix for output files (character scalar).
+#' @export
+write_hmm_CN <- function(hmm_CN, prefix) {
+  stopifnot(inherits(hmm_CN, "hmm_CN"))
+  stopifnot(is.character(prefix) && length(prefix) == 1)
+  write.csv(hmm_CN$by_window, paste0(prefix, "_by_window.csv"), row.names = FALSE)
+  write.csv(hmm_CN$by_marker, paste0(prefix, "_by_marker.csv"), row.names = FALSE)
+  # Save params or params_samples as RDS, depending on which is present
+  if (!is.null(hmm_CN$params_samples)) {
+    saveRDS(list(params_samples = hmm_CN$params_samples), file = paste0(prefix, "_params.rds"))
+  } else if (!is.null(hmm_CN$params)) {
+    saveRDS(hmm_CN$params, file = paste0(prefix, "_params.rds"))
+  } else {
+    stop("hmm_CN object must have either 'params' or 'params_samples'.")
+  }
+}
+
+#' Read hmm_CN object from three files
+#'
+#' Reads the three main components of an hmm_CN object (by_window, by_marker, params or params_samples) from files.
+#' The user must provide the three file paths explicitly.
+#' @param by_window_file Path to the by_window CSV file.
+#' @param by_marker_file Path to the by_marker CSV file.
+#' @param params_file Path to the params RDS file.
+#' @return An object of class 'hmm_CN'.
+#' @export
+read_hmm_CN <- function(by_window_file, by_marker_file, params_file) {
+  by_window <- read.csv(by_window_file, stringsAsFactors = FALSE)
+  by_marker <- read.csv(by_marker_file, stringsAsFactors = FALSE)
+  params_obj <- readRDS(params_file)
+  # Multi-sample: params_obj is a list with params_samples, or just the params_samples list itself
+  if (is.list(params_obj) && (!is.null(params_obj$params_samples) || (is.null(names(params_obj)) && all(sapply(params_obj, function(x) is.list(x) && all(c("cn_grid", "mu", "sigma") %in% names(x))))))) {
+    params_samples <- if (!is.null(params_obj$params_samples)) params_obj$params_samples else params_obj
+    structure(list(by_window = by_window, by_marker = by_marker, params_samples = params_samples), class = "hmm_CN")
+  } else if (is.list(params_obj) && !is.null(names(params_obj)) && all(c("cn_grid", "mu", "sigma") %in% names(params_obj))) {
+    structure(list(by_window = by_window, by_marker = by_marker, params = params_obj), class = "hmm_CN")
+  } else {
+    stop("params_file does not contain a recognizable params or params_samples object.")
+  }
+}

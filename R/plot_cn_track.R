@@ -1,3 +1,8 @@
+# Suppress R CMD check notes for non-standard evaluation in dplyr/ggplot2
+if (getRversion() >= "2.15.1") utils::globalVariables(
+  c("starts_all", "starts", "outlier", "WindowID", "z_mean", "Chr", "region_id", "w_baf", "SampleName", "Position", "baf", "Start", "End", "prob_call", "CN_call")
+)
+
 #' Plot copy-number segments per window with posterior shading and BAF
 #'
 #' Plots a genome track for each window, showing the called copy number (CN) as a horizontal segment and coloring by the posterior probability of that call. Facets are split by chromosome. The top panel shows z-scores per window, colored by BAF weight; the bottom panel shows CN segments colored by posterior probability. The new top panel shows BAF values per SNP, colored by BAF weight, for the selected sample and chromosomes. If `qploidy_standarize_result` is NULL, marker-level data is taken from `hmm_CN$updated_data` (if available).
@@ -49,7 +54,7 @@
 #'
 #' @export
 plot_cn_track <- function(hmm_CN,
-                          qploidy_standarize_result = NULL, 
+                          qploidy_standarize_result = NULL,
                           sample_id = NULL,
                           cn_min = NULL,
                           cn_max = NULL,
@@ -61,18 +66,17 @@ plot_cn_track <- function(hmm_CN,
                           line_linetype = "dashed",
                           heights = c(2, 2.5),
                           z_by_mean = TRUE,
-                          chr = NULL) {  # NEW ARGUMENT
+                          chr = NULL) {
 
   stopifnot(inherits(hmm_CN, "hmm_CN"))
   stopifnot(inherits(qploidy_standarize_result, "qploidy_standardization") || is.null(qploidy_standarize_result))
 
-  # packages used
-  # (keep as imports in your pkg / DESCRIPTION; here assumed available)
-  # dplyr, tidyr, purrr, ggplot2, ggpubr, scales
+  if (!is.null(hmm_CN$by_window)) {
+    df <- hmm_CN$by_window
+  } else {
+    stop("hmm_CN object must have by_window or result data frame.")
+  }
 
-  df <- hmm_CN$result
-
-  # defaults BEFORE filtering
   if (is.null(sample_id)) sample_id <- unique(df$Sample)[1]
   x <- filter(df, Sample == sample_id)
   if (nrow(x) == 0) stop("No rows for sample_id = ", sample_id)
@@ -90,29 +94,19 @@ plot_cn_track <- function(hmm_CN,
   chr_order <- chr_order[order(as.numeric(gsub("[^0-9]+", "", chr_order)), chr_order)]
   x$Chr <- factor(x$Chr, levels = chr_order)
 
-  # If qploidy_standarize_result is NULL, use hmm_CN$updated_data as marker-level data
-  if (is.null(qploidy_standarize_result)) {
-    if (!is.null(hmm_CN$updated_data)) {
-      data_sample2 <- hmm_CN$updated_data
-      if (!is.null(data_sample2) && is.data.frame(data_sample2)) {
-        data_sample2 <- filter(data_sample2, SampleName == sample_id & Chr %in% unique(x$Chr))
-        data_sample2 <- data_sample2[!is.na(data_sample2$Chr), ]
-        data_sample2$Chr <- factor(data_sample2$Chr, levels = chr_order)
-      } else {
-        stop("hmm_CN$updated_data is not a valid data.frame.")
-      }
-    } else {
-      stop("Both qploidy_standarize_result and hmm_CN$updated_data are NULL. Cannot plot marker-level data.")
-    }
-  } else {
+  # Marker-level data: prefer by_marker, then qploidy_standarize_result
+  if (!is.null(hmm_CN$by_marker)) {
+    data_sample2 <- hmm_CN$by_marker
+    data_sample2 <- filter(data_sample2, SampleName == sample_id & Chr %in% unique(x$Chr))
+    data_sample2 <- data_sample2[!is.na(data_sample2$Chr), ]
+    data_sample2$Chr <- factor(data_sample2$Chr, levels = chr_order)
+  } else if (!is.null(qploidy_standarize_result)) {
     data_sample2 <- qploidy_standarize_result$data
-    if (!is.null(data_sample2) && is.data.frame(data_sample2)) {
-      data_sample2 <- filter(data_sample2, SampleName == sample_id & Chr %in% unique(x$Chr))
-      data_sample2 <- data_sample2[!is.na(data_sample2$Chr), ]
-      data_sample2$Chr <- factor(data_sample2$Chr, levels = chr_order)
-    } else {
-      stop("qploidy_standarize_result$data is not a valid data.frame.")
-    }
+    data_sample2 <- filter(data_sample2, SampleName == sample_id & Chr %in% unique(x$Chr))
+    data_sample2 <- data_sample2[!is.na(data_sample2$Chr), ]
+    data_sample2$Chr <- factor(data_sample2$Chr, levels = chr_order)
+  } else {
+    stop("No marker-level data found in hmm_CN or qploidy_standarize_result.")
   }
 
   if (is.null(cn_min)) cn_min <- min(x$CN_call, na.rm = TRUE)
@@ -132,32 +126,6 @@ plot_cn_track <- function(hmm_CN,
   x$Start <- as.numeric(x$Start)
   x$End   <- as.numeric(x$End)
   x$Mid   <- (x$Start + x$End)/2
-
-  # Pull marker-level data for the sample
-  # Use hmm_CN$updated_data if qploidy_standarize_result is NULL
-  if (is.null(qploidy_standarize_result)) {
-    if (!is.null(hmm_CN$updated_data)) {
-      data_sample2 <- hmm_CN$updated_data
-      if (!is.null(data_sample2) && is.data.frame(data_sample2)) {
-        data_sample2 <- filter(data_sample2, SampleName == sample_id & Chr %in% unique(x$Chr))
-        data_sample2 <- data_sample2[!is.na(data_sample2$Chr), ]
-        data_sample2$Chr <- factor(data_sample2$Chr, levels = chr_order)
-      } else {
-        stop("hmm_CN$updated_data is not a valid data.frame.")
-      }
-    } else {
-      stop("Both qploidy_standarize_result and hmm_CN$updated_data are NULL. Cannot plot marker-level data.")
-    }
-  } else {
-    data_sample2 <- qploidy_standarize_result$data
-    if (!is.null(data_sample2) && is.data.frame(data_sample2)) {
-      data_sample2 <- filter(data_sample2, SampleName == sample_id & Chr %in% unique(x$Chr))
-      data_sample2 <- data_sample2[!is.na(data_sample2$Chr), ]
-      data_sample2$Chr <- factor(data_sample2$Chr, levels = chr_order)
-    } else {
-      stop("qploidy_standarize_result$data is not a valid data.frame.")
-    }
-  }
 
   # Per-chromosome genomic range (based on BAF markers)
   chrom_ghost <- data_sample2 %>%
@@ -222,17 +190,14 @@ plot_cn_track <- function(hmm_CN,
   # Tag markers and join correct w_baf
   marker_df <- data_sample2 %>%
     tag_markers_with_region(break_tbl) %>%
-    left_join(win_tbl %>% select(Chr, region_id, w_baf),
+    left_join(win_tbl %>% select(Chr, region_id),
                      by = c("Chr", "region_id"))
-
-  # OPTIONAL: if any w_baf are slightly out of [0,1], squish for color scaling
-  # marker_df$w_baf <- squish(marker_df$w_baf, range = c(0, 1))
 
   # -------- top panel: z dots (color = w_baf, shape = outlier if present) --------
   shape_aes <- if ("outlier" %in% colnames(marker_df)) aes(shape = outlier) else NULL
 
   if (z_by_mean) {
-    z_means <- hmm_CN$result %>%
+    z_means <- hmm_CN$by_window %>%
       filter(Sample == sample_id & !is.na(Chr) & Chr %in% chr_order) %>%
       select(Chr, WindowID, Start, End, w_baf, z_mean = z) %>%
       arrange(factor(Chr, levels = chr_order), Start)
@@ -241,7 +206,7 @@ plot_cn_track <- function(hmm_CN,
       geom_point(size = 1.2, alpha = 0.8, mapping = shape_aes) +
       geom_segment(
         data = z_means,
-        aes(x = Start, xend = End, y = z_mean, yend = z_mean, group = WindowID, color = NULL),
+        aes(x = Start, xend = End, y = z_mean, yend = z_mean, group = WindowID),
         inherit.aes = FALSE,
         color = "black", linewidth = 0.7
       ) +
@@ -249,18 +214,21 @@ plot_cn_track <- function(hmm_CN,
         data = chrom_ghost,
         inherit.aes = FALSE,
         aes(x = Position, y = min(marker_df$z, na.rm = TRUE))
-      ) +
-      { if (show_window_lines)
-        geom_vline(data = vlines, aes(xintercept = Start),
+      )
+    if (show_window_lines) {
+      p_z <- p_z + geom_vline(data = vlines, aes(xintercept = Start),
                    color = line_color, alpha = line_alpha,
                    linewidth = line_width, linetype = line_linetype)
-        else NULL } +
+    }
+    if ("outlier" %in% colnames(marker_df)) {
+      p_z <- p_z + scale_shape_manual(values = c("FALSE" = 16, "TRUE" = 4), name = "Outlier")
+    }
+    p_z <- p_z +
       facet_wrap(~ Chr, scales = "free_x", nrow = 1) +
       scale_color_distiller(palette = "Spectral", direction = -1,
                             limits = c(0, 1),
                             oob = squish,
                             name = "BAF weight") +
-      { if ("outlier" %in% colnames(marker_df)) scale_shape_manual(values = c("FALSE" = 16, "TRUE" = 4), name = "Outlier") else NULL } +
       labs(x = NULL, y = "z") +
       theme_bw(base_size = 12) +
       theme(
@@ -280,18 +248,21 @@ plot_cn_track <- function(hmm_CN,
         data = chrom_ghost,
         inherit.aes = FALSE,
         aes(x = Position, y = min(marker_df$z, na.rm = TRUE))
-      ) +
-      { if (show_window_lines)
-        geom_vline(data = vlines, aes(xintercept = Start),
+      )
+    if (show_window_lines) {
+      p_z <- p_z + geom_vline(data = vlines, aes(xintercept = Start),
                    color = line_color, alpha = line_alpha,
                    linewidth = line_width, linetype = line_linetype)
-        else NULL } +
+    }
+    if ("outlier" %in% colnames(marker_df)) {
+      p_z <- p_z + scale_shape_manual(values = c("FALSE" = 16, "TRUE" = 4), name = "Outlier")
+    }
+    p_z <- p_z +
       facet_wrap(~ Chr, scales = "free_x", nrow = 1) +
       scale_color_distiller(palette = "Spectral", direction = -1,
                             limits = c(0, 1),
                             oob = squish,
                             name = "BAF weight") +
-      { if ("outlier" %in% colnames(marker_df)) scale_shape_manual(values = c("FALSE" = 16, "TRUE" = 4), name = "Outlier") else NULL } +
       labs(x = NULL, y = "z") +
       theme_bw(base_size = 12) +
       theme(
@@ -329,12 +300,13 @@ plot_cn_track <- function(hmm_CN,
       data = x_pt,
       aes(x = Start, y = CN_call, color = prob_call),
       size = 2
-    ) +
-    { if (show_window_lines)
-      geom_vline(data = vlines, aes(xintercept = Start),
-                          color = line_color, alpha = line_alpha,
-                          linewidth = line_width, linetype = line_linetype)
-      else NULL } +
+    )
+  if (show_window_lines) {
+    p_cn <- p_cn + geom_vline(data = vlines, aes(xintercept = Start),
+                 color = line_color, alpha = line_alpha,
+                 linewidth = line_width, linetype = line_linetype)
+  }
+  p_cn <- p_cn +
     facet_wrap(~ Chr, scales = "free_x", nrow = 1) +
     scale_y_continuous(breaks = seq(cn_min, cn_max, by = 1), minor_breaks = NULL) +
     scale_color_viridis_c(name = "P(CN call)", limits = c(0, 1), option = "D", direction = -1) +
@@ -351,7 +323,7 @@ plot_cn_track <- function(hmm_CN,
   # -------- BAF panel (color = w_baf; uses SAME tagging/join as z panel) --------
   plot_df <- data_sample2 %>%
     tag_markers_with_region(break_tbl) %>%
-    left_join(win_tbl %>% select(Chr, region_id, w_baf),
+    left_join(win_tbl %>% select(Chr, region_id),
                      by = c("Chr", "region_id"))
 
   p_baf <- ggplot(plot_df, aes(x = Position, y = baf, color = w_baf)) +
@@ -360,19 +332,20 @@ plot_cn_track <- function(hmm_CN,
       inherit.aes = FALSE,
       aes(x = Position, y = 0)
     ) +
-    geom_point(alpha = 0.7, size = 1) +
-    { if (show_window_lines)
-      geom_vline(data = vlines, aes(xintercept = Start),
-                          color = line_color, alpha = line_alpha,
-                          linewidth = line_width, linetype = line_linetype)
-      else NULL } +
+    geom_point(alpha = 0.7, size = 1)
+  if (show_window_lines) {
+    p_baf <- p_baf + geom_vline(data = vlines, aes(xintercept = Start),
+               color = line_color, alpha = line_alpha,
+               linewidth = line_width, linetype = line_linetype)
+  }
+  p_baf <- p_baf +
     facet_wrap(~Chr, scales = "free_x", nrow = 1) +
     theme_bw() +
     ylab("BAF") +
     scale_color_distiller(palette = "Spectral", direction = -1,
-                                   limits = c(0, 1),
-                                   oob = squish,
-                                   name = "BAF weight") +
+                          limits = c(0, 1),
+                          oob = squish,
+                          name = "BAF weight") +
     theme(
       axis.text.x        = element_text(angle = 30, vjust = 1, hjust = 1),
       legend.position    = "top",
@@ -424,12 +397,12 @@ compare_cn_track <- function(hmm_CN,
                              facet_nrow = NULL) {
 
   stopifnot(inherits(hmm_CN, "hmm_CN"))
-  cnv_df <- hmm_CN$result
+  cnv_df <- hmm_CN$by_window
 
   req_cols <- c("Sample", "Chr", "Start", "End", "CN_call", "post_max")
   missing_cols <- setdiff(req_cols, colnames(cnv_df))
   if (length(missing_cols) > 0) {
-    stop("hmm_CN$result is missing required columns: ", paste(missing_cols, collapse = ", "))
+    stop("hmm_CN$by_window is missing required columns: ", paste(missing_cols, collapse = ", "))
   }
 
   # If samples_to_plot is NULL, use the first sample found

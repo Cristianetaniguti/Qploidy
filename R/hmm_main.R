@@ -80,7 +80,7 @@
 #'   snps_per_window = 500,
 #'   cn_grid = 2:6
 #' )
-#' head(res$result)
+#' head(res$by_window)
 #' res$params
 #' }
 #'
@@ -331,17 +331,6 @@ hmm_estimate_CN <- function(
   z <- win_df$z_mean
   if (length(z) == 0 || all(is.na(z))) stop("No valid z values found in any window.")
 
-  # --- BAF histograms and likelihoods ---
-  breaks <- seq(0, 1, length.out = M + 1)
-  hist_counts <- matrix(0L, nrow = W, ncol = M)
-  for (i in seq_len(W)) {
-    if (length(baf_list[[i]]) == 0 || all(is.na(baf_list[[i]]))) {
-      warning(sprintf("Window %d (Chr %s, WindowID %s) has no valid BAF values for histogram.",
-                      i, win_df$Chr[i], win_df$WindowID[i]))
-    }
-    hist_counts[i, ] <- hist(baf_list[[i]], breaks = breaks, plot = FALSE)$counts
-  }
-
   # Generate BAF likelihoods and probabilities per window
   # Uses parameters from selected_model
   if(!z_only){
@@ -367,7 +356,7 @@ hmm_estimate_CN <- function(
       ref_q <- suppressWarnings(quantile(HET_N[HET_N>0], het_quantile, na.rm=TRUE))
       if (!is.finite(ref_q) || ref_q <= 0) ref_q <- max(HET_N, na.rm=TRUE)
       if (!is.finite(ref_q) || ref_q <= 0) ref_q <- 1
-      w_baf <- sqrt(pmin(1, HET_N / ref_q))  # sqrt: temper influence
+      w_baf <- sqrt(pmin(1, HET_N / ref_q))
     } else {
       w_baf <- rep(0, W)
     }
@@ -591,7 +580,7 @@ hmm_estimate_CN <- function(
 #' @param sample_ids Character vector of sample IDs to analyze, or "all" for all samples in the data.
 #' @param n_cores Number of cores to use (default: 2).
 #' @param ... Additional arguments passed to hmm_estimate_CN (e.g., chr, snps_per_window, etc).
-#' @return A data.frame with results for all samples, as returned by hmm_estimate_CN$result, combined.
+#' @return A data.frame with results for all samples, as returned by hmm_estimate_CN$by_window, combined.
 #'
 #' @importFrom parallel makeCluster parLapply stopCluster clusterExport
 #'

@@ -133,7 +133,7 @@ res <- hmm_estimate_CN(
   snps_per_window = 500,
   cn_grid = 2:6
 )
-head(res$result)
+head(res$by_window)
 res$params
 }
 

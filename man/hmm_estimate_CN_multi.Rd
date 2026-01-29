@@ -21,7 +21,7 @@ hmm_estimate_CN_multi(
 \item{...}{Additional arguments passed to hmm_estimate_CN (e.g., chr, snps_per_window, etc).}
 }
 \value{
-A data.frame with results for all samples, as returned by hmm_estimate_CN$result, combined.
+A data.frame with results for all samples, as returned by hmm_estimate_CN$by_window, combined.
 }
 \description{
 Runs copy-number HMM for each sample in a user-defined vector (or all samples if "all" is specified).

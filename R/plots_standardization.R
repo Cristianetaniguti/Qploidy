@@ -436,6 +436,8 @@ plot_baf_hist <- function(data_sample,
 #' the distribution of allele frequencies.
 #' - **zscore**: Plots z-scores for each chromosome, which can help identify
 #' outliers or regions with unusual data distributions.
+#' - **R**: Plots the R column (e.g., read depth) for each chromosome, using the 
+#' same style as the z-score plot (smoothed line, per chromosome, with median line).
 #' - **BAF_hist**: Plots histograms of BAF values for each chromosome,
 #' providing a summary of allele frequency distributions.
 #' - **BAF_hist_overall**: Plots a single histogram of BAF values for the
@@ -457,7 +459,7 @@ plot_qploidy_standardization <- function(x,
                                          chr = NULL,
                                          type = c(
                                            "all", "het", "BAF", "zscore",
-                                           "BAF_hist", "ratio",
+                                           "BAF_hist", "ratio", "R",
                                            "BAF_hist_overall",
                                            "Ratio_hist_overall"
                                          ),
@@ -493,7 +495,7 @@ plot_qploidy_standardization <- function(x,
 
   data_sample <- data_sample %>%
     filter(Chr %in% chr) %>%
-    select(MarkerName, SampleName, Chr, Position, baf, z, ratio)
+    select(MarkerName, SampleName, Chr, Position, baf, z, ratio, R)
 
   data_sample$Position <- as.numeric(data_sample$Position)
 
@@ -616,6 +618,24 @@ plot_qploidy_standardization <- function(x,
       geom_hline(yintercept = median(zscore_sample$z), linetype = "dashed")
   }
 
+  # Add R plot (like zscore, but for R column)
+  if (any(type == "R")) {
+    R_sample <- data_sample %>% pivot_wider(names_from = SampleName, values_from = R)
+    colnames(R_sample)[ncol(R_sample)] <- "R"
+    p_R <- R_sample %>%
+      ggplot(aes(x = Position, y = R)) +
+      facet_grid(. ~ Chr, scales = "free") +
+      geom_smooth(method = "gam") +
+      theme_bw() +
+      theme(
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
+        text = element_text(size = font_size)
+      ) +
+      geom_hline(yintercept = median(R_sample$R, na.rm = TRUE), linetype = "dashed")
+  } else {
+    p_R <- NULL
+  }
+
   if (any(type == "ratio")) {
     raw_ratio <- data_sample %>% ggplot(aes(x = Position, y = ratio)) +
       geom_point(alpha = 0.7, size = dot.size) +
@@ -677,7 +697,7 @@ plot_qploidy_standardization <- function(x,
 
   p_all <- list(
     het_rate, raw_ratio, baf_point, baf_hist, baf_hist_overall,
-    ratio_hist_overall, p_z
+    ratio_hist_overall, p_z, p_R
   )
 
   rm <- which(sapply(p_all, is.null))
@@ -1165,4 +1185,108 @@ plot_baf_with_ploidy_guides <- function(df,
   p
 }
 
+#' Plot observed and expected values by genotype dosage for each marker
+#'
+#' This function visualizes the distribution of observed values (ratio and BAF) by genotype dosage for each marker, and overlays the expected values for a given ploidy. For each marker, it shows jittered points for individual observations, the observed median per dosage (red), and the expected value per dosage (blue).
+#'
+#' @param df A data.frame containing columns 'geno' (genotype dosage), 'ratio', 'baf', and 'MarkerName'.
+#' @param ploidy Integer specifying the expected ploidy. If NULL (default), the maximum observed genotype dosage in the data is used.
+#'
+#' @return A ggplot object with one panel per marker and metric (ratio, BAF), showing observed and expected values by genotype dosage.
+#'
+#' @details
+#' - For each marker and metric (ratio, BAF), the function plots:
+#'   - Jittered points for all observed values by genotype dosage.
+#'   - The observed median per dosage (red dot).
+#'   - The expected value per dosage (blue dot), calculated as d/ploidy for d = 0..ploidy.
+#' - Facets are arranged by metric (rows) and marker (columns).
+#' - Useful for visually assessing concordance between observed and expected values by genotype.
+#'
+#' @import ggplot2
+#' @importFrom dplyr summarise pull mutate if_else distinct
+#' @importFrom tidyr pivot_longer crossing
+#' @export
+plot_geno_by_marker <- function(df, ploidy = NULL) {
 
+  # infer ploidy from the highest observed geno (unless user supplies it)
+  if (is.null(ploidy)) {
+    ploidy <- df %>%
+      summarise(max_geno = suppressWarnings(max(geno, na.rm = TRUE))) %>%
+      pull(max_geno)
+
+    if (!is.finite(ploidy)) ploidy <- NA_real_
+  }
+
+  df_plot <- df %>%
+    mutate(
+      geno_cat = if_else(is.na(geno), "unknown", as.character(geno)),
+      geno_num = suppressWarnings(as.numeric(as.character(geno))),
+      MarkerName = as.factor(MarkerName),
+      geno_cat = factor(
+        geno_cat,
+        levels = c(sort(unique(na.omit(as.character(geno)))), "unknown")
+      )
+    ) %>%
+    pivot_longer(
+      cols = c(ratio, baf),
+      names_to = "metric",
+      values_to = "value"
+    ) %>%
+    mutate(
+      metric = factor(metric, levels = c("ratio", "baf"))  # ratio on top
+    )
+
+  # expected values for any ploidy: d/ploidy for d = 0..ploidy
+  expected_df <- df_plot %>%
+    distinct(MarkerName, metric) %>%
+    tidyr::crossing(geno_num = 0:ploidy) %>%
+    mutate(
+      geno_cat = factor(as.character(geno_num), levels = levels(df_plot$geno_cat)),
+      expected = geno_num / ploidy,
+      type = "Expected"
+    )
+
+  ggplot(df_plot, aes(x = geno_cat, y = value)) +
+
+    # red dot = observed median per geno
+    stat_summary(
+      aes(color = "Observed median"),
+      fun = median,
+      geom = "point",
+      size = 3,
+      na.rm = TRUE
+    ) +
+
+    # blue dot = expected value per geno
+    geom_point(
+      data = expected_df,
+      aes(x = geno_cat, y = expected, color = type),
+      inherit.aes = FALSE,
+      size = 3
+    ) +
+    geom_jitter(width = 0.15, height = 0, alpha = 0.6, na.rm = TRUE) +
+
+    facet_grid(
+      rows = vars(metric),
+      cols = vars(MarkerName),
+      scales = "free_y"
+    ) +
+    scale_color_manual(
+      name = NULL,
+      values = c(
+        "Observed median" = "red",
+        "Expected" = "blue"
+      )
+    ) +
+    labs(
+      x = "dosages",
+      y = NULL
+    ) +
+    theme_bw() +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      strip.background = element_rect(fill = "grey95"),
+      strip.text.y = element_text(face = "bold"),
+      legend.position = "top"
+    )
+}

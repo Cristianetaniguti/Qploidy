@@ -8,7 +8,7 @@ plot_qploidy_standardization(
   x,
   sample = NULL,
   chr = NULL,
-  type = c("all", "het", "BAF", "zscore", "BAF_hist", "ratio", "BAF_hist_overall",
+  type = c("all", "het", "BAF", "zscore", "BAF_hist", "ratio", "R", "BAF_hist_overall",
     "Ratio_hist_overall"),
   area_single = 0.75,
   ploidy = 4,
@@ -100,6 +100,8 @@ useful for identifying regions with high or low heterozygosity.
 the distribution of allele frequencies.
 - **zscore**: Plots z-scores for each chromosome, which can help identify
 outliers or regions with unusual data distributions.
+- **R**: Plots the R column (e.g., read depth) for each chromosome, using the 
+same style as the z-score plot (smoothed line, per chromosome, with median line).
 - **BAF_hist**: Plots histograms of BAF values for each chromosome,
 providing a summary of allele frequency distributions.
 - **BAF_hist_overall**: Plots a single histogram of BAF values for the

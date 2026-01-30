@@ -530,9 +530,37 @@ standardize <- function(data = NULL,
     stop("Not all required inputs were defined.")
   }
 
-  if(!all(colnames(data) %in% c("MarkerName", "SampleName", "X", "Y", "R", "ratio"))) stop("Column names of the provided data object does not match the required.")
-  if(!all(colnames(genos) %in% c("MarkerName", "SampleName", "geno", "prob"))) stop("Column names of the provided genos object does not match the required.")
-  if(!all(colnames(geno.pos) %in% c("MarkerName", "SampleName", "Chromosome", "Position"))) stop("Column names of the provided geno.pos object does not match the required.")
+  # Check column names and order for data
+  required_data_cols <- c("MarkerName", "SampleName", "X", "Y", "R", "ratio")
+  if (!identical(colnames(data), required_data_cols)) {
+    stop(sprintf(
+      "Column names of the provided data object must be exactly: %s (in this order).",
+      paste(required_data_cols, collapse = ", ")
+    ))
+  }
+  # Check column names and order for genos
+  allowed_genos_cols <- list(
+    c("MarkerName", "SampleName", "geno"),
+    c("MarkerName", "SampleName", "geno", "prob")
+  )
+  genos_colnames <- colnames(genos)
+  if (!any(sapply(allowed_genos_cols, function(cols) identical(genos_colnames, cols)))) {
+    stop(sprintf(
+      "Column names of the provided genos object must be exactly: %s (in this order), or: %s (in this order).",
+      paste(allowed_genos_cols[[1]], collapse = ", "),
+      paste(allowed_genos_cols[[2]], collapse = ", ")
+    ))
+  }
+  has_prob_col <- identical(genos_colnames, allowed_genos_cols[[2]])
+
+  # Check column names and order for geno.pos
+  required_genopos_cols <- c("MarkerName", "Chromosome", "Position")
+  if (!identical(colnames(geno.pos), required_genopos_cols)) {
+    stop(sprintf(
+      "Column names of the provided geno.pos object must be exactly: %s (in this order).",
+      paste(required_genopos_cols, collapse = ", ")
+    ))
+  }
 
   dose <- max(genos$geno, na.rm = T)
   if(dose != ploidy.standardization) stop("Ploidy of the provided reference samples do not match with the one defined in the ploidy.standardization parameter.")
@@ -540,14 +568,18 @@ standardize <- function(data = NULL,
   if(verbose) cat("Generating standardized BAFs...\n")
   if(is.null(threshold.n.clusters)) threshold.n.clusters <- ploidy.standardization + 1
 
-  ## Filter by prob
-  idx <- genos$prob < threshold.geno.prob
-  prob.rm <- table(idx)
-  if(!is.na(prob.rm["TRUE"])) prob.rm <- round(as.numeric(prob.rm["TRUE"]/sum(prob.rm)*100),2) else prob.rm <- 0
-  idx <- which(idx)
-  if(length(idx) > 0) genos$geno[idx] <- NA
-
-  if(verbose) print(paste0("Percentage of genotypes turned into missing data because of low genotype probability:", prob.rm))
+  ## Filter by prob (only if prob column is present)
+  if (has_prob_col) {
+    idx <- genos$prob < threshold.geno.prob
+    prob.rm <- table(idx)
+    if(!is.na(prob.rm["TRUE"])) prob.rm <- round(as.numeric(prob.rm["TRUE"]/sum(prob.rm)*100),2) else prob.rm <- 0
+    idx <- which(idx)
+    if(length(idx) > 0) genos$geno[idx] <- NA
+    if(verbose) print(paste0("Percentage of genotypes turned into missing data because of low genotype probability:", prob.rm))
+  } else {
+    prob.rm <- 0
+    if(verbose) print("No 'prob' column in genos: skipping genotype probability filtering.")
+  }
 
   ## Filter by missing data
   n.na <- genos %>% group_by(MarkerName) %>% summarize(n.na = (sum(is.na(geno))/length(geno)))
@@ -672,10 +704,13 @@ standardize <- function(data = NULL,
 
   if(verbose) cat("Merging results into qploidy_standardization object...\n")
   qploidy_data <- full_join(data, data_standardization[,-3], c("MarkerName", "SampleName"))
-  qploidy_data <- full_join(qploidy_data,baf_melt, c("MarkerName", "SampleName"))
-  qploidy_data <- full_join(qploidy_data[,-c(8,9)], zscore, c("MarkerName", "SampleName"))
+  qploidy_data <- full_join(qploidy_data,baf_melt[,-c(2,3)], c("MarkerName", "SampleName"))
+  qploidy_data <- full_join(qploidy_data, zscore[,-c(2,3)], c("MarkerName", "SampleName"))
 
-  qploidy_data$Position <- as.numeric(qploidy_data$Position)
+  # Fill Chr and Position columns in qploidy_data using geno.pos
+  marker_idx <- match(qploidy_data$MarkerName, geno.pos$MarkerName)
+  qploidy_data$Chr <- geno.pos$Chromosome[marker_idx]
+  qploidy_data$Position <- as.numeric(geno.pos$Position[marker_idx])
 
   result <- structure(list(info = c(threshold.missing.geno = threshold.missing.geno,
                                     threshold.geno.prob = threshold.geno.prob,

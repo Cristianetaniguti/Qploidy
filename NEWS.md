@@ -1,3 +1,11 @@
+# Qploidy 1.6.2
+
+* Avoid markers without chromosome information in the standardized dataset
+* Add plot to compare ratios and standardazed ratios (BAF) in a geno vs value format
+* Add new type of plot for plot_qploidy_standardized for raw total depth (R)
+* Add checks for standardize input files. It now requires specific column names and ordering.
+
+
 # Qploidy 1.6.1
 
 * write and read function for hmm_CN object

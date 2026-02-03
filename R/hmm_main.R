@@ -30,6 +30,14 @@
 #' @param exp_ploidy Numeric. Expected ploidy value. If \code{NA} or \code{NULL}, it is set to the best CN from the BAF model. Default \code{NA}.
 #' @param rm_outliers Logical. If \code{TRUE}, remove outliers from z-scores before HMM fitting. Default \code{TRUE}.
 #' @param outlier_alpha Numeric. Alpha threshold for outlier removal in z-scores. Default 0.05.
+#' @param selected_model Optional. An object of class \code{selected_BAF_model}. If provided, it is used instead of running \code{select_best_baf_model}.
+#' @param dists Character vector. Distribution families to test in BAF model selection (e.g., c("gaussian", "beta", ...)).
+#' @param bw_grid Numeric vector. Bandwidth (SD or concentration) values to try for kernel smoothing in BAF model selection. Default: c(0.02, 0.03, 0.04).
+#' @param add_uniform_grid Logical vector. Whether to include a uniform noise component in the BAF template. Default: c(FALSE, TRUE).
+#' @param uniform_weight_grid Numeric vector. Mixture weights for the uniform component (when enabled). Default: c(0.01, 0.03, 0.05, 0.10, 0.15).
+#' @param param_count Optional named integer vector. Number of free parameters per distribution (for BIC penalty in BAF model selection). If NULL, defaults to 0 for all.
+#' @param count_grid_as_params Logical. If TRUE (default), adds +1 to BIC penalty for each hyperparameter tuned by grid search (bw, and uniform_weight if used).
+#' @param plot Logical. If TRUE, returns a ggplot object for the best BAF model only (default FALSE).
 #'
 #' @return An object of class \code{hmm_CN}, a list with two elements:
 #'   \describe{
@@ -113,7 +121,14 @@ hmm_estimate_CN <- function(
     verbose = TRUE,
     exp_ploidy = NA,
     rm_outliers = TRUE,
-    outlier_alpha = 0.05
+    outlier_alpha = 0.05,
+    selected_model = NULL,
+    dists = c("gaussian", "beta", "beta_binomial", "negative_binomial"),
+    bw_grid = c(0.02, 0.03, 0.04),
+    add_uniform_grid = c(FALSE, TRUE),
+    uniform_weight_grid = c(0.01, 0.03, 0.05, 0.10, 0.15),
+    param_count = NULL,
+    count_grid_as_params = TRUE
 ) {
 
   # --- input checks ---
@@ -160,10 +175,24 @@ hmm_estimate_CN <- function(
 
   # --- set expected ploidy ---
   # Calculate expected ploidy using sample-level BAF distribution
-  selected_model <- select_best_baf_model(d$baf,
-                                          cn_grid= cn_grid,
-                                          M = M,
-                                          reflect = reflect)
+  if (!is.null(selected_model)) {
+    if (!inherits(selected_model, "selected_BAF_model")) {
+      stop("selected_model argument must be of class 'selected_BAF_model'.")
+    }
+    # Use user-provided selected_model
+    if (verbose) cat("  Using user-provided selected_model object.\n")
+  } else {
+    selected_model <- select_best_baf_model(d$baf,
+                                            cn_grid= cn_grid,
+                                            dists = dists,
+                                            M = M,
+                                            reflect = reflect,
+                                            bw_grid = bw_grid,
+                                            add_uniform_grid = add_uniform_grid,
+                                            uniform_weight_grid = uniform_weight_grid,
+                                            param_count = param_count,
+                                            count_grid_as_params = count_grid_as_params)
+  }
 
   # Use exp_ploidy argument if provided, otherwise use selected_model$best$best_cn
   if (is.null(exp_ploidy) || (length(exp_ploidy) == 1 && is.na(exp_ploidy))) {
@@ -225,8 +254,7 @@ hmm_estimate_CN <- function(
       End        = max(x[["Position"]]),
       n_snps     = nrow(x),
       n_het      = sum(x$is_het, na.rm = TRUE),
-      z_mean     = mean(x[["z"]], na.rm = TRUE),
-      stringsAsFactors = FALSE
+      z_mean     = mean(x[["z"]], na.rm = TRUE)
     )
   }))
   rownames(win_df) <- NULL

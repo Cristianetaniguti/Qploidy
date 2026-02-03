@@ -470,6 +470,7 @@ select_best_baf_model <- function(
     out$plot <- best_plot_res$plot
   }
 
+  class(out) <- "selected_BAF_model"
   return(out)
 }
 

@@ -25,7 +25,14 @@ hmm_estimate_CN(
   verbose = TRUE,
   exp_ploidy = NA,
   rm_outliers = TRUE,
-  outlier_alpha = 0.05
+  outlier_alpha = 0.05,
+  selected_model = NULL,
+  dists = c("gaussian", "beta", "beta_binomial", "negative_binomial"),
+  bw_grid = c(0.02, 0.03, 0.04),
+  add_uniform_grid = c(FALSE, TRUE),
+  uniform_weight_grid = c(0.01, 0.03, 0.05, 0.1, 0.15),
+  param_count = NULL,
+  count_grid_as_params = TRUE
 )
 }
 \arguments{
@@ -72,6 +79,22 @@ mixture before renormalization. Default FALSE.}
 \item{rm_outliers}{Logical. If \code{TRUE}, remove outliers from z-scores before HMM fitting. Default \code{TRUE}.}
 
 \item{outlier_alpha}{Numeric. Alpha threshold for outlier removal in z-scores. Default 0.05.}
+
+\item{selected_model}{Optional. An object of class \code{selected_BAF_model}. If provided, it is used instead of running \code{select_best_baf_model}.}
+
+\item{dists}{Character vector. Distribution families to test in BAF model selection (e.g., c("gaussian", "beta", ...)).}
+
+\item{bw_grid}{Numeric vector. Bandwidth (SD or concentration) values to try for kernel smoothing in BAF model selection. Default: c(0.02, 0.03, 0.04).}
+
+\item{add_uniform_grid}{Logical vector. Whether to include a uniform noise component in the BAF template. Default: c(FALSE, TRUE).}
+
+\item{uniform_weight_grid}{Numeric vector. Mixture weights for the uniform component (when enabled). Default: c(0.01, 0.03, 0.05, 0.10, 0.15).}
+
+\item{param_count}{Optional named integer vector. Number of free parameters per distribution (for BIC penalty in BAF model selection). If NULL, defaults to 0 for all.}
+
+\item{count_grid_as_params}{Logical. If TRUE (default), adds +1 to BIC penalty for each hyperparameter tuned by grid search (bw, and uniform_weight if used).}
+
+\item{plot}{Logical. If TRUE, returns a ggplot object for the best BAF model only (default FALSE).}
 }
 \value{
 An object of class \code{hmm_CN}, a list with two elements:

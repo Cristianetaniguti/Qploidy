@@ -499,6 +499,9 @@ plot_qploidy_standardization <- function(x,
 
   data_sample$Position <- as.numeric(data_sample$Position)
 
+  # If there are NA in chromosome, remove them (otherwise the plots will make it as a separate chromosome)
+  if(any(is.na(data_sample$Chr)))  data_sample <- data_sample %>% filter(!is.na(Chr))
+
   if (nrow(data_sample) == 0) stop("Sample or chromosome not found.")
 
   baf_sample <- data_sample %>% pivot_wider(

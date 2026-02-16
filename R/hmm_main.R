@@ -20,7 +20,6 @@
 #' @param cn_grid Integer vector of copy-number states to consider (e.g., \code{2:8}).
 #' @param M Integer. Number of BAF histogram bins on [0,1]. Default \code{121}.
 #' @param max_iter Integer. Maximum EM iterations. Default \code{60}.
-#' @param het_lims Numeric vector of length 2. BAF limits to consider a SNP heterozygous. Default \code{c(0,1)}.
 #' @param het_quantile Numeric. Quantile used to scale BAF emission weight based on heterozygote count. Default \code{0.8}.
 #' @param baf_weight Numeric. Overall weight applied to BAF emission (0–1). Default \code{1}.
 #' @param z_range Numeric. Padding added to min/max z for initial mean estimation. Default \code{0.2}.
@@ -100,7 +99,7 @@
 #' @importFrom dplyr filter
 #'
 #' @export
-hmm_estimate_CN <- function(
+  hmm_estimate_CN <- function(
     qploidy_standarize_result,
     sample_id,
     chr = NULL,
@@ -112,7 +111,6 @@ hmm_estimate_CN <- function(
     cn_grid = 2:8,
     M = 100,
     max_iter = 60,
-    het_lims = c(0,1), # baf limits to consider a SNP heterozygous
     het_quantile = 0.8, # increase this value to reduce the weight of baf when few hets
     baf_weight = 1,
     z_range = NULL,
@@ -129,7 +127,7 @@ hmm_estimate_CN <- function(
     uniform_weight_grid = c(0.01, 0.03, 0.05, 0.10, 0.15),
     param_count = NULL,
     count_grid_as_params = TRUE
-) {
+  ) {
 
   # --- input checks ---
   if (!is(qploidy_standarize_result, "qploidy_standardization")) {
@@ -241,11 +239,8 @@ hmm_estimate_CN <- function(
 
   # summarize per window
   if (verbose) cat("Summarizing data by window...\n")
-  agg <- within(d, {
-    is_het <- baf > het_lims[1] & baf < het_lims[2]
-  })
 
-  win_df <- do.call(rbind, by(agg, list(agg[["Chr"]], agg[[win_col]]), function(x) {
+  win_df <- do.call(rbind, by(d, list(d[["Chr"]], d[[win_col]]), function(x) {
     if (is.null(x) || nrow(x) == 0) return(NULL)
     data.frame(
       Chr        = x[1, "Chr"],
@@ -253,22 +248,17 @@ hmm_estimate_CN <- function(
       Start      = min(x[["Position"]]),
       End        = max(x[["Position"]]),
       n_snps     = nrow(x),
-      n_het      = sum(x$is_het, na.rm = TRUE),
       z_mean     = mean(x[["z"]], na.rm = TRUE)
     )
   }))
   rownames(win_df) <- NULL
-
   if(any(is.nan(win_df$z_mean))) {
     warning("Some windows have no z-score values.")
   }
-
   if (is.null(win_df) || nrow(win_df) == 0) stop("No windows could be formed. Check input data and window parameters.")
-
-  # drop very small windows - mostly for the last window
   keep <- win_df$n_snps >= min_snps_per_window
   if (!any(keep)) stop("All windows dropped by min_snps_per_window filter. Try lowering min_snps_per_window or check input data.")
-
+  # n_het is now filled later using vectorized dosages
   # Handle single-window case: assign CN by BAF likelihood only, skip HMM/EM
   if (sum(keep) == 1) {
     if (verbose) cat("Only one window remains after filtering. Assigning CN by BAF likelihood only.\n")
@@ -287,6 +277,15 @@ hmm_estimate_CN <- function(
     post_df <- as.data.frame(matrix(0, nrow=1, ncol=length(cn_grid)))
     names(post_df) <- paste0("post_CN", cn_grid)
     post_df[1, which.max(ll_baf_matrix[1, ])] <- 1
+    # n_het is now calculated using dosages
+    dosages <- mapply(function(x, y) call_BAF_dosages(x,
+                     cn = y,
+                     bw = selected_model$best$bw,
+                     plot = FALSE,
+                     dist = selected_model$best$dist,
+                     add_uniform = selected_model$best$add_uniform,
+                     uniform_weight = selected_model$best$uniform_weight), baf_list[keep], cn_call, SIMPLIFY = FALSE)
+    n_het <- sum(dosages[[1]]$dosage != 0 & dosages[[1]]$dosage != cn_call[1], na.rm = TRUE)
     result <- cbind(
       data.frame(
         Sample    = sample_id,
@@ -295,7 +294,7 @@ hmm_estimate_CN <- function(
         Start     = win_df$Start[keep],
         End       = win_df$End[keep],
         n_snps    = win_df$n_snps[keep],
-        n_het     = win_df$n_het[keep],
+        n_het     = n_het,
         z         = win_df$z_mean[keep],
         w_baf     = 1,
         CN_call   = cn_call,
@@ -315,7 +314,6 @@ hmm_estimate_CN <- function(
       bw = selected_model$best$bw,
       loglik = NA,
       z_range = z_range,
-      het_lims = het_lims,
       het_quantile = het_quantile,
       baf_weight = baf_weight,
       transition_jump = transition_jump,
@@ -329,7 +327,6 @@ hmm_estimate_CN <- function(
       add_uniform = add_uniform,
       uniform_weight = selected_model$best$uniform_weight
     )
-
     window_map <- match(d$.__w__, result$WindowID)
     d$w_baf    <- result$w_baf[window_map]
     d$CN_call  <- result$CN_call[window_map]
@@ -363,8 +360,9 @@ hmm_estimate_CN <- function(
   # Uses parameters from selected_model
   if(!z_only){
     if(verbose) cat("Generating BAF likelihoods per window...\n")
+    force_1 <- unique(c(1,cn_grid))
     baf_results <- lapply(baf_list, function(baf_vec) compute_baf_likelihoods(baf_vec,
-                                                                              cn_grid,
+                                                                              force_1, # always test 1 for LOH loci
                                                                               M = M,
                                                                               bw = selected_model$best$bw,
                                                                               plot = FALSE,
@@ -374,12 +372,31 @@ hmm_estimate_CN <- function(
                                                                               uniform_weight = selected_model$best$uniform_weight))
 
     ll_baf_matrix <- do.call(rbind, lapply(baf_results, function(res) res$ll_vec))
+    ploidies_temp <- apply(ll_baf_matrix, 1, which.max)
+    ploidies_temp <- force_1[ploidies_temp]
+
+    dosages <- mapply(function(x, y) call_BAF_dosages(x,
+                     cn = y,
+                     bw = selected_model$best$bw,
+                     plot = FALSE,
+                     dist = selected_model$best$dist,
+                     add_uniform = selected_model$best$add_uniform,
+                     uniform_weight = selected_model$best$uniform_weight), baf_list, ploidies_temp, SIMPLIFY = FALSE)
+
+    # remove CN 1 if was not required by user
+    colnames(ll_baf_matrix) <- force_1
+    if(!any(cn_grid == 1)) ll_baf_matrix <- ll_baf_matrix[,-which(colnames(ll_baf_matrix) == "1")]
+
+    # For each window, count heterozygotes: dosage != 0 & dosage != ploidies_temp
+    n_het_window <- vapply(seq_along(dosages), function(i) {
+      sum(dosages[[i]]$data$dosage != 0 & dosages[[i]]$data$dosage != ploidies_temp[i], na.rm = TRUE)
+    }, integer(1))
 
     if(verbose) cat("Counting heterozygous to determine BAF weights...\n")
     # BAF weights from heterozygote counts
     # Lower the number of heterozygotes in the window, lower the weight of the BAF emission
     # If there are no heterozygous, only z-score will be considered
-    HET_N <- win_df$n_het
+    HET_N <- n_het_window
     if (any(HET_N > 0)) {
       ref_q <- suppressWarnings(quantile(HET_N[HET_N>0], het_quantile, na.rm=TRUE))
       if (!is.finite(ref_q) || ref_q <= 0) ref_q <- max(HET_N, na.rm=TRUE)
@@ -552,7 +569,7 @@ hmm_estimate_CN <- function(
       Start     = win_df$Start,
       End       = win_df$End,
       n_snps    = win_df$n_snps,
-      n_het     = win_df$n_het,
+      n_het     = n_het_window,
       z         = z,
       w_baf     = if(z_only) 0 else w_baf,
       CN_call   = cn_call,
@@ -561,31 +578,30 @@ hmm_estimate_CN <- function(
     ),
     post_df
   )
-  params <- list(
-    cn_grid = cn_grid,
-    distribution = selected_model$best$dist,
-    mu = mu,
-    sigma = sig,
-    A = A,
-    pi0 = pi0,
-    bins = M,
-    bw = selected_model$best$bw,
-    loglik = ll_hist[iter],
-    z_range = z_range,
-    het_lims = het_lims,
-    het_quantile = het_quantile,
-    baf_weight = baf_weight,
-    transition_jump = transition_jump,
-    z_only = z_only,
-    exp_ploidy = exp_ploidy,
-    rm_outliers = rm_outliers,
-    outlier_alpha = outlier_alpha,
-    segment_zscore = segment_zscore,
-    snps_per_window = snps_per_window,
-    min_snps_per_window = min_snps_per_window,
-    add_uniform = add_uniform,
-    uniform_weight = selected_model$best$uniform_weight
-  )
+    params <- list(
+      cn_grid = cn_grid,
+      distribution = selected_model$best$dist,
+      mu = mu,
+      sigma = sig,
+      A = A,
+      pi0 = pi0,
+      bins = M,
+      bw = selected_model$best$bw,
+      loglik = ll_hist[iter],
+      z_range = z_range,
+      het_quantile = het_quantile,
+      baf_weight = baf_weight,
+      transition_jump = transition_jump,
+      z_only = z_only,
+      exp_ploidy = exp_ploidy,
+      rm_outliers = rm_outliers,
+      outlier_alpha = outlier_alpha,
+      segment_zscore = segment_zscore,
+      snps_per_window = snps_per_window,
+      min_snps_per_window = min_snps_per_window,
+      add_uniform = add_uniform,
+      uniform_weight = selected_model$best$uniform_weight
+    )
   if(verbose) cat("\nDone!\n")
 
   if (!is.null(result) && !is.null(d)) {

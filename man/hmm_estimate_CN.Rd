@@ -16,7 +16,6 @@ hmm_estimate_CN(
   cn_grid = 2:8,
   M = 100,
   max_iter = 60,
-  het_lims = c(0, 1),
   het_quantile = 0.8,
   baf_weight = 1,
   z_range = NULL,
@@ -59,8 +58,6 @@ mixture before renormalization. Default FALSE.}
 \item{M}{Integer. Number of BAF histogram bins on [0,1]. Default \code{121}.}
 
 \item{max_iter}{Integer. Maximum EM iterations. Default \code{60}.}
-
-\item{het_lims}{Numeric vector of length 2. BAF limits to consider a SNP heterozygous. Default \code{c(0,1)}.}
 
 \item{het_quantile}{Numeric. Quantile used to scale BAF emission weight based on heterozygote count. Default \code{0.8}.}
 

@@ -27,7 +27,7 @@
 #   algorithms for normal, beta, and beta-binomial distributions.
 #
 # ------------------------------------------------------------------------------
-# 1) What Qploidy current approach does 
+# 1) What Qploidy current approach does
 # ------------------------------------------------------------------------------
 #
 # A) Fixed "templates" rather than fitted mixture parameters
@@ -166,15 +166,15 @@ if(getRversion() >= "2.15.1") utils::globalVariables(c(
 #'   \item{prob_vec}{Vector of probabilities (n_cn), softmax-transformed from log-likelihoods.}
 #'   \item{plot}{Optional ggplot object if plot=TRUE.}
 #' @details Uses the generate_baf_template and baf_log_likelihood helpers from Qploidy.
-#' 
+#'
 #' @import ggplot2
 #' @importFrom tidyr pivot_longer
 #' @importFrom dplyr mutate
 #' @importFrom purrr map
-#' 
+#'
 #' @export
 #' @author Cristiane Taniguti
-compute_baf_likelihoods <- function(baf_vec, cn_grid, M = 100, bw = 0.03, 
+compute_baf_likelihoods <- function(baf_vec, cn_grid, M = 100, bw = 0.03,
                                    plot = FALSE, dist="gaussian", reflect = TRUE,
                                    add_uniform = FALSE, uniform_weight = 0.05) {
   K <- length(cn_grid)
@@ -250,10 +250,10 @@ compute_baf_likelihoods <- function(baf_vec, cn_grid, M = 100, bw = 0.03,
 
 #' Select the Best BAF Template Model via Grid Search and BIC
 #'
-#' This function performs a grid search over candidate BAF template models, varying distribution 
-#' family, kernel bandwidth, and optional uniform noise component, to select the best model for a 
-#' given BAF vector. For each configuration, it computes the BAF likelihoods across candidate copy 
-#' number (CN) states, selects the best CN, and evaluates model fit using the Bayesian Information 
+#' This function performs a grid search over candidate BAF template models, varying distribution
+#' family, kernel bandwidth, and optional uniform noise component, to select the best model for a
+#' given BAF vector. For each configuration, it computes the BAF likelihoods across candidate copy
+#' number (CN) states, selects the best CN, and evaluates model fit using the Bayesian Information
 #' Criterion (BIC). The function returns the best model configuration, a summary of all grid results,
 #' and (optionally) a plot for the best model.
 #'
@@ -505,15 +505,16 @@ select_best_baf_model <- function(
 #' @export
 #' @importFrom stats dnorm dbeta dbinom dnbinom
 #' @author Cristiane Taniguti
-generate_baf_template <- function(c, M = 101, bw = 0.03, floor_eps = 1e-8,
+
+generate_baf_template <- function(cn, M = 101, bw = 0.03, floor_eps = 1e-8,
                          dist = c("gaussian","beta","beta_binomial","negative_binomial"),
                          reflect = TRUE,
                          add_uniform = FALSE,
                          uniform_weight = 0.05) {
 
   dist <- match.arg(dist)
-  stopifnot(length(c) == 1, is.finite(c), c >= 1)
-  c <- as.integer(c)
+  stopifnot(length(cn) == 1, is.finite(cn), cn >= 1)
+  cn <- as.integer(cn)
   stopifnot(length(M) == 1, M >= 2)
   M <- as.integer(M)
 
@@ -523,12 +524,12 @@ generate_baf_template <- function(c, M = 101, bw = 0.03, floor_eps = 1e-8,
 
   x <- seq(0, 1, length.out = M)
 
-  # genotype centers exactly at d/c
-  d <- 0:c
-  centers <- d / c
+  # genotype centers exactly at d/cn
+  d <- 0:cn
+  centers <- d / cn
 
   # relative heights (user can swap later if desired)
-  wd <- dbinom(d, size = c, prob = 0.5)
+  wd <- dbinom(d, size = cn, prob = 0.5)
   wd <- wd / sum(wd)
 
   # --- helper: add reflection for continuous kernels
@@ -561,7 +562,7 @@ generate_baf_template <- function(c, M = 101, bw = 0.03, floor_eps = 1e-8,
 
   } else if (dist %in% c("beta_binomial","negative_binomial")) {
 
-    grid_idx_for_k <- vapply(0:c, function(k) which.min(abs(x - (k / c))), integer(1))
+    grid_idx_for_k <- vapply(0:cn, function(k) which.min(abs(x - (k / cn))), integer(1))
 
     smooth_on_grid <- function(p) {
       if (!is.finite(bw) || bw <= 0) return(p)
@@ -581,7 +582,7 @@ generate_baf_template <- function(c, M = 101, bw = 0.03, floor_eps = 1e-8,
 
     make_spike_pmf <- function(p_k) {
       p <- numeric(M)
-      for (k in 0:c) {
+      for (k in 0:cn) {
         p[grid_idx_for_k[k + 1]] <- p[grid_idx_for_k[k + 1]] + p_k[k + 1]
       }
       smooth_on_grid(p)
@@ -593,14 +594,14 @@ generate_baf_template <- function(c, M = 101, bw = 0.03, floor_eps = 1e-8,
       one_kernel <- function(d0) {
         if (d0 == 0) {
           alpha <- 1; beta <- 1 + phi
-        } else if (d0 == c) {
+        } else if (d0 == cn) {
           alpha <- 1 + phi; beta <- 1
         } else {
-          alpha <- 1 + (d0 / c) * phi
-          beta <- 1 + (1 - d0 / c) * phi
+          alpha <- 1 + (d0 / cn) * phi
+          beta <- 1 + (1 - d0 / cn) * phi
         }
-        k <- 0:c
-        logpmf <- lchoose(c, k) + lbeta(k + alpha, c - k + beta) - lbeta(alpha, beta)
+        k <- 0:cn
+        logpmf <- lchoose(cn, k) + lbeta(k + alpha, cn - k + beta) - lbeta(alpha, beta)
         p_k <- exp(logpmf - max(logpmf))
         p_k <- p_k / sum(p_k)
         make_spike_pmf(p_k)
@@ -609,12 +610,12 @@ generate_baf_template <- function(c, M = 101, bw = 0.03, floor_eps = 1e-8,
       dens <- Reduce(`+`, Map(function(d0, w) w * one_kernel(d0), d, wd))
 
     } else { # negative_binomial
-      size <- max(1, c)
+      size <- max(1, cn)
 
       one_kernel <- function(d0) {
-        k <- 0:c
+        k <- 0:cn
         if (d0 == 0) {
-          p_k <- numeric(c + 1); p_k[1] <- 1
+          p_k <- numeric(cn + 1); p_k[1] <- 1
           return(make_spike_pmf(p_k))
         }
         p <- size / (size + d0)
@@ -664,3 +665,4 @@ baf_log_likelihood <- function(counts, templ, eps=1e-8) {
   if (!any(idx)) return(0)  # empty histogram contributes nothing
   sum(counts[idx] * log(templ[idx] + eps))
 }
+

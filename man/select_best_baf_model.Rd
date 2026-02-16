@@ -50,10 +50,10 @@ A list with the following elements:
   \item{note}{(If no usable data or all models fail) diagnostic message.}
 }
 \description{
-This function performs a grid search over candidate BAF template models, varying distribution 
-family, kernel bandwidth, and optional uniform noise component, to select the best model for a 
-given BAF vector. For each configuration, it computes the BAF likelihoods across candidate copy 
-number (CN) states, selects the best CN, and evaluates model fit using the Bayesian Information 
+This function performs a grid search over candidate BAF template models, varying distribution
+family, kernel bandwidth, and optional uniform noise component, to select the best model for a
+given BAF vector. For each configuration, it computes the BAF likelihoods across candidate copy
+number (CN) states, selects the best CN, and evaluates model fit using the Bayesian Information
 Criterion (BIC). The function returns the best model configuration, a summary of all grid results,
 and (optionally) a plot for the best model.
 }

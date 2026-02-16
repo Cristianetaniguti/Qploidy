@@ -1,3 +1,10 @@
+# Qploidy 1.6.5
+
+* Number of heterozygous to define the BAF weight now is counted using dosage call based only on BAF
+* Dosage call functions added based only on BAF and based on BAF according to HMM CN call result
+* Export called dosages in a VCF format
+* Add co-pilot-instructions to the repository
+
 # Qploidy 1.6.2
 
 * Avoid markers without chromosome information in the standardized dataset

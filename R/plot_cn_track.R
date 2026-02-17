@@ -400,10 +400,8 @@ plot_cn_track <- function(hmm_CN,
       legend.position = "top"
     )
 
-  # Extract legends from BAF and Z panels
-  get_legend <- function(p) {
-    get_legend(p + theme(legend.position = "top"))
-  }
+
+  # Extract legends from BAF and CN panels (call only on ggplot objects)
   legend_baf <- get_legend(p_baf)
   legend_cn <- get_legend(p_cn)
 
@@ -411,7 +409,11 @@ plot_cn_track <- function(hmm_CN,
   legends_v <- ggarrange(legend_baf, legend_cn, ncol = 1, nrow = 2, heights = c(1, 1))
 
   # Prepare text panel for HMM params
-  params <- hmm_CN$params
+  if(!any(grepl("params$",names(hmm_CN)))) {
+    params <- hmm_CN$params_samples[[sample_id]]
+  } else {
+    params <- hmm_CN$params
+  }
   cn_grid <- if (!is.null(params$cn_grid)) paste(params$cn_grid, collapse = ", ") else "NA"
   dist <- if (!is.null(params$distribution)) as.character(params$distribution) else "NA"
   mu <- if (!is.null(params$mu)) paste(round(params$mu, 3), collapse = ", ") else "NA"

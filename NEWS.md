@@ -1,3 +1,8 @@
+# Qploidy 1.6.7
+
+* Make initial probability 0.95 for the expected ploidy
+* Bugfix plot_cn_track
+
 # Qploidy 1.6.6
 
 * Add correction factor for Z and BAF likelihood to have same weight if BAF_weight = 0.5 (new default)

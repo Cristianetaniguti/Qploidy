@@ -434,7 +434,19 @@
   A <- A / rowSums(A)
   # To consider: If is possible to change this matrix to favor specific small jumps, like if changing from 2->4 is more likely than 2->6
   # pi0 is the initial state distribution at the first window; here it’s uniform (no prior preference for any CN at the start).
-  pi0 <- rep(1/K, K)
+  # Set pi0 to favor exp_ploidy (if provided) or best CN from BAF model
+  pi0 <- rep((1 - 0.95) / (K - 1), K)
+  if (!is.null(exp_ploidy) && !is.na(exp_ploidy)) {
+    best_cn <- as.numeric(exp_ploidy)
+  } else {
+    best_cn <- as.numeric(selected_model$best$best_cn)
+  }
+  best_idx <- which(as.numeric(cn_grid) == best_cn)
+  if (length(best_idx) == 1) {
+    pi0[best_idx] <- 0.85
+  } else {
+    pi0 <- rep(1/K, K) # fallback to uniform if best CN not found
+  }
 
   if(verbose) cat("  Defining z-score distribution templates.\n")
   # z mean init (monotone ramp)

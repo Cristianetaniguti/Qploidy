@@ -46,10 +46,19 @@ plot_cn_track(
 A \code{ggplot} object (from ggpubr::ggarrange). Print to render, or add layers/scales as needed.
 }
 \description{
-Plots a genome track for each window, showing the called copy number (CN) as a horizontal segment and coloring by the posterior probability of that call. Facets are split by chromosome. The top panel shows z-scores per window, colored by BAF weight; the bottom panel shows CN segments colored by posterior probability. The new top panel shows BAF values per SNP, colored by BAF weight, for the selected sample and chromosomes. If `qploidy_standarize_result` is NULL, marker-level data is taken from `hmm_CN$updated_data` (if available).
+Produces a multi-panel genome track visualization for a selected sample, including:
+- A BAF distribution density plot (all markers, all chromosomes/windows)
+- Stacked legends for BAF weight and P(CN call)
+- A summary panel with CN grid, distribution, mu, sigma, sample name, and log-likelihood
+- BAF panel (per-SNP BAF values, colored by BAF weight, with a gray density background)
+- Z-score panel (window z-scores, colored by BAF weight)
+- CN panel (copy number segments, colored by posterior probability)
 }
 \details{
-Posterior columns are detected by the prefix "post_CN" and matched to \code{CN_call} values, so the function is agnostic to the specific CN grid. The BAF panel shows per-SNP BAF values for the selected sample and chromosomes, colored by the BAF weight for the corresponding region. The z panel shows window z-scores, colored by BAF weight. The CN panel shows copy number segments colored by posterior probability. If marker-level data is unavailable in \code{qploidy_standarize_result}, the function will use \code{hmm_CN$updated_data} if present, otherwise an error is thrown.
+The panels are arranged as: first row (BAF distribution, legends, summary), second row (BAF), third row (z), fourth row (CN). If `qploidy_standarize_result` is NULL, marker-level data is taken from `hmm_CN$updated_data` (if available).
+
+
+Posterior columns are detected by the prefix "post_CN" and matched to \code{CN_call} values, so the function is agnostic to the specific CN grid. The BAF panel shows per-SNP BAF values for the selected sample and chromosomes, colored by the BAF weight for the corresponding region, and includes a gray density background for BAF distribution. The z panel shows window z-scores, colored by BAF weight. The CN panel shows copy number segments colored by posterior probability. The top summary panel displays the CN grid, emission distribution, estimated mu and sigma, sample name, and final log-likelihood. If marker-level data is unavailable in \code{qploidy_standarize_result}, the function will use \code{hmm_CN$updated_data} if present, otherwise an error is thrown.
 }
 \section{Expected columns}{
 

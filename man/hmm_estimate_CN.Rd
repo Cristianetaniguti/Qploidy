@@ -17,7 +17,7 @@ hmm_estimate_CN(
   M = 100,
   max_iter = 60,
   het_quantile = 0.8,
-  baf_weight = 1,
+  baf_weight = 0.5,
   z_range = NULL,
   transition_jump = 0.995,
   z_only = FALSE,
@@ -31,7 +31,8 @@ hmm_estimate_CN(
   add_uniform_grid = c(FALSE, TRUE),
   uniform_weight_grid = c(0.01, 0.03, 0.05, 0.1, 0.15),
   param_count = NULL,
-  count_grid_as_params = TRUE
+  count_grid_as_params = TRUE,
+  correct_scale = TRUE
 )
 }
 \arguments{

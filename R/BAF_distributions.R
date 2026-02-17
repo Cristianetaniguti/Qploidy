@@ -236,7 +236,7 @@ compute_baf_likelihoods <- function(baf_vec, cn_grid, M = 100, bw = 0.03,
       theme(legend.position = "top", legend.box = "vertical") +
       guides(
         fill = guide_legend(order = 2, ncol = 3, byrow = TRUE),
-        color = guide_legend(order = 1, override.aes = list(linetype = "solid", size = 1)),
+        color = guide_legend(order = 1, override.aes = list(linetype = "solid", linewidth = 1)),
         linetype = guide_legend(order = 1)
       )
   }

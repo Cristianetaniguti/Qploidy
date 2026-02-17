@@ -112,7 +112,7 @@
     M = 100,
     max_iter = 60,
     het_quantile = 0.8, # increase this value to reduce the weight of baf when few hets
-    baf_weight = 1,
+    baf_weight = 0.5,
     z_range = NULL,
     transition_jump = 0.995, # decrease this value if you think there changes in CN is likely
     z_only = FALSE,
@@ -126,7 +126,8 @@
     add_uniform_grid = c(FALSE, TRUE),
     uniform_weight_grid = c(0.01, 0.03, 0.05, 0.10, 0.15),
     param_count = NULL,
-    count_grid_as_params = TRUE
+    count_grid_as_params = TRUE,
+    correct_scale = TRUE
   ) {
 
   # --- input checks ---
@@ -360,9 +361,9 @@
   # Uses parameters from selected_model
   if(!z_only){
     if(verbose) cat("Generating BAF likelihoods per window...\n")
-    force_1 <- unique(c(1,cn_grid))
+    grid1 <- unique(c(1,cn_grid)) # always test 1 for LOH loci
     baf_results <- lapply(baf_list, function(baf_vec) compute_baf_likelihoods(baf_vec,
-                                                                              force_1, # always test 1 for LOH loci
+                                                                              grid1,
                                                                               M = M,
                                                                               bw = selected_model$best$bw,
                                                                               plot = FALSE,
@@ -373,7 +374,7 @@
 
     ll_baf_matrix <- do.call(rbind, lapply(baf_results, function(res) res$ll_vec))
     ploidies_temp <- apply(ll_baf_matrix, 1, which.max)
-    ploidies_temp <- force_1[ploidies_temp]
+    ploidies_temp <- grid1[ploidies_temp]
 
     dosages <- mapply(function(x, y) call_BAF_dosages(x,
                      cn = y,
@@ -383,14 +384,18 @@
                      add_uniform = selected_model$best$add_uniform,
                      uniform_weight = selected_model$best$uniform_weight), baf_list, ploidies_temp, SIMPLIFY = FALSE)
 
-    # remove CN 1 if was not required by user
-    colnames(ll_baf_matrix) <- force_1
-    if(!any(cn_grid == 1)) ll_baf_matrix <- ll_baf_matrix[,-which(colnames(ll_baf_matrix) == "1")]
+    colnames(ll_baf_matrix) <- paste0("CN", grid1)
+    if(!any(cn_grid == 1)) {
+      ll_baf_matrix <- ll_baf_matrix[, -which(colnames(ll_baf_matrix) == "CN1"), drop=FALSE]
+    }
 
-    # For each window, count heterozygotes: dosage != 0 & dosage != ploidies_temp
+    # For each window, count heterozygotes: dosage != 0 & dosage != ploidies_temp & dosage_prob > 0.6
     n_het_window <- vapply(seq_along(dosages), function(i) {
-      sum(dosages[[i]]$data$dosage != 0 & dosages[[i]]$data$dosage != ploidies_temp[i], na.rm = TRUE)
+      sum(dosages[[i]]$data$dosage != 0 & dosages[[i]]$data$dosage != ploidies_temp[i] & dosages[[i]]$data$max_prob > 0.6, na.rm = TRUE)
     }, integer(1))
+
+    # Count number of markers with BAF values in each window
+    n_baf <- sapply(baf_list, function(x) if(any(is.na(x))) length(x[-which(is.na(x))]) else length(x))
 
     if(verbose) cat("Counting heterozygous to determine BAF weights...\n")
     # BAF weights from heterozygote counts
@@ -479,7 +484,10 @@
         ll_em[,k] <- llz
       } else {
         llb <- ll_baf_matrix[,k]
-        ll_em[, k] <- llz + w_baf * llb
+        if(correct_scale) {
+          llb <- llb/ n_baf
+        }
+        ll_em[, k] <- (1-w_baf) * llz + w_baf * llb
       }
     }
 

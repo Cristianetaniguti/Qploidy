@@ -1,3 +1,10 @@
+# Qploidy 1.6.6
+
+* Add correction factor for Z and BAF likelihood to have same weight if BAF_weight = 0.5 (new default)
+* Filter low probability heterozygous for counts on determining the BAF_weight
+* If correct_scale = TRUE (default) BAF likelihood is corrected by the number of markers (with BAF values) used for the distribution
+* plot_cn_track now contains the sample-level BAF histogram and parameters descriptions written on the figure
+
 # Qploidy 1.6.5
 
 * Number of heterozygous to define the BAF weight now is counted using dosage call based only on BAF

@@ -5,7 +5,15 @@ if (getRversion() >= "2.15.1") utils::globalVariables(
 
 #' Plot copy-number segments per window with posterior shading and BAF
 #'
-#' Plots a genome track for each window, showing the called copy number (CN) as a horizontal segment and coloring by the posterior probability of that call. Facets are split by chromosome. The top panel shows z-scores per window, colored by BAF weight; the bottom panel shows CN segments colored by posterior probability. The new top panel shows BAF values per SNP, colored by BAF weight, for the selected sample and chromosomes. If `qploidy_standarize_result` is NULL, marker-level data is taken from `hmm_CN$updated_data` (if available).
+#' Produces a multi-panel genome track visualization for a selected sample, including:
+#' - A BAF distribution density plot (all markers, all chromosomes/windows)
+#' - Stacked legends for BAF weight and P(CN call)
+#' - A summary panel with CN grid, distribution, mu, sigma, sample name, and log-likelihood
+#' - BAF panel (per-SNP BAF values, colored by BAF weight, with a gray density background)
+#' - Z-score panel (window z-scores, colored by BAF weight)
+#' - CN panel (copy number segments, colored by posterior probability)
+#'
+#' The panels are arranged as: first row (BAF distribution, legends, summary), second row (BAF), third row (z), fourth row (CN). If `qploidy_standarize_result` is NULL, marker-level data is taken from `hmm_CN$updated_data` (if available).
 #'
 #' @param hmm_CN An object of class \code{hmm_CN} (output from \code{hmm_estimate_CN}), containing a \code{result} data frame with one row per window and columns: \code{Sample}, \code{Chr}, \code{Start}, \code{End}, \code{CN_call}, \code{post_CN*}, etc. Optionally, may contain \code{updated_data} for marker-level fallback.
 #' @param qploidy_standarize_result An object of class \code{qploidy_standardization} (output from \code{standardize}), used to extract BAF values for the BAF panel. If NULL, marker-level data is taken from \code{hmm_CN$updated_data}.
@@ -21,7 +29,7 @@ if (getRversion() >= "2.15.1") utils::globalVariables(
 #' @return A \code{ggplot} object (from ggpubr::ggarrange). Print to render, or add layers/scales as needed.
 #'
 #' @details
-#' Posterior columns are detected by the prefix "post_CN" and matched to \code{CN_call} values, so the function is agnostic to the specific CN grid. The BAF panel shows per-SNP BAF values for the selected sample and chromosomes, colored by the BAF weight for the corresponding region. The z panel shows window z-scores, colored by BAF weight. The CN panel shows copy number segments colored by posterior probability. If marker-level data is unavailable in \code{qploidy_standarize_result}, the function will use \code{hmm_CN$updated_data} if present, otherwise an error is thrown.
+#' Posterior columns are detected by the prefix "post_CN" and matched to \code{CN_call} values, so the function is agnostic to the specific CN grid. The BAF panel shows per-SNP BAF values for the selected sample and chromosomes, colored by the BAF weight for the corresponding region, and includes a gray density background for BAF distribution. The z panel shows window z-scores, colored by BAF weight. The CN panel shows copy number segments colored by posterior probability. The top summary panel displays the CN grid, emission distribution, estimated mu and sigma, sample name, and final log-likelihood. If marker-level data is unavailable in \code{qploidy_standarize_result}, the function will use \code{hmm_CN$updated_data} if present, otherwise an error is thrown.
 #'
 #' @section Expected columns:
 #' The function assumes posterior columns named exactly \code{post_CN<k>} for each copy-number state \code{k}. If your column naming differs, rename them before calling this function.
@@ -48,8 +56,9 @@ if (getRversion() >= "2.15.1") utils::globalVariables(
 #' @import dplyr
 #' @import tidyr
 #' @importFrom magrittr %>%
-#' @importFrom ggpubr ggarrange
+#' @importFrom ggpubr ggarrange get_legend
 #' @importFrom scales squish
+#' @importFrom stats density
 #' @importFrom purrr map
 #'
 #' @export
@@ -225,7 +234,7 @@ plot_cn_track <- function(hmm_CN,
     }
     p_z <- p_z +
       facet_wrap(~ Chr, scales = "free_x", nrow = 1) +
-      scale_color_distiller(palette = "Spectral", direction = -1,
+      scale_color_viridis_c(option = "plasma", direction = -1,
                             limits = c(0, 1),
                             oob = squish,
                             name = "BAF weight") +
@@ -259,7 +268,7 @@ plot_cn_track <- function(hmm_CN,
     }
     p_z <- p_z +
       facet_wrap(~ Chr, scales = "free_x", nrow = 1) +
-      scale_color_distiller(palette = "Spectral", direction = -1,
+      scale_color_viridis_c(option = "plasma", direction = -1,
                             limits = c(0, 1),
                             oob = squish,
                             name = "BAF weight") +
@@ -326,11 +335,32 @@ plot_cn_track <- function(hmm_CN,
     left_join(win_tbl %>% select(Chr, region_id),
                      by = c("Chr", "region_id"))
 
+  # Compute BAF density for y-axis background
+  dens_list <- lapply(split(plot_df, plot_df$Chr), function(df) {
+    if (nrow(df) < 2) return(NULL)
+    dens <- stats::density(df$baf, na.rm = TRUE)
+    data.frame(
+      Chr = unique(df$Chr),
+      y = dens$x,
+      density = dens$y
+    )
+  })
+  dens_df <- do.call(rbind, dens_list)
+
   p_baf <- ggplot(plot_df, aes(x = Position, y = baf, color = w_baf)) +
     geom_blank(
       data = chrom_ghost,
       inherit.aes = FALSE,
       aes(x = Position, y = 0)
+    ) +
+    # Add density polygon on y-axis (background)
+    geom_polygon(
+      data = dens_df,
+      aes(x = min(plot_df$Position, na.rm = TRUE) +
+                (max(plot_df$Position, na.rm = TRUE) - min(plot_df$Position, na.rm = TRUE)) * density / max(density, na.rm = TRUE),
+          y = y, group = Chr),
+      fill = "#848d98", alpha = 0.3, color = NA,
+      inherit.aes = FALSE
     ) +
     geom_point(alpha = 0.7, size = 1)
   if (show_window_lines) {
@@ -342,7 +372,7 @@ plot_cn_track <- function(hmm_CN,
     facet_wrap(~Chr, scales = "free_x", nrow = 1) +
     theme_bw() +
     ylab("BAF") +
-    scale_color_distiller(palette = "Spectral", direction = -1,
+    scale_color_viridis_c(option = "plasma", direction = -1,
                           limits = c(0, 1),
                           oob = squish,
                           name = "BAF weight") +
@@ -354,16 +384,77 @@ plot_cn_track <- function(hmm_CN,
     )
 
   # -------- stack with ggpubr (no patchwork needed) --------
+  # BAF distribution plot (all markers, all chromosomes/windows)
+  p_baf_dist <- ggplot(plot_df, aes(x = baf)) +
+    geom_density(fill = "#848d98", alpha = 0.5, color = NA) +
+    theme_bw() +
+    labs(title = "BAF distribution", x = "BAF", y = "Density") +
+    scale_x_continuous(limits = c(0, 1)) +
+    scale_y_continuous(expand = expansion(mult = c(0, 0.05))) +
+    theme(
+      plot.title = element_text(size = 10, hjust = 0.5),
+      axis.title = element_text(size = 9),
+      axis.text = element_text(size = 8),
+      panel.grid = element_blank(),
+      panel.border = element_rect(color = "grey60", fill = NA),
+      legend.position = "top"
+    )
+
+  # Extract legends from BAF and Z panels
+  get_legend <- function(p) {
+    get_legend(p + theme(legend.position = "top"))
+  }
+  legend_baf <- get_legend(p_baf)
+  legend_cn <- get_legend(p_cn)
+
+  # Stack legends vertically
+  legends_v <- ggarrange(legend_baf, legend_cn, ncol = 1, nrow = 2, heights = c(1, 1))
+
+  # Prepare text panel for HMM params
+  params <- hmm_CN$params
+  cn_grid <- if (!is.null(params$cn_grid)) paste(params$cn_grid, collapse = ", ") else "NA"
+  dist <- if (!is.null(params$distribution)) as.character(params$distribution) else "NA"
+  mu <- if (!is.null(params$mu)) paste(round(params$mu, 3), collapse = ", ") else "NA"
+  sigma <- if (!is.null(params$sigma)) paste(round(params$sigma, 3), collapse = ", ") else "NA"
+  sample_name <- if (!is.null(sample_id)) as.character(sample_id) else "NA"
+  loglik <- if (!is.null(params$loglik)) round(params$loglik, 3) else "NA"
+  param_text <- paste0(
+    "Sample Name: ", sample_name, "\n",
+    "Final log-likelihood: ", loglik, "\n",
+    "CN grid: ", cn_grid, "\n",
+    "Z_Mu: ", mu, "\n",
+    "Distribution: ", dist, "\n",
+    "Sigma: ", sigma
+  )
+  param_panel <- ggplot() +
+    theme_void() +
+    annotate("text", x = 0.5, y = 0.5, label = param_text, hjust = 0.5, vjust = 0.5, size = 3.5, family = "mono")
+
+  # First row: three columns (BAF distribution, stacked legends, HMM params)
+  first_row <- ggarrange(
+    p_baf_dist,
+    legends_v,
+    param_panel,
+    ncol = 3, nrow = 1, widths = c(3, 1, 2)
+  )
+
+  # Stack all panels vertically
+  arranged <- ggarrange(
+    first_row,
+    p_baf + theme(legend.position = "none"),
+    p_z + theme(legend.position = "none"),
+    p_cn + theme(legend.position = "none"),
+    ncol = 1, nrow = 4,
+    heights = c(2, heights[1], heights[2], heights[2]),
+    align = "v"
+  )
+
   return(list(
     baf = p_baf,
     z   = p_z,
     cn  = p_cn,
-    arranged = ggarrange(
-      p_baf, p_z, p_cn,
-      ncol = 1, nrow = 3,
-      heights = heights,
-      align = "v"
-    )
+    baf_dist = p_baf_dist,
+    arranged = arranged
   ))
 }
 

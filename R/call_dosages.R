@@ -4,12 +4,58 @@
 #'
 #' @param hmm_dosage_calls A data.frame with columns: MarkerName, SampleName, Chr, Position, X, Y, CN_call, post_max_CN, dosage, post_max_dosage, BAF, z
 #' @param file Path to output VCF file
+#' 
+#' @importFrom data.table data.table setDT dcast fwrite setcolorder
+#' 
+#' @details The VCF INFO field will contain the mode of CN_call values for each marker. The FORMAT field will include GT (genotype), CN (copy number call), AD (allelic depths), BAF, Z, PMC (posterior max CN), and PMD (posterior max dosage). Genotypes are assigned based on the dosage and CN_call, with 1 representing the alternate allele and 0 representing the reference allele.
+#' 
+#' @return The path to the written VCF file (invisible)
+#' 
 #' @export
 export_VCF <- function(hmm_dosage_calls, file) {
   stopifnot(is.data.frame(hmm_dosage_calls))
   required_cols <- c("MarkerName", "SampleName", "Chr", "Position", "X", "Y", "CN_call", "post_max_CN", "dosage", "post_max_dosage", "baf", "z")
   missing_cols <- setdiff(required_cols, names(hmm_dosage_calls))
   if (length(missing_cols) > 0) stop(sprintf("Missing columns: %s", paste(missing_cols, collapse=", ")))
+
+  if (!requireNamespace("data.table", quietly = TRUE)) stop("Please install the 'data.table' package for fast VCF export.")
+  setDT(hmm_dosage_calls)
+  samples <- unique(hmm_dosage_calls$SampleName)
+
+  # Precompute FORMAT fields for all rows (vectorized, no vapply)
+  hmm_dosage_calls[, GT := ifelse(!is.na(CN_call) & !is.na(dosage),
+    sapply(seq_len(.N), function(i) {
+      cn <- as.integer(CN_call[i]); dosage <- as.integer(dosage[i])
+      if (is.na(cn) || is.na(dosage)) return("./.")
+      gt_vec <- sort(c(rep(1, dosage), rep(0, cn - dosage)))
+      paste(gt_vec, collapse="/")
+    }), "./.")]
+  hmm_dosage_calls[, AD := ifelse(is.na(X) | is.na(Y), ".,.", paste0(round(as.numeric(X),2), ",", round(as.numeric(Y),2)))]
+  hmm_dosage_calls[, BAF := ifelse(is.na(baf), ".", format(round(as.numeric(baf),2), nsmall=2))]
+  hmm_dosage_calls[, Z := ifelse(is.na(z), ".", format(round(as.numeric(z),2), nsmall=2))]
+  hmm_dosage_calls[, PMC := ifelse(is.na(post_max_CN), ".", format(round(as.numeric(post_max_CN),3), nsmall=3))]
+  hmm_dosage_calls[, PMD := ifelse(is.na(post_max_dosage), ".", format(round(as.numeric(post_max_dosage),3), nsmall=3))]
+  hmm_dosage_calls[, CN_call := ifelse(is.na(CN_call), ".", as.character(CN_call))]
+  hmm_dosage_calls[, FORMAT := paste(GT, CN_call, AD, BAF, Z, PMC, PMD, sep=":")]
+
+  # Use data.table for wide format, but process in chunks if needed
+  vcf_dt <- dcast(
+    hmm_dosage_calls,
+    Chr + Position + MarkerName ~ SampleName,
+    value.var = "FORMAT",
+    fill = "./:.:.,.:.:.:.:."
+  )
+
+  # INFO: CN is the mode of all CN_call values for this marker
+  vcf_dt[, INFO := {
+    cn_vals <- hmm_dosage_calls[.BY, on=.(Chr, Position, MarkerName)]$CN_call
+    mode_cn <- as.integer(names(sort(table(cn_vals), decreasing=TRUE))[1])
+    paste0("CN=", mode_cn)
+  }, by=.(Chr, Position, MarkerName)]
+  vcf_dt[, `:=`(REF = ".", ALT = ".", QUAL = ".", FILTER = ".", FORMAT = "GT:CN:AD:BAF:Z:PMC:PMD")]
+
+  # Set column order for VCF
+  setcolorder(vcf_dt, c("Chr", "Position", "MarkerName", "REF", "ALT", "QUAL", "FILTER", "INFO", "FORMAT", samples))
 
   # Prepare VCF header
   vcf_header <- c(
@@ -23,64 +69,12 @@ export_VCF <- function(hmm_dosage_calls, file) {
     "##FORMAT=<ID=PMC,Number=1,Type=Float,Description=Posterior probability of CN_call>",
     "##FORMAT=<ID=PMD,Number=1,Type=Float,Description=Posterior probability of dosage call>"
   )
-
-  # Get all unique samples and markers
-  samples <- unique(hmm_dosage_calls$SampleName)
-  markers <- unique(hmm_dosage_calls[, c("Chr", "Position", "MarkerName")])
-
-  # VCF column header
   vcf_col_header <- paste0("#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t", paste(samples, collapse="\t"))
   vcf_header <- c(vcf_header, vcf_col_header)
 
-  # For each marker, gather all sample data
-  vcf_body <- apply(markers, 1, function(marker_row) {
-    chr <- as.character(marker_row["Chr"])
-    pos <- as.integer(marker_row["Position"])
-    id <- as.character(marker_row["MarkerName"])
-    ref <- "."
-    alt <- "."
-    qual <- "."
-    filter <- "."
-    # Get all rows for this marker (across samples)
-    rows <- hmm_dosage_calls[hmm_dosage_calls$Chr == chr & hmm_dosage_calls$Position == pos & hmm_dosage_calls$MarkerName == id, ]
-    # INFO: CN is the mode of all CN_call values for this marker
-    cn_vals <- rows$CN_call
-    mode_cn <- as.integer(names(sort(table(cn_vals), decreasing=TRUE))[1])
-    info <- paste0("CN=", mode_cn)
-    format <- "GT:CN:AD:BAF:Z:PMC:PMD"
-    # For each sample, build the FORMAT string
-    sample_fields <- vapply(samples, function(samp) {
-      row <- rows[rows$SampleName == samp, ]
-      if (nrow(row) == 0) return("./:.:.,.:.:.:.:.")
-      cn <- as.integer(row$CN_call)
-      dosage <- as.integer(row$dosage)
-      gt <- if (!is.na(cn) && !is.na(dosage)) {
-        gt_vec <- c(rep(1, dosage), rep(0, cn - dosage))
-        paste(gt_vec, collapse="/")
-      } else {
-        "./."
-      }
-      ad <- paste0(round(as.numeric(row$X),2), ",", round(as.numeric(row$Y),2))
-      baf <- format(round(as.numeric(row$BAF),2), nsmall=2)
-      z <- format(round(as.numeric(row$z),2), nsmall=2)
-      # Convert post_max_CN and post_max_dosage to phred scores, cap at 99
-      pmc_raw <- suppressWarnings(as.numeric(row$post_max_CN))
-      pmd_raw <- suppressWarnings(as.numeric(row$post_max_dosage))
-      pmc <- if (!is.na(pmc_raw) && pmc_raw > 0) format(round(-10*log10(1-pmc_raw),2), nsmall=2) else "."
-      pmd <- if (!is.na(pmd_raw) && pmd_raw > 0) format(round(-10*log10(1-pmd_raw),2), nsmall=2) else "."
-      # Cap at 99
-      # Only coerce to numeric if not '.'
-      pmc_num <- suppressWarnings(as.numeric(pmc))
-      pmd_num <- suppressWarnings(as.numeric(pmd))
-      if (!is.na(pmc_num) && pmc != "." && pmc_num > 99) pmc <- "99.00"
-      if (!is.na(pmd_num) && pmd != "." && pmd_num > 99) pmd <- "99.00"
-      paste(gt, cn, ad, baf, z, pmc, pmd, sep=":")
-    }, character(1))
-    paste(chr, pos, id, ref, alt, qual, filter, info, format, paste(sample_fields, collapse="\t"), sep="\t")
-  })
-
-  # Write to file
-  writeLines(c(vcf_header, vcf_body), file)
+  # Write header and body efficiently
+  writeLines(vcf_header, file)
+  fwrite(vcf_dt, file = file, sep = "\t", quote = FALSE, col.names = FALSE, row.names = FALSE, append = TRUE, showProgress = FALSE)
   invisible(file)
 }
 #' Assign BAF Dosages Using Selected Model

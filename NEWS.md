@@ -1,3 +1,9 @@
+# Qploidy 1.6.8
+
+* Increase speed to export VCF
+* Add re_standardize function to run standardization based on HMM results
+* Reduce text on plot_cn_track
+
 # Qploidy 1.6.7
 
 * Make initial probability 0.95 for the expected ploidy

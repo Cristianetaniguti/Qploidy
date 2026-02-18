@@ -416,15 +416,13 @@ plot_cn_track <- function(hmm_CN,
   }
   cn_grid <- if (!is.null(params$cn_grid)) paste(params$cn_grid, collapse = ", ") else "NA"
   dist <- if (!is.null(params$distribution)) as.character(params$distribution) else "NA"
-  mu <- if (!is.null(params$mu)) paste(round(params$mu, 3), collapse = ", ") else "NA"
   sigma <- if (!is.null(params$sigma)) paste(round(params$sigma, 3), collapse = ", ") else "NA"
   sample_name <- if (!is.null(sample_id)) as.character(sample_id) else "NA"
   loglik <- if (!is.null(params$loglik)) round(params$loglik, 3) else "NA"
   param_text <- paste0(
     "Sample Name: ", sample_name, "\n",
-    "Final log-likelihood: ", loglik, "\n",
+    "Log-likelihood: ", loglik, "\n",
     "CN grid: ", cn_grid, "\n",
-    "Z_Mu: ", mu, "\n",
     "Distribution: ", dist, "\n",
     "Sigma: ", sigma
   )

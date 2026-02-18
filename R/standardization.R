@@ -909,3 +909,114 @@ write_qploidy_standardization <- function(qploidy_standardization_object, out_fi
   vroom_write(filters, file = out_filename, append = TRUE, col_names = T)
   vroom_write(qploidy_standardization_object$data, file = out_filename, append = TRUE, col_names = T)
 }
+
+
+#' Re-standardize a Qploidy HMM object
+#'
+#' This function re-runs the standardization pipeline on a Qploidy HMM object (from `hmm_estimate_CN_multi`),
+#' generating a new qploidy_standardization object for downstream analysis or Shiny app input. It extracts marker-level
+#' data and genotype dosages for a selected model, applies quality filters, estimates cluster centers, computes BAF and Z-scores,
+#' and merges results into a standardized data frame. This is useful for re-standardizing after model selection or parameter tuning.
+#'
+#' @param hmm_CN_multi An object of class `hmm_CN` as returned by `hmm_estimate_CN_multi`.
+#' @param selected_model Character. The name of the model to use from `hmm_CN_multi$params_samples` (required).
+#' @param ploidy.standardization Integer. Ploidy level to use for standardization. If NULL, uses the mode of CN_call in dosages.
+#' @param threshold.n.clusters Integer. Minimum number of expected dosage clusters per marker. Defaults to ploidy + 1.
+#' @param n.cores Integer. Number of cores for parallel computation. Default is 1.
+#' @param threshold.geno.prob Numeric (0–1). Minimum genotype call probability. Default is 0.5.
+#' @param threshold.missing.geno Numeric (0–1). Maximum fraction of missing genotypes per marker. Default is 0.90.
+#' @param out_filename Optional. Path to save the standardized dataset (CSV/TSV).
+#' @param type Character. Data type for clustering: "intensities" (default), "counts", or "updog".
+#' @param multidog_obj Optional. updog multidog object for cluster center estimation.
+#' @param parallel.type Character. Parallel backend: "FORK" or "PSOCK". Default is "PSOCK".
+#' @param rm_outlier Logical. Remove outliers before estimating cluster centers. Default is TRUE.
+#' @param cluster_median Logical. Use median (TRUE) or mean (FALSE) for cluster centers. Default is TRUE.
+#' @param verbose Logical. Print progress messages. Default is TRUE.
+#'
+#' @return An object of class `qploidy_standardization` (list) with elements:
+#'   - info: Named vector of standardization parameters.
+#'   - filters: Named vector summarizing filtering steps.
+#'   - data: Data frame with merged BAF, Z-score, and genotype info by marker and sample.
+#'
+#' @details
+#' This function is intended for re-standardizing a Qploidy HMM object after model selection or parameter changes.
+#' It extracts the relevant marker-level and dosage data, applies quality filters, estimates cluster centers,
+#' computes BAF and Z-scores, and merges all results into a standardized data frame suitable for downstream analysis or Shiny app input.
+#'
+#' @examples
+#' # Example usage:
+#' # hmm_CN_multi <- hmm_estimate_CN_multi(...)
+#' # std <- re_standardize(hmm_CN_multi, selected_model = "model1", ploidy.standardization = 4)
+#'
+#' @export
+re_standardize <- function(hmm_CN_multi,
+                           selected_model = NULL,
+                           ploidy.standardization = NULL,
+                           threshold.n.clusters = NULL,
+                           n.cores = 1,
+                           threshold.geno.prob = 0.5,
+                           threshold.missing.geno = 0.90,
+                           out_filename = NULL,
+                           type = "intensities",
+                           multidog_obj = NULL,
+                           parallel.type = "PSOCK",
+                           rm_outlier = TRUE,
+                           cluster_median = TRUE,
+                           verbose = TRUE) {
+
+  # Check input object
+  # check if hmm_CN_multi is hmm_CN class
+  if (!inherits(hmm_CN_multi, "hmm_CN")) stop("Input object must be of class 'hmm_CN'")
+  # check if hmm_CN_multi has params_samples element
+  if (!any(names(hmm_CN_multi) == "params_samples")) stop("Input object must come from hmm_estimate_CN_multi function")
+
+  # make selected_model required
+  if (is.null(selected_model)) stop("selected_model must be provided")
+
+  # Set ploidy.standardization if not provided
+  if(is.null(ploidy.standardization)) {
+    ploidy.standardization <- mode( hmm_CN_multi$by_marker$CN_call)
+    if (verbose) cat("ploidy.standardization not provided, using:", ploidy.standardization, "\n")
+  }
+  hmm_CN_multi_filt <- hmm_CN_multi
+  hmm_CN_multi_filt$by_marker <- hmm_CN_multi$by_marker[which(hmm_CN_multi$by_marker$CN_call == ploidy.standardization), ]
+
+  # Call dosages for the selected model
+  dosages <- call_hmm_dosages(hmm_CN = hmm_CN_multi_filt, selected_model)
+
+  # Extract marker-level data
+  data <- hmm_CN_multi$by_marker[, c("MarkerName", "SampleName", "X", "Y", "R", "ratio")]
+
+  genos <- dosages[, c("MarkerName", "SampleName", "dosage", "post_max_dosage")]
+  colnames(genos)[3:4] <- c("geno", "prob")
+
+  geno.pos <- hmm_CN_multi$by_marker[, c("MarkerName", "Chr", "Position")]
+  geno.pos <- unique.data.frame(geno.pos)
+  colnames(geno.pos) <- c("MarkerName", "Chromosome", "Position")
+
+
+  if (is.null(threshold.n.clusters)) {
+    threshold.n.clusters <- ploidy.standardization + 1
+    if (verbose) cat("threshold.n.clusters not provided, using:", threshold.n.clusters, "\n")
+  }
+
+  re_qploidy_standardization <- standardize(
+    data = data,
+    genos = genos,
+    geno.pos = geno.pos,
+    ploidy.standardization = ploidy.standardization,
+    threshold.n.clusters = threshold.n.clusters,
+    n.cores = n.cores,
+    threshold.geno.prob = threshold.geno.prob,
+    threshold.missing.geno = threshold.missing.geno,
+    out_filename = out_filename,
+    type = type,
+    multidog_obj = multidog_obj,
+    parallel.type = parallel.type,
+    rm_outlier = rm_outlier,
+    cluster_median = cluster_median,
+    verbose = verbose
+  )
+
+  return(re_qploidy_standardization)
+}

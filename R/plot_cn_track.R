@@ -3,65 +3,71 @@ if (getRversion() >= "2.15.1") utils::globalVariables(
   c("starts_all", "starts", "outlier", "WindowID", "z_mean", "Chr", "region_id", "w_baf", "SampleName", "Position", "baf", "Start", "End", "prob_call", "CN_call")
 )
 
-#' Plot copy-number segments per window with posterior shading and BAF
-#'
-#' Produces a multi-panel genome track visualization for a selected sample, including:
-#' - A BAF distribution density plot (all markers, all chromosomes/windows)
-#' - Stacked legends for BAF weight and P(CN call)
-#' - A summary panel with CN grid, distribution, mu, sigma, sample name, and log-likelihood
-#' - BAF panel (per-SNP BAF values, colored by BAF weight, with a gray density background)
-#' - Z-score panel (window z-scores, colored by BAF weight)
-#' - CN panel (copy number segments, colored by posterior probability)
-#'
-#' The panels are arranged as: first row (BAF distribution, legends, summary), second row (BAF), third row (z), fourth row (CN). If `qploidy_standarize_result` is NULL, marker-level data is taken from `hmm_CN$updated_data` (if available).
-#'
-#' @param hmm_CN An object of class \code{hmm_CN} (output from \code{hmm_estimate_CN}), containing a \code{result} data frame with one row per window and columns: \code{Sample}, \code{Chr}, \code{Start}, \code{End}, \code{CN_call}, \code{post_CN*}, etc. Optionally, may contain \code{updated_data} for marker-level fallback.
-#' @param qploidy_standarize_result An object of class \code{qploidy_standardization} (output from \code{standardize}), used to extract BAF values for the BAF panel. If NULL, marker-level data is taken from \code{hmm_CN$updated_data}.
-#' @param sample_id Character scalar. Which sample from \code{hmm_CN$Sample} to display. Defaults to the first unique value in \code{hmm_CN$Sample}.
-#' @param cn_min,cn_max Numeric scalars. Y-axis limits for CN. Defaults span the min/max of \code{CN_call}.
-#' @param show_window_lines Logical. If TRUE, show dashed vertical lines at window boundaries.
-#' @param include_first_in_chr Logical. If TRUE, include the first window line in each chromosome.
-#' @param line_color,line_alpha,line_width,line_linetype Appearance settings for window boundary lines.
-#' @param heights Numeric vector of length 2 or 3. Relative heights of the BAF, z, and CN panels.
-#' @param z_by_mean Logical. If TRUE, plot horizontal black lines for mean z per window using geom_segment; otherwise, use geom_smooth as before.
-#' @param chr Character vector. If provided, only these chromosomes are displayed in the plots.
-#'
-#' @return A \code{ggplot} object (from ggpubr::ggarrange). Print to render, or add layers/scales as needed.
-#'
-#' @details
-#' Posterior columns are detected by the prefix "post_CN" and matched to \code{CN_call} values, so the function is agnostic to the specific CN grid. The BAF panel shows per-SNP BAF values for the selected sample and chromosomes, colored by the BAF weight for the corresponding region, and includes a gray density background for BAF distribution. The z panel shows window z-scores, colored by BAF weight. The CN panel shows copy number segments colored by posterior probability. The top summary panel displays the CN grid, emission distribution, estimated mu and sigma, sample name, and final log-likelihood. If marker-level data is unavailable in \code{qploidy_standarize_result}, the function will use \code{hmm_CN$updated_data} if present, otherwise an error is thrown.
-#'
-#' @section Expected columns:
-#' The function assumes posterior columns named exactly \code{post_CN<k>} for each copy-number state \code{k}. If your column naming differs, rename them before calling this function.
-#'
-#' @examples
-#' \dontrun{
-#' library(dplyr)
-#' library(ggplot2)
-#' toy <- data.frame(
-#'   Sample   = "S1",
-#'   Chr      = c("chr1","chr1","chr1"),
-#'   Start    = c(1, 1e6, 2e6),
-#'   End      = c(1e6-1, 2e6-1, 3e6-1),
-#'   CN_call  = c(2,3,2),
-#'   post_CN2 = c(0.95, 0.05, 0.9),
-#'   post_CN3 = c(0.05, 0.94, 0.1)
-#' )
-#' # qploidy_standarize_result should be a
-#' # qploidy_standardization object with $data containing BAF values
-#' plot_cn_track(toy, qploidy_standarize_result, sample_id = "S1")
-#' }
-#'
-#' @import ggplot2
-#' @import dplyr
-#' @import tidyr
-#' @importFrom magrittr %>%
-#' @importFrom ggpubr ggarrange get_legend
-#' @importFrom scales squish
-#' @importFrom stats density
-#' @importFrom purrr map
-#'
-#' @export
+##' Plot copy-number segments per window with posterior shading and BAF
+##'
+##' Produces a multi-panel genome track visualization for a selected sample, including:
+##' - A BAF distribution density plot (all markers, all chromosomes/windows)
+##' - Stacked legends for BAF weight and P(CN call)
+##' - A summary panel with CN grid, distribution, mu, sigma, sample name, and log-likelihood
+##' - BAF panel (per-SNP BAF values, colored by BAF weight, with a gray density background)
+##' - Z-score panel (window z-scores, colored by BAF weight)
+##' - CN panel (copy number segments, colored by posterior probability)
+##'
+##' The panels are arranged as: first row (BAF distribution, legends, summary), second row (BAF), third row (z), fourth row (CN).
+##' If `qploidy_standarize_result` is NULL, marker-level data is taken from `hmm_CN$updated_data` (if available).
+##'
+##' @param hmm_CN An object of class \code{hmm_CN} (output from \code{hmm_estimate_CN}), containing a \code{result} data frame with one row per window and columns: \code{Sample}, \code{Chr}, \code{Start}, \code{End}, \code{CN_call}, \code{post_CN*}, etc. Optionally, may contain \code{updated_data} for marker-level fallback.
+##' @param qploidy_standarize_result An object of class \code{qploidy_standardization} (output from \code{standardize}), used to extract BAF values for the BAF panel. If NULL, marker-level data is taken from \code{hmm_CN$updated_data}.
+##' @param sample_id Character scalar. Which sample from \code{hmm_CN$Sample} to display. Defaults to the first unique value in \code{hmm_CN$Sample}.
+##' @param cn_min,cn_max Numeric scalars. Y-axis limits for CN. Defaults span the min/max of \code{CN_call}.
+##' @param show_window_lines Logical. If TRUE, show dashed vertical lines at window boundaries.
+##' @param include_first_in_chr Logical. If TRUE, include the first window line in each chromosome.
+##' @param line_color,line_alpha,line_width,line_linetype Appearance settings for window boundary lines.
+##' @param heights Numeric vector of length 2 or 3. Relative heights of the BAF, z, and CN panels.
+##' @param z_by_mean Logical. If TRUE, plot horizontal black lines for mean z per window using geom_segment; otherwise, use geom_smooth as before.
+##' @param chr Character vector. If provided, only these chromosomes are displayed in the plots.
+##' @param depth_zero_as_x Logical. If TRUE, markers with R == 0 are shown as 'x' in the z-score panel; otherwise, they are shown as normal dots. Default is FALSE.
+##'
+##' @return A \code{ggplot} object (from ggpubr::ggarrange). Print to render, or add layers/scales as needed.
+##'
+##' @details
+##' Posterior columns are detected by the prefix "post_CN" and matched to \code{CN_call} values, so the function is agnostic to the specific CN grid.
+##' The BAF panel shows per-SNP BAF values for the selected sample and chromosomes, colored by the BAF weight for the corresponding region, and includes a gray density background for BAF distribution.
+##' The z panel shows window z-scores, colored by BAF weight. Outliers (if present) are marked as 'x'. If `depth_zero_as_x = TRUE`, markers with R == 0 are also shown as 'x' and distinguished in the legend.
+##' The CN panel shows copy number segments colored by posterior probability. The top summary panel displays the CN grid, emission distribution, estimated mu and sigma, sample name, and final log-likelihood.
+##' If marker-level data is unavailable in \code{qploidy_standarize_result}, the function will use \code{hmm_CN$updated_data} if present, otherwise an error is thrown.
+##'
+##' @section Expected columns:
+##' The function assumes posterior columns named exactly \code{post_CN<k>} for each copy-number state \code{k}. If your column naming differs, rename them before calling this function.
+##'
+##' @examples
+##' \dontrun{
+##' library(dplyr)
+##' library(ggplot2)
+##' toy <- data.frame(
+##'   Sample   = "S1",
+##'   Chr      = c("chr1","chr1","chr1"),
+##'   Start    = c(1, 1e6, 2e6),
+##'   End      = c(1e6-1, 2e6-1, 3e6-1),
+##'   CN_call  = c(2,3,2),
+##'   post_CN2 = c(0.95, 0.05, 0.9),
+##'   post_CN3 = c(0.05, 0.94, 0.1)
+##' )
+##' # qploidy_standarize_result should be a
+##' # qploidy_standardization object with $data containing BAF values
+##' plot_cn_track(toy, qploidy_standarize_result, sample_id = "S1", depth_zero_as_x = TRUE)
+##' }
+##'
+##' @import ggplot2
+##' @import dplyr
+##' @import tidyr
+##' @importFrom magrittr %>%
+##' @importFrom ggpubr ggarrange get_legend
+##' @importFrom scales squish
+##' @importFrom stats density
+##' @importFrom purrr map
+##'
+##' @export
 plot_cn_track <- function(hmm_CN,
                           qploidy_standarize_result = NULL,
                           sample_id = NULL,
@@ -75,7 +81,8 @@ plot_cn_track <- function(hmm_CN,
                           line_linetype = "dashed",
                           heights = c(2, 2.5),
                           z_by_mean = TRUE,
-                          chr = NULL) {
+                          chr = NULL,
+                          depth_zero_as_x = FALSE) {
 
   stopifnot(inherits(hmm_CN, "hmm_CN"))
   stopifnot(inherits(qploidy_standarize_result, "qploidy_standardization") || is.null(qploidy_standarize_result))
@@ -202,8 +209,50 @@ plot_cn_track <- function(hmm_CN,
     left_join(win_tbl %>% select(Chr, region_id),
                      by = c("Chr", "region_id"))
 
-  # -------- top panel: z dots (color = w_baf, shape = outlier if present) --------
-  shape_aes <- if ("outlier" %in% colnames(marker_df)) aes(shape = outlier) else NULL
+  # -------- top panel: z dots (color = w_baf, shape = outlier or R0) --------
+  # Add a column to marker_df to indicate R == 0
+  marker_df$R0 <- ifelse(!is.null(marker_df$R) & marker_df$R == 0, TRUE, FALSE)
+
+  # Determine shape aesthetic: priority is outlier+R0, then outlier, then R0, else none
+  shape_aes <- NULL
+  shape_scale <- NULL
+  if (depth_zero_as_x) {
+    if ("outlier" %in% colnames(marker_df)) {
+      # Combine outlier and R0 into a single shape variable
+      marker_df$shape_flag <- ifelse(marker_df$R0, "R0", ifelse(marker_df$outlier, "Outlier", "Normal"))
+      shape_aes <- aes(shape = shape_flag)
+      shape_scale <- scale_shape_manual(
+        values = c("Normal" = 16, "Outlier" = 4, "R0" = 4),
+        name = "Marker flag",
+        breaks = c("Normal", "Outlier", "R0"),
+        labels = c("Normal", "Outlier", "R = 0")
+      )
+    } else if ("R0" %in% colnames(marker_df)) {
+      marker_df$shape_flag <- ifelse(marker_df$R0, "R0", "Normal")
+      shape_aes <- aes(shape = shape_flag)
+      shape_scale <- scale_shape_manual(
+        values = c("Normal" = 16, "R0" = 4),
+        name = "Marker flag",
+        breaks = c("Normal", "R0"),
+        labels = c("Normal", "R = 0")
+      )
+    }
+  } else {
+    # No special shape for R0
+    if ("outlier" %in% colnames(marker_df)) {
+      marker_df$shape_flag <- ifelse(marker_df$outlier, "Outlier", "Normal")
+      shape_aes <- aes(shape = shape_flag)
+      shape_scale <- scale_shape_manual(
+        values = c("Normal" = 16, "Outlier" = 4),
+        name = "Marker flag",
+        breaks = c("Normal", "Outlier"),
+        labels = c("Normal", "Outlier")
+      )
+    } else {
+      shape_aes <- NULL
+      shape_scale <- NULL
+    }
+  }
 
   if (z_by_mean) {
     z_means <- hmm_CN$by_window %>%
@@ -229,8 +278,8 @@ plot_cn_track <- function(hmm_CN,
                    color = line_color, alpha = line_alpha,
                    linewidth = line_width, linetype = line_linetype)
     }
-    if ("outlier" %in% colnames(marker_df)) {
-      p_z <- p_z + scale_shape_manual(values = c("FALSE" = 16, "TRUE" = 4), name = "Outlier")
+    if (!is.null(shape_scale)) {
+      p_z <- p_z + shape_scale
     }
     p_z <- p_z +
       facet_wrap(~ Chr, scales = "free_x", nrow = 1) +
@@ -263,8 +312,8 @@ plot_cn_track <- function(hmm_CN,
                    color = line_color, alpha = line_alpha,
                    linewidth = line_width, linetype = line_linetype)
     }
-    if ("outlier" %in% colnames(marker_df)) {
-      p_z <- p_z + scale_shape_manual(values = c("FALSE" = 16, "TRUE" = 4), name = "Outlier")
+    if (!is.null(shape_scale)) {
+      p_z <- p_z + shape_scale
     }
     p_z <- p_z +
       facet_wrap(~ Chr, scales = "free_x", nrow = 1) +

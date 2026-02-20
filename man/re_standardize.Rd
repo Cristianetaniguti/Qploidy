@@ -5,6 +5,8 @@
 \title{Re-standardize a Qploidy HMM object}
 \usage{
 re_standardize(
+  data = NULL,
+  geno.pos = NULL,
   hmm_CN_multi,
   selected_model = NULL,
   ploidy.standardization = NULL,
@@ -22,6 +24,21 @@ re_standardize(
 )
 }
 \arguments{
+\item{data}{A `data.frame` containing the full dataset with the following columns:
+- MarkerName: Marker identifiers.
+- SampleName: Sample identifiers.
+- X: Reference allele intensity or count.
+- Y: Alternative allele intensity or count.
+- R: Total signal intensity or read depth (X + Y).
+- ratio: Allelic ratio, typically Y / (X + Y).}
+
+\item{geno.pos}{A data.frame with marker genomic positions, containing the following columns:
+\describe{
+  \item{MarkerName}{Marker identifiers.}
+  \item{Chromosome}{Chromosome identifier where the marker is located.}
+  \item{Position}{Genomic position (base-pair coordinate) of the marker.}
+}}
+
 \item{hmm_CN_multi}{An object of class `hmm_CN` as returned by `hmm_estimate_CN_multi`.}
 
 \item{selected_model}{Character. The name of the model to use from `hmm_CN_multi$params_samples` (required).}

@@ -1,3 +1,8 @@
+# Qploidy 1.6.9
+
+* Add filter_R argument on standardize. If FALSE (default) filters defined are not applied for z score calculation
+* Add depth_zero_as_x to plot_cn_track. Total counts (R) of missing genotypes are counted as 0 and converted to z score. depth_zero_as_x = TRUE mark on the graphic which z values refer to the 0 total counts
+
 # Qploidy 1.6.8
 
 * Increase speed to export VCF

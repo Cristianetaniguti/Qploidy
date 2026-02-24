@@ -1,11 +1,40 @@
-library(Qploidy)
-library(dplyr)
-library(tidyr)
-library(tibble)
-library(ggplot2)
-library(scales)
-
-#### function ####
+#### Window-level  Depth Comparison Plot ####
+#' Window-level  Depth Comparison Plot
+#'
+#' Generates a scatter plot comparing normalized SNP depth of selected samples against the population mean in genomic windows.
+#' Significance is calculated per window using unpaired t-tests and indicated in the legend.
+#'
+#' @param qploidy_object A Qploidy object or path to a standardized Qploidy dataset.
+#' @param selected_samples Character vector of sample names to compare against the population.
+#' @param col2test Column name to use for depth comparison. Options are "R" or "z".
+#' @param window_size Size of genomic windows in base pairs (default 1e6).
+#'
+#' @details
+#' The function reads standardized SNP depth data from the Qploidy object, normalizes it per sample,
+#' and aggregates values within windows across chromosomes. It performs unpaired t-tests per window
+#' to compare the selected sample against the population mean. Significance is categorized by direction
+#' (higher or lower than population) and adjusted p-value (FDR).
+#'
+#' The resulting ggplot2 scatter plot shows normalized SNP depth per window along the x-axis (megabase),
+#' colored by significance, with facets for each sample and chromosome.
+#'
+#' @return A ggplot2 object representing window-level SNP depth comparison.
+#'
+#' @examples
+#' window_level_test_plot_qploidy(
+#'   qploidy_object = "standardization.tsv.gz",
+#'   selected_samples = "J432",
+#'   col2test = "z",
+#'   window_size = 1e6
+#' )
+#'
+#' @importFrom dplyr select distinct bind_rows case_when
+#' @importFrom tidyr pivot_wider pivot_longer
+#' @importFrom tibble column_to_rownames
+#' @importFrom ggplot2 ggplot aes geom_point facet_grid scale_color_manual scale_y_continuous theme_bw labs
+#' @importFrom stats t.test p.adjust
+#' @importFrom scales percent_format
+#' @export
 window_level_test_plot_qploidy <- function(
     qploidy_object,
     selected_samples,
@@ -13,27 +42,23 @@ window_level_test_plot_qploidy <- function(
     window_size = 1e6
 ) {
 
-
   # Validate col2test
-  col2test <- base::match.arg(col2test)
-  base::message("Using column: ", col2test)
-
+  col2test <- match.arg(col2test)
+  message("Using column: ", col2test)
 
   # Read standardized data
-  ttest_data <- Qploidy::read_qploidy_standardization(qploidy_object)$data
-  ttest_data$SampleName <- base::sub("^X", "", ttest_data$SampleName)
-
+  ttest_data <- read_qploidy_standardization(qploidy_object)$data
 
   # Build genotype matrix
-  gt_dp <- dplyr::select(ttest_data, MarkerName, SampleName, dplyr::all_of(col2test)) %>%
-    tidyr::pivot_wider(
+  gt_dp <- select(ttest_data, MarkerName, SampleName, all_of(col2test)) %>%
+    pivot_wider(
       names_from  = SampleName,
-      values_from = dplyr::all_of(col2test)
+      values_from = all_of(col2test)
     ) %>%
-    tibble::column_to_rownames(var = "MarkerName") %>%
-    base::as.matrix()
+    column_to_rownames(var = "MarkerName") %>%
+    as.matrix()
 
-  gt_dp_num <- base::matrix(
+  gt_dp_num <- matrix(
     as.numeric(gt_dp),
     nrow = nrow(gt_dp),
     ncol = ncol(gt_dp),
@@ -41,67 +66,65 @@ window_level_test_plot_qploidy <- function(
   )
 
   # Normalization
-  snp_prop <- base::sweep(
+  snp_prop <- sweep(
     gt_dp_num,
     2,
-    base::colSums(gt_dp_num, na.rm = TRUE),
+    colSums(gt_dp_num, na.rm = TRUE),
     "/"
   ) * 100
 
   all_samples <- colnames(snp_prop)
 
-
-  # Window labels aligned with snp_prop rows
-  marker_info <- dplyr::select(ttest_data, MarkerName, Chr, Position) %>%
-    dplyr::distinct(MarkerName, .keep_all = TRUE)
+  # Window labels
+  marker_info <- select(ttest_data, MarkerName, Chr, Position) %>%
+    distinct(MarkerName, .keep_all = TRUE)
 
   chroms    <- marker_info$Chr
   positions <- marker_info$Position
 
-  window_id    <- base::floor((positions - 1) / window_size) + 1
-  window_label <- base::paste0(chroms, "_MB", window_id)
-  unique_windows <- base::unique(window_label)
+  window_id    <- floor((positions - 1) / window_size) + 1
+  window_label <- paste0(chroms, "_MB", window_id)
+  unique_windows <- unique(window_label)
 
-  base::stopifnot(length(window_label) == nrow(snp_prop))  # sanity check
+  stopifnot(length(window_label) == nrow(snp_prop))  # sanity check
 
+  # Window-level test
+  window_plot_df <- lapply(selected_samples, function(selected_sample) {
 
-  # WINDOW-LEVEL TEST
-  window_plot_df <- base::lapply(selected_samples, function(selected_sample) {
-
-    other_samples <- base::setdiff(all_samples, selected_sample)
+    other_samples <- setdiff(all_samples, selected_sample)
 
     # Population mean
-    snp_pop_mean <- base::rowMeans(snp_prop[, other_samples], na.rm = TRUE)
+    snp_pop_mean <- rowMeans(snp_prop[, other_samples], na.rm = TRUE)
 
     # Aggregate per window
-    df <- base::data.frame(
+    df <- data.frame(
       WINDOW     = unique_windows,
-      CHROM      = base::sub("_MB.*", "", unique_windows),
-      Megabase   = base::as.integer(base::sub(".*_MB", "", unique_windows)),
+      CHROM      = sub("_MB.*", "", unique_windows),
+      Megabase   = as.integer(sub(".*_MB", "", unique_windows)),
       Sample     = selected_sample,
-      SampleProp = base::vapply(unique_windows, function(win) {
-        base::mean(snp_prop[window_label == win, selected_sample], na.rm = TRUE)
+      SampleProp = vapply(unique_windows, function(win) {
+        mean(snp_prop[window_label == win, selected_sample], na.rm = TRUE)
       }, numeric(1)),
-      PopAvgProp = base::vapply(unique_windows, function(win) {
-        base::mean(snp_pop_mean[window_label == win], na.rm = TRUE)
+      PopAvgProp = vapply(unique_windows, function(win) {
+        mean(snp_pop_mean[window_label == win], na.rm = TRUE)
       }, numeric(1))
     )
 
     # Unpaired t-test per window
-    df$p_raw <- base::vapply(unique_windows, function(win) {
+    df$p_raw <- vapply(unique_windows, function(win) {
       idx <- window_label == win
       x_sel <- snp_prop[idx, selected_sample]
       x_pop <- snp_pop_mean[idx]
-      ok <- base::is.finite(x_sel) & base::is.finite(x_pop)
-      if (base::sum(ok) >= 5) stats::t.test(x_sel[ok], x_pop[ok], paired = FALSE)$p.value else NA_real_
+      ok <- is.finite(x_sel) & is.finite(x_pop)
+      if (sum(ok) >= 5) t.test(x_sel[ok], x_pop[ok], paired = FALSE)$p.value else NA_real_
     }, numeric(1))
 
-    df$p_adj <- stats::p.adjust(df$p_raw, method = "fdr")
+    df$p_adj <- p.adjust(df$p_raw, method = "fdr")
     df$delta <- df$SampleProp - df$PopAvgProp
 
     # Significance categories
-    df$SigDir <- dplyr::case_when(
-      base::is.na(df$p_adj) | df$p_adj >= 0.05 ~ "Not significant",
+    df$SigDir <- case_when(
+      is.na(df$p_adj) | df$p_adj >= 0.05 ~ "Not significant",
       df$delta < 0 & df$p_adj < 0.001    ~ "Lower: P < 0.001",
       df$delta < 0 & df$p_adj < 0.01     ~ "Lower: P < 0.01",
       df$delta < 0                        ~ "Lower: P < 0.05",
@@ -111,19 +134,17 @@ window_level_test_plot_qploidy <- function(
     )
 
     df
-  }) %>% dplyr::bind_rows()
+  }) %>% bind_rows()
 
-
-  #plotting
-
-  window_plot_long <- tidyr::pivot_longer(
+  # Plotting
+  window_plot_long <- pivot_longer(
     window_plot_df,
     cols = c(SampleProp, PopAvgProp),
     names_to = "ID",
     values_to = "DepthProp"
   )
 
-  window_plot_long$LegendGroup <- dplyr::case_when(
+  window_plot_long$LegendGroup <- case_when(
     window_plot_long$ID == "PopAvgProp" ~ "Population mean",
     window_plot_long$ID == "SampleProp" & window_plot_long$SigDir == "Not significant" ~ "Sample not significant",
     TRUE ~ window_plot_long$SigDir
@@ -140,25 +161,18 @@ window_level_test_plot_qploidy <- function(
     "Higher: P < 0.001"      = "#cb181d"
   )
 
-  ggplot2::ggplot(
+  ggplot(
     window_plot_long,
-    ggplot2::aes(x = Megabase, y = DepthProp, color = LegendGroup)
+    aes(x = Megabase, y = DepthProp, color = LegendGroup)
   ) +
-    ggplot2::geom_point(size = 0.75, alpha = 0.85) +
-    ggplot2::facet_grid(Sample ~ CHROM, scales = "free_x") +
-    ggplot2::scale_color_manual(values = legend_colors, name = "Legend") +
-    ggplot2::scale_y_continuous(labels = scales::percent_format(scale = 1)) +
-    ggplot2::theme_bw() +
-    ggplot2::labs(
+    geom_point(size = 0.75, alpha = 0.85) +
+    facet_grid(Sample ~ CHROM, scales = "free_x") +
+    scale_color_manual(values = legend_colors, name = "Legend") +
+    scale_y_continuous(labels = scales::percent_format(scale = 1)) +
+    theme_bw() +
+    labs(
       x = "Window (Mb)",
       y = "Normalized SNP depth (%)",
       title = "Window-level SNP depth: sample vs population"
     )
-
 }
-
-
-#### example ####
-window_level_test_plot_qploidy(qploidy_object = "standardization.tsv.gz",
-                               selected_samples = "J432",
-                               col2test = "z")

@@ -45,7 +45,7 @@ qploidy_read_vcf <- function(vcf_file, geno = FALSE, geno.pos = FALSE) {
   if(!(geno || geno.pos)){
     DP <- extract.gt(vcf, "AD")
 
-    mknames <- pivot_longer(data.frame(mks = rownames(DP), DP),
+    mknames <- pivot_longer(cbind(mks = rownames(DP), as.data.frame(DP)),
                             cols = 2:(ncol(DP)+1))
 
     dp_split <- strsplit(mknames$value, ",")
@@ -66,7 +66,7 @@ qploidy_read_vcf <- function(vcf_file, geno = FALSE, geno.pos = FALSE) {
                                ratio = alt/(ref+alt))
   } else if(geno){
     GT_m <- extract.gt(vcf, "GT")
-    GT <- pivot_longer(data.frame(mks = rownames(GT_m), GT_m),
+    GT <- pivot_longer(cbind(mks = rownames(GT_m), as.data.frame(GT_m)),
                        cols = 2:(ncol(GT_m)+1))
     GT$value <- stringr::str_count(GT$value, "1")
     colnames(GT) <- c("MarkerName","SampleName","geno")
@@ -89,7 +89,7 @@ qploidy_read_vcf <- function(vcf_file, geno = FALSE, geno.pos = FALSE) {
       }
     }
 
-    prob <- pivot_longer(data.frame(mks = rownames(prob), prob),
+    prob <- pivot_longer(cbind(mks = rownames(prob), as.data.frame(prob)),
                          cols = 2:(ncol(prob)+1))
     colnames(prob) <- c("MarkerName","SampleName","prob")
 

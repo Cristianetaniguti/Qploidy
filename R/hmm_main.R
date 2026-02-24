@@ -24,6 +24,7 @@
 #' @param baf_weight Numeric. Overall weight applied to BAF emission (0–1). Default \code{1}.
 #' @param z_range Numeric. Padding added to min/max z for initial mean estimation. Default \code{0.2}.
 #' @param transition_jump Numeric. Diagonal value for transition matrix (probability to stay in same CN state). Default \code{0.995}.
+#' @param initial_prob Numeric. Initial probability for the best CN state in the initial state distribution (pi0). Default \code{0.15}. Sets the prior probability for the expected ploidy (or best CN from BAF model) at the first window; remaining probability is distributed uniformly across other states. If the best CN is not found, pi0 is uniform across all states.
 #' @param z_only Logical. If \code{TRUE}, fit the HMM using the z-emission only (ignores BAF). Default \code{FALSE}.
 #' @param verbose Logical. If \code{TRUE}, print progress messages. Default \code{TRUE}.
 #' @param exp_ploidy Numeric. Expected ploidy value. If \code{NA} or \code{NULL}, it is set to the best CN from the BAF model. Default \code{NA}.
@@ -115,6 +116,7 @@
     baf_weight = 0.5,
     z_range = NULL,
     transition_jump = 0.995, # decrease this value if you think there changes in CN is likely
+    initial_prob = 0.95, # Initial probability for the best CN state in the initial state distribution (pi0). Default 0.15. Sets the prior probability for the expected ploidy (or best CN from BAF model) at the first window; remaining probability is distributed uniformly across other states. If the best CN is not found, pi0 is uniform across all states.
     z_only = FALSE,
     verbose = TRUE,
     exp_ploidy = NA,
@@ -435,7 +437,7 @@
   # To consider: If is possible to change this matrix to favor specific small jumps, like if changing from 2->4 is more likely than 2->6
   # pi0 is the initial state distribution at the first window; here it’s uniform (no prior preference for any CN at the start).
   # Set pi0 to favor exp_ploidy (if provided) or best CN from BAF model
-  pi0 <- rep((1 - 0.95) / (K - 1), K)
+  pi0 <- rep((1 - initial_prob) / (K - 1), K)
   if (!is.null(exp_ploidy) && !is.na(exp_ploidy)) {
     best_cn <- as.numeric(exp_ploidy)
   } else {

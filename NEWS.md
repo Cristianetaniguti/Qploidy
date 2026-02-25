@@ -1,3 +1,10 @@
+# Qploidy 1.7.0
+
+* New functions chrom_ttest and window_ttest
+* Adding to plot_geno_by_marker:
+  - transparency argument alpha
+  - identify decreasing ratios by dosage for expected dot plot
+
 # Qploidy 1.6.9
 
 * Add filter_R argument on standardize. If FALSE (default) filters defined are not applied for z score calculation

@@ -1,16 +1,19 @@
-#### Window-level  Depth Comparison Plot ####
 #' Window-level  Depth Comparison Plot
 #'
 #' Generates a scatter plot comparing normalized SNP depth of selected samples against the population mean in genomic windows.
 #' Significance is calculated per window using unpaired t-tests and indicated in the legend.
 #'
-#' @param qploidy_object A Qploidy object or path to a standardized Qploidy dataset.
+#' @param input Accepts one of:
+#'   1. A data.frame with columns: MarkerName, SampleName, Chr, Position, R. Column with z is optional but required if col2test = "z".
+#'   2. An object of class 'qploidy_standardization' (from Qploidy standardization functions)
+#'   3. A character string: path to a .tsv[.gz] file with standardized Qploidy data
+#'   The function will validate and process the input according to its type.
 #' @param selected_samples Character vector of sample names to compare against the population.
 #' @param col2test Column name to use for depth comparison. Options are "R" or "z".
 #' @param window_size Size of genomic windows in base pairs (default 1e6).
 #'
 #' @details
-#' The function reads standardized SNP depth data from the Qploidy object, normalizes it per sample,
+#' The function reads standardized SNP depth data from the input, normalizes it per sample,
 #' and aggregates values within windows across chromosomes. It performs unpaired t-tests per window
 #' to compare the selected sample against the population mean. Significance is categorized by direction
 #' (higher or lower than population) and adjusted p-value (FDR).
@@ -36,7 +39,7 @@
 #' @importFrom scales percent_format
 #' @export
 window_level_test_plot_qploidy <- function(
-    qploidy_object,
+    input,
     selected_samples,
     col2test = c("R","z"),
     window_size = 1e6
@@ -46,8 +49,26 @@ window_level_test_plot_qploidy <- function(
   col2test <- match.arg(col2test)
   message("Using column: ", col2test)
 
-  # Read standardized data
-  ttest_data <- read_qploidy_standardization(qploidy_object)$data
+ # Handle input type
+  if (inherits(input, "qploidy_standardization")) {
+    ttest_data <- input$data
+  } else if (is.character(input) && length(input) == 1 && file.exists(input)) {
+    ttest_data <- read_qploidy_standardization(input)$data
+  } else if (is.data.frame(input)) {
+    required_cols <- c("MarkerName", "SampleName", "Chr", "Position", "R")
+    missing_cols <- setdiff(required_cols, colnames(input))
+    if (length(missing_cols) > 0) {
+      stop(sprintf("Input data.frame is missing required columns: %s", paste(missing_cols, collapse = ", ")))
+    }
+    ttest_data <- input
+  } else {
+    stop("input must be a data.frame, a 'qploidy_standardization' object, or a valid file path.")
+  }
+
+  # Check if user chose col2test as "z" but it's not present in the data
+  if (col2test == "z" && !("z" %in% colnames(ttest_data))) {
+    stop("Column 'z' not found in the data. Please choose 'R' or ensure 'z' is present in the input data by running the standardization.")
+  }
 
   # Build genotype matrix
   gt_dp <- select(ttest_data, MarkerName, SampleName, all_of(col2test)) %>%

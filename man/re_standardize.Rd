@@ -24,20 +24,18 @@ re_standardize(
 )
 }
 \arguments{
-\item{data}{A `data.frame` containing the full dataset with the following columns:
-- MarkerName: Marker identifiers.
-- SampleName: Sample identifiers.
-- X: Reference allele intensity or count.
-- Y: Alternative allele intensity or count.
-- R: Total signal intensity or read depth (X + Y).
-- ratio: Allelic ratio, typically Y / (X + Y).}
+\item{data}{A `data.frame` containing the full dataset with columns:
+- MarkerName: Marker identifiers
+- SampleName: Sample identifiers
+- X: Reference allele intensity or count
+- Y: Alternative allele intensity or count
+- R: Total signal intensity or read depth (X + Y)
+- ratio: Allelic ratio, typically Y / (X + Y)}
 
-\item{geno.pos}{A data.frame with marker genomic positions, containing the following columns:
-\describe{
-  \item{MarkerName}{Marker identifiers.}
-  \item{Chromosome}{Chromosome identifier where the marker is located.}
-  \item{Position}{Genomic position (base-pair coordinate) of the marker.}
-}}
+\item{geno.pos}{A `data.frame` with marker genomic positions, with columns:
+- MarkerName: Marker identifiers
+- Chromosome: Chromosome identifier
+- Position: Genomic position (base-pair coordinate)}
 
 \item{hmm_CN_multi}{An object of class `hmm_CN` as returned by `hmm_estimate_CN_multi`.}
 
@@ -69,24 +67,39 @@ re_standardize(
 }
 \value{
 An object of class `qploidy_standardization` (list) with elements:
-  - info: Named vector of standardization parameters.
-  - filters: Named vector summarizing filtering steps.
-  - data: Data frame with merged BAF, Z-score, and genotype info by marker and sample.
+  - info: Named vector of standardization parameters
+  - filters: Named vector summarizing filtering steps
+  - data: Data frame with merged BAF, Z-score, and genotype info by marker and sample
 }
 \description{
-This function re-runs the standardization pipeline on a Qploidy HMM object (from `hmm_estimate_CN_multi`),
-generating a new qploidy_standardization object for downstream analysis or Shiny app input. It extracts marker-level
-data and genotype dosages for a selected model, applies quality filters, estimates cluster centers, computes BAF and Z-scores,
-and merges results into a standardized data frame. This is useful for re-standardizing after model selection or parameter tuning.
+Re-runs the Qploidy standardization pipeline on a HMM object (from `hmm_estimate_CN_multi`),
+generating a new `qploidy_standardization` object for downstream analysis or Shiny app input.
+This is useful for re-standardizing after model selection or parameter tuning.
 }
 \details{
+The function extracts marker-level data and genotype dosages for a selected model, applies quality filters,
+estimates cluster centers, computes BAF (B-allele frequency) and Z-scores, and merges results into a standardized data frame.
+
+
 This function is intended for re-standardizing a Qploidy HMM object after model selection or parameter changes.
 It extracts the relevant marker-level and dosage data, applies quality filters, estimates cluster centers,
 computes BAF and Z-scores, and merges all results into a standardized data frame suitable for downstream analysis or Shiny app input.
+
+Filtering steps include:
+  1. Genotype probability filter: Genotypes with probability below `threshold.geno.prob` are set to missing.
+  2. Marker missingness filter: Markers with fraction of missing genotypes above `threshold.missing.geno` are removed.
+  3. Cluster number filter: Markers with fewer than `threshold.n.clusters` clusters are removed.
+  4. Genomic info filter: Markers lacking chromosome or position info are removed.
 }
 \examples{
 # Example usage:
 # hmm_CN_multi <- hmm_estimate_CN_multi(...)
-# std <- re_standardize(hmm_CN_multi, selected_model = "model1", ploidy.standardization = 4)
+# std <- re_standardize(
+#   data = my_data,
+#   geno.pos = my_geno_pos,
+#   hmm_CN_multi = hmm_CN_multi,
+#   selected_model = "model1",
+#   ploidy.standardization = 4
+# )
 
 }

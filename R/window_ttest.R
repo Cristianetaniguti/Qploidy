@@ -152,13 +152,13 @@ window_level_test_plot_qploidy <- function(
       }, numeric(1))
     )
 
-    # Unpaired t-test per window
+    # Paired t-test per window (markers are paired between x_sel and x_pop)
     df$p_raw <- vapply(unique_windows, function(win) {
       idx <- window_label == win
       x_sel <- snp_prop[idx, selected_sample]
       x_pop <- snp_pop_mean[idx]
       ok <- is.finite(x_sel) & is.finite(x_pop)
-      if (sum(ok) >= 5) t.test(x_sel[ok], x_pop[ok], paired = FALSE)$p.value else NA_real_
+      if (sum(ok) >= 5) t.test(x_sel[ok], x_pop[ok], paired = TRUE)$p.value else NA_real_
     }, numeric(1))
 
     df$p_adj <- p.adjust(df$p_raw, method = "fdr")

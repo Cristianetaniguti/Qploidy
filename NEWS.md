@@ -1,3 +1,17 @@
+# Qploidy 1.7.1
+
+* New function depth_pca_plot to check for batch effects using a pca based on total depth
+* Allow input data for function chrom_ttest, window_ttest and depth_pca_plot to have only MarkerName, SampleName, and R columns if geno.pos data.frame is provided with Chromosome and Position information.
+* Bugfix on DESCRIPTION authors 
+* Improve documentation for new functions
+
+# Qploidy 1.7.0
+
+* New functions chrom_ttest and window_ttest
+* Adding to plot_geno_by_marker:
+  - transparency argument alpha
+  - identify decreasing ratios by dosage for expected dot plot
+
 # Qploidy 1.6.9
 
 * Add filter_R argument on standardize. If FALSE (default) filters defined are not applied for z score calculation

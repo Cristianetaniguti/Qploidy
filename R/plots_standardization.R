@@ -1194,6 +1194,7 @@ plot_baf_with_ploidy_guides <- function(df,
 #'
 #' @param df A data.frame containing columns 'geno' (genotype dosage), 'ratio', 'baf', and 'MarkerName'.
 #' @param ploidy Integer specifying the expected ploidy. If NULL (default), the maximum observed genotype dosage in the data is used.
+#' @param alpha Numeric (0-1) specifying the transparency of the jittered points. Default is 0.6.
 #'
 #' @return A ggplot object with one panel per marker and metric (ratio, BAF), showing observed and expected values by genotype dosage.
 #'
@@ -1209,7 +1210,7 @@ plot_baf_with_ploidy_guides <- function(df,
 #' @importFrom dplyr summarise pull mutate if_else distinct
 #' @importFrom tidyr pivot_longer crossing
 #' @export
-plot_geno_by_marker <- function(df, ploidy = NULL) {
+plot_geno_by_marker <- function(df, ploidy = NULL, alpha = 0.6) {
 
   # infer ploidy from the highest observed geno (unless user supplies it)
   if (is.null(ploidy)) {
@@ -1239,13 +1240,25 @@ plot_geno_by_marker <- function(df, ploidy = NULL) {
       metric = factor(metric, levels = c("ratio", "baf"))  # ratio on top
     )
 
-  # expected values for any ploidy: d/ploidy for d = 0..ploidy
+  # For each marker, check if observed values decrease with dosage (ref/alt inverted)
+  trend_df <- df_plot %>%
+    group_by(MarkerName, metric) %>%
+    summarise(
+      min_dosage = min(geno_num, na.rm = TRUE),
+      max_dosage = max(geno_num, na.rm = TRUE),
+      min_val = median(value[geno_num == min(geno_num, na.rm = TRUE)], na.rm = TRUE),
+      max_val = median(value[geno_num == max(geno_num, na.rm = TRUE)], na.rm = TRUE),
+      decreasing = max_val < min_val,
+      .groups = "drop"
+    )
+
   expected_df <- df_plot %>%
     distinct(MarkerName, metric) %>%
     tidyr::crossing(geno_num = 0:ploidy) %>%
+    left_join(trend_df, by = c("MarkerName", "metric")) %>%
     mutate(
       geno_cat = factor(as.character(geno_num), levels = levels(df_plot$geno_cat)),
-      expected = geno_num / ploidy,
+      expected = ifelse(decreasing, 1 - geno_num / ploidy, geno_num / ploidy),
       type = "Expected"
     )
 
@@ -1267,7 +1280,7 @@ plot_geno_by_marker <- function(df, ploidy = NULL) {
       inherit.aes = FALSE,
       size = 3
     ) +
-    geom_jitter(width = 0.15, height = 0, alpha = 0.6, na.rm = TRUE) +
+    geom_jitter(width = 0.15, height = 0, alpha = alpha, na.rm = TRUE) +
 
     facet_grid(
       rows = vars(metric),

@@ -4,12 +4,14 @@
 \alias{plot_geno_by_marker}
 \title{Plot observed and expected values by genotype dosage for each marker}
 \usage{
-plot_geno_by_marker(df, ploidy = NULL)
+plot_geno_by_marker(df, ploidy = NULL, alpha = 0.6)
 }
 \arguments{
 \item{df}{A data.frame containing columns 'geno' (genotype dosage), 'ratio', 'baf', and 'MarkerName'.}
 
 \item{ploidy}{Integer specifying the expected ploidy. If NULL (default), the maximum observed genotype dosage in the data is used.}
+
+\item{alpha}{Numeric (0-1) specifying the transparency of the jittered points. Default is 0.6.}
 }
 \value{
 A ggplot object with one panel per marker and metric (ratio, BAF), showing observed and expected values by genotype dosage.

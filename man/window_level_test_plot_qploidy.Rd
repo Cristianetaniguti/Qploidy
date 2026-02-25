@@ -7,18 +7,21 @@
 window_level_test_plot_qploidy(
   input,
   selected_samples,
+  geno.pos = NULL,
   col2test = c("R", "z"),
   window_size = 1e+06
 )
 }
 \arguments{
 \item{input}{Accepts one of:
-1. A data.frame with columns: MarkerName, SampleName, Chr, Position, R. Column with z is optional but required if col2test = "z".
+1. A data.frame with columns: MarkerName, SampleName, Chr, Position, R. Columns Chr and Position are optional, but if they are absent geno.pos object is required. Column with z is optional but required if col2test = "z".
 2. An object of class 'qploidy_standardization' (from Qploidy standardization functions)
 3. A character string: path to a .tsv[.gz] file with standardized Qploidy data
 The function will validate and process the input according to its type.}
 
 \item{selected_samples}{Character vector of sample names to compare against the population.}
+
+\item{geno.pos}{Optional. A data.frame with columns: MarkerName, Chromosome, Position. Required if input data.frame does not contain Chr and Position columns.}
 
 \item{col2test}{Column name to use for depth comparison. Options are "R" or "z".}
 
@@ -48,4 +51,7 @@ window_level_test_plot_qploidy(
   window_size = 1e6
 )
 
+}
+\author{
+Josue Chinchilla-Vargas
 }

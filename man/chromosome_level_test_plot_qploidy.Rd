@@ -6,6 +6,7 @@
 \usage{
 chromosome_level_test_plot_qploidy(
   input,
+  geno.pos = NULL,
   selected_samples,
   col2test = c("R", "z")
 )
@@ -16,6 +17,8 @@ chromosome_level_test_plot_qploidy(
 2. An object of class 'qploidy_standardization' (from Qploidy standardization functions)
 3. A character string: path to a .tsv[.gz] file with standardized Qploidy data
 The function will validate and process the input according to its type.}
+
+\item{geno.pos}{Optional. A data.frame with columns: MarkerName, Chromosome, Position. Required if input data.frame does not contain Chr and Position columns.}
 
 \item{selected_samples}{Character vector of sample names to compare against the population.}
 
@@ -44,4 +47,7 @@ chromosome_level_test_plot_qploidy(
   col2test = "z"
 )
 
+}
+\author{
+Josue Chinchilla-Vargas
 }

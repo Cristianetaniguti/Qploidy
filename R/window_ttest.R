@@ -4,10 +4,12 @@
 #' Significance is calculated per window using unpaired t-tests and indicated in the legend.
 #'
 #' @param input Accepts one of:
-#'   1. A data.frame with columns: MarkerName, SampleName, Chr, Position, R. Column with z is optional but required if col2test = "z".
+#'   1. A data.frame with columns: MarkerName, SampleName, Chr, Position, R. Columns Chr and Position are optional, but if they are absent geno.pos object is required. Column with z is optional but required if col2test = "z".
 #'   2. An object of class 'qploidy_standardization' (from Qploidy standardization functions)
 #'   3. A character string: path to a .tsv[.gz] file with standardized Qploidy data
 #'   The function will validate and process the input according to its type.
+#' 
+#' @param geno.pos Optional. A data.frame with columns: MarkerName, Chromosome, Position. Required if input data.frame does not contain Chr and Position columns.
 #' @param selected_samples Character vector of sample names to compare against the population.
 #' @param col2test Column name to use for depth comparison. Options are "R" or "z".
 #' @param window_size Size of genomic windows in base pairs (default 1e6).
@@ -37,10 +39,14 @@
 #' @importFrom ggplot2 ggplot aes geom_point facet_grid scale_color_manual scale_y_continuous theme_bw labs
 #' @importFrom stats t.test p.adjust
 #' @importFrom scales percent_format
+#' 
+#' @author Josue Chinchilla-Vargas
+#' 
 #' @export
 window_level_test_plot_qploidy <- function(
     input,
     selected_samples,
+    geno.pos = NULL,
     col2test = c("R","z"),
     window_size = 1e6
 ) {
@@ -49,18 +55,33 @@ window_level_test_plot_qploidy <- function(
   col2test <- match.arg(col2test)
   message("Using column: ", col2test)
 
- # Handle input type
+  # Handle input type
   if (inherits(input, "qploidy_standardization")) {
     ttest_data <- input$data
   } else if (is.character(input) && length(input) == 1 && file.exists(input)) {
     ttest_data <- read_qploidy_standardization(input)$data
   } else if (is.data.frame(input)) {
-    required_cols <- c("MarkerName", "SampleName", "Chr", "Position", "R")
+    required_cols <- c("MarkerName", "SampleName", "R")
     missing_cols <- setdiff(required_cols, colnames(input))
     if (length(missing_cols) > 0) {
       stop(sprintf("Input data.frame is missing required columns: %s", paste(missing_cols, collapse = ", ")))
     }
-    ttest_data <- input
+    # Check for Chr and Position
+    if (all(c("Chr", "Position") %in% colnames(input))) {
+      ttest_data <- input
+    } else {
+      # Need geno.pos to add Chr and Position
+      if (is.null(geno.pos)) {
+        stop("Input data.frame does not contain Chr and Position columns, and geno.pos was not provided.")
+      }
+      if (!all(c("MarkerName", "Chromosome", "Position") %in% colnames(geno.pos))) {
+        stop("geno.pos must have columns: MarkerName, Chromosome, Position.")
+      }
+      m_idx <- match(input$MarkerName, geno.pos$MarkerName)
+      input$Chr <- geno.pos$Chromosome[m_idx]
+      input$Position <- geno.pos$Position[m_idx]
+      ttest_data <- input
+    }
   } else {
     stop("input must be a data.frame, a 'qploidy_standardization' object, or a valid file path.")
   }
@@ -189,7 +210,7 @@ window_level_test_plot_qploidy <- function(
     geom_point(size = 0.75, alpha = 0.85) +
     facet_grid(Sample ~ CHROM, scales = "free_x") +
     scale_color_manual(values = legend_colors, name = "Legend") +
-    scale_y_continuous(labels = scales::percent_format(scale = 1)) +
+    scale_y_continuous(labels = percent_format(scale = 1)) +
     theme_bw() +
     labs(
       x = "Window (Mb)",

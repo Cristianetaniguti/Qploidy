@@ -1,6 +1,6 @@
 Package: Qploidy
 Title: Estimation of Ploidy and Detection of Aneuploidy Using Genotyping Data
-Version: 1.7.0
+Version: 1.7.1
 Authors@R: c(person(given='Cristiane', 
                     family='Taniguti', 
                     email = 'ctaniguti@ufl.edu', 
@@ -8,20 +8,20 @@ Authors@R: c(person(given='Cristiane',
              person(given='Josue', 
                     family='Chinchilla-Vargas', 
                     email = 'josue.chinchilla@ufl.edu', 
-                    role = c('aut')),
+                    role = 'aut'),
              person(given='Meng',
                     family='Lin',
                     role='ctb'),
              person(given='Jeekin', 
                     family='Lau',  
                     email = 'Jeekin.Lau@usda.gov', 
-                    role = c('ctb')),
+                    role = 'ctb'),
              person(given = "Oscar",
                     family = "Riera-Lizarazu",
-                    role = c("ctb"),
+                    role = "ctb"),
              person('University', 'Florida',
-                    role=c('cph'), 
-                    comment = "Breeding Insight"))
+                    role='cph', 
+                    comment = "Breeding Insight")
              )
 Description: Provides functions and a shiny interface for estimating ploidy levels and detecting aneuploidy 
              in individuals using allele intensities or allele count data from high-throughput genotyping platforms, including 

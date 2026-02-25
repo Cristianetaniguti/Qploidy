@@ -9,6 +9,7 @@
 #'   3. A character string: path to a .tsv[.gz] file with standardized Qploidy data
 #'   The function will validate and process the input according to its type.
 #' 
+#' @param geno.pos Optional. A data.frame with columns: MarkerName, Chromosome, Position. Required if input data.frame does not contain Chr and Position columns.
 #' @param selected_samples Character vector of sample names to compare against the population.
 #' @param col2test Column name to use for depth comparison. Options are "R" or "z".
 #'
@@ -35,9 +36,14 @@
 #' @importFrom tibble column_to_rownames
 #' @importFrom ggplot2 ggplot aes geom_bar geom_text scale_fill_manual scale_color_manual guides facet_wrap
 #' @importFrom stats t.test p.adjust
+#' @importFrom scales percent_format
+#' 
+#' @author Josue Chinchilla-Vargas
+#' 
 #' @export
 chromosome_level_test_plot_qploidy <- function(
     input,
+    geno.pos = NULL,
     selected_samples,
     col2test = c("R","z")
 ) {
@@ -53,12 +59,27 @@ chromosome_level_test_plot_qploidy <- function(
   } else if (is.character(input) && length(input) == 1 && file.exists(input)) {
     ttest_data <- read_qploidy_standardization(input)$data
   } else if (is.data.frame(input)) {
-    required_cols <- c("MarkerName", "SampleName", "Chr", "Position", "R")
+    required_cols <- c("MarkerName", "SampleName", "R")
     missing_cols <- setdiff(required_cols, colnames(input))
     if (length(missing_cols) > 0) {
       stop(sprintf("Input data.frame is missing required columns: %s", paste(missing_cols, collapse = ", ")))
     }
-    ttest_data <- input
+    # Check for Chr and Position
+    if (all(c("Chr", "Position") %in% colnames(input))) {
+      ttest_data <- input
+    } else {
+      # Need geno.pos to add Chr and Position
+      if (is.null(geno.pos)) {
+        stop("Input data.frame does not contain Chr and Position columns, and geno.pos was not provided.")
+      }
+      if (!all(c("MarkerName", "Chromosome", "Position") %in% colnames(geno.pos))) {
+        stop("geno.pos must have columns: MarkerName, Chromosome, Position.")
+      }
+      m_idx <- match(input$MarkerName, geno.pos$MarkerName)
+      input$Chr <- geno.pos$Chromosome[m_idx]
+      input$Position <- geno.pos$Position[m_idx]
+      ttest_data <- input
+    }
   } else {
     stop("input must be a data.frame, a 'qploidy_standardization' object, or a valid file path.")
   }
@@ -226,7 +247,7 @@ chromosome_level_test_plot_qploidy <- function(
     ) +
 
     facet_wrap(~ Sample, scales = "free_x") +
-    scale_y_continuous(labels = scales::percent_format(scale = 1)) +
+    scale_y_continuous(labels = percent_format(scale = 1)) +
     theme_bw() +
     theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +
     labs(

@@ -9,12 +9,13 @@ depth_pca_plot(
   geno.pos = NULL,
   passport_file,
   group_column,
+  sampleID_column,
   col2use = c("R", "z")
 )
 }
 \arguments{
 \item{input}{Accepts one of:
-1. A data.frame with columns: MarkerName, SampleName, Chr, Position, R. Column with z is optional but required if col2test = "z".
+1. A data.frame with columns: MarkerName, SampleName, Chr, Position, R. Column with z is optional but required if col2use = "z".
 2. An object of class 'qploidy_standardization' (from Qploidy standardization functions)
 3. A character string: path to a .tsv[.gz] file with standardized Qploidy data
 The function will validate and process the input according to its type.}
@@ -25,6 +26,8 @@ The function will validate and process the input according to its type.}
 
 \item{group_column}{Character. The name of the column in the passport file
 used to color/group the PCA plots.}
+
+\item{sampleID_column}{character or numeric indicating the column name or index where the sample name is located. Sample name must match `input`}
 
 \item{col2use}{Character. Either "R" or "z". Which Qploidy column to use for
 the PCA. Defaults to c("R","z").}

@@ -13,6 +13,7 @@
 #' @param geno.pos Optional. A data.frame with columns: MarkerName, Chromosome, Position. Required if input data.frame does not contain Chr and Position columns.
 #' @param group_column Character. The name of the column in the passport file
 #'   used to color/group the PCA plots.
+#' @param sampleID_column character or numeric indicating the column name or index where the sample name is located. Sample name must match `input`
 #' @param col2use Character. Either "R" or "z". Which Qploidy column to use for
 #'   the PCA. Defaults to c("R","z").
 #'
@@ -32,15 +33,16 @@
 #' @importFrom tidyr pivot_wider
 #' @importFrom tibble column_to_rownames
 #' @importFrom scales percent_format
-#' 
+#'
 #' @author Josue Chinchilla-Vargas
-#' 
+#'
 #' @export
 depth_pca_plot <- function(
     input,
     geno.pos = NULL,
     passport_file,
     group_column,
+    sampleID_column,
     col2use = c("R","z")
 ) {
 
@@ -156,10 +158,12 @@ depth_pca_plot <- function(
   )
 
   #### Merge passport ####
+  if(is.numeric(sampleID_column)) id <- colnames(passport)[sampleID_column] else id <- sampleID_column
+
   merged_df <- left_join(
     pca_scores,
     passport,
-    by = c("ID" = colnames(passport)[1])  # assumes first column is ID
+    by = c("ID" = id)  # assumes first column is ID
   )
 
   # Ensure the grouping column is a factor for discrete coloring

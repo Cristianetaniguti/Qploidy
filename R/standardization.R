@@ -140,7 +140,7 @@ standardize <- function(data = NULL,
   dose <- max(genos$geno, na.rm = T)
   if(dose != ploidy.standardization) stop("Ploidy of the provided reference samples do not match with the one defined in the ploidy.standardization parameter.")
 
-  vmsg("Generating standardized BAFs", verbose = verbose, level = 0, type = "INFO")
+  vmsg("Generating standardized BAFs", verbose = verbose, level = 0, type = ">>")
   if(is.null(threshold.n.clusters)) threshold.n.clusters <- ploidy.standardization + 1
 
   ## Filter by prob (only if prob column is present)
@@ -150,10 +150,10 @@ standardize <- function(data = NULL,
     if(!is.na(prob.rm["TRUE"])) prob.rm <- round(as.numeric(prob.rm["TRUE"]/sum(prob.rm)*100),2) else prob.rm <- 0
     idx <- which(idx)
     if(length(idx) > 0) genos$geno[idx] <- NA
-    vmsg("Percentage of genotypes turned into missing data because of low genotype probability: %s", verbose = verbose, level = 2, type = "INFO", prob.rm)
+    vmsg("Percentage of genotypes turned into missing data because of low genotype probability: %s", verbose = verbose, level = 2, type = ">>", prob.rm)
   } else {
     prob.rm <- 0
-    vmsg("No 'prob' column in genos: skipping genotype probability filtering.", verbose = verbose, level = 1, type = "INFO")
+    vmsg("No 'prob' column in genos: skipping genotype probability filtering.", verbose = verbose, level = 1, type = ">>")
   }
 
   ## Filter by missing data
@@ -161,7 +161,7 @@ standardize <- function(data = NULL,
   rm.mks <- n.na$MarkerName[which(n.na$n.na > threshold.missing.geno)]
   mis.rm <- length(rm.mks)
 
-  vmsg("Markers removed because of excess of missing data: %s", verbose = verbose, level = 2, type = "INFO", mis.rm)
+  vmsg("Markers removed because of excess of missing data: %s", verbose = verbose, level = 2, type = ">>", mis.rm)
 
   if(length(rm.mks) > 0){
     genos_filt <- genos[which(!(genos$MarkerName %in% rm.mks)),]
@@ -186,7 +186,7 @@ standardize <- function(data = NULL,
   if(is.null(multidog_obj)){
     lst_standardization <- split(data_standardization, data_standardization$MarkerName)
 
-    vmsg("Going to parallel mode", verbose = verbose, level = 1, type = "INFO")
+    vmsg("Going to parallel mode", verbose = verbose, level = 1, type = ">>")
     clust <- makeCluster(n.cores, type = parallel.type)
     clusterExport(clust, c("get_centers", "rm_outlier"), envir = .GlobalEnv)
     clusterEvalQ(clust, { library(magrittr); library(dplyr)}) # load required packages and Qploidy on workers
@@ -199,7 +199,7 @@ standardize <- function(data = NULL,
 
     stopCluster(clust)
 
-    vmsg("Back to single core usage", verbose = verbose, level = 1, type = "INFO")
+    vmsg("Back to single core usage", verbose = verbose, level = 1, type = ">>")
 
     gc(verbose = FALSE)
 
@@ -211,7 +211,7 @@ standardize <- function(data = NULL,
   rm.mks <- sapply(clusters, function(x) x$rm != 0)
   clusters.rm <- sum(rm.mks)
 
-  vmsg("Markers removed because of smaller number of clusters than set threshold: %s", verbose = verbose, level = 2, type = "INFO", clusters.rm)
+  vmsg("Markers removed because of smaller number of clusters than set threshold: %s", verbose = verbose, level = 2, type = ">>", clusters.rm)
 
   if(length(which(rm.mks)) > 0)  clusters_filt <- clusters[-which(rm.mks)] else clusters_filt <- clusters
 
@@ -240,7 +240,7 @@ standardize <- function(data = NULL,
   }
 
   # Get BAF
-  vmsg("Going to parallel mode", verbose = verbose, level = 1, type = "INFO")
+  vmsg("Going to parallel mode", verbose = verbose, level = 1, type = ">>")
 
   clust <- makeCluster(n.cores, type = parallel.type)
   clusterExport(clust, c("get_baf_par", "get_baf"))
@@ -248,7 +248,7 @@ standardize <- function(data = NULL,
 
   stopCluster(clust)
 
-  vmsg("Back to single core usage", verbose = verbose, level = 1, type = "INFO")
+  vmsg("Back to single core usage", verbose = verbose, level = 1, type = ">>")
 
   gc()
 
@@ -270,19 +270,19 @@ standardize <- function(data = NULL,
     bafs_join <- bafs_join[-which(is.na(bafs_join$Chr)),]
 
   baf_melt <- pivot_longer(bafs_join, cols = 4:ncol(bafs_join), names_to = "SampleName", values_to = "baf")
-  vmsg("BAFs ready!", verbose = verbose, level = 1, type = "INFO")
+  vmsg("BAFs ready!", verbose = verbose, level = 1, type = ">>")
 
   # Z score
-  vmsg("Generating z scores", verbose = verbose, level = 0, type = "INFO")
+  vmsg("Generating z scores", verbose = verbose, level = 0, type = ">>")
   if(filter_R)
     zscore <- get_zscore(data_filt, geno.pos) # z score is calculated only for markers that passed missing data filter
   else zscore <- get_zscore(data, geno.pos)
 
-  vmsg("Z scores ready!", verbose = verbose, level = 1, type = "INFO")
+  vmsg("Z scores ready!", verbose = verbose, level = 1, type = ">>")
 
-  vmsg("Preparing outputs", verbose = verbose, level = 0, type = "INFO")
+  vmsg("Preparing outputs", verbose = verbose, level = 0, type = ">>")
 
-  vmsg("Merging results into qploidy_standardization object", verbose = verbose, level = 1, type = "INFO")
+  vmsg("Merging results into qploidy_standardization object", verbose = verbose, level = 1, type = ">>")
   qploidy_data <- full_join(data, data_standardization[,-3], c("MarkerName", "SampleName"))
   qploidy_data <- full_join(qploidy_data,baf_melt[,-c(2,3)], c("MarkerName", "SampleName"))
   qploidy_data <- full_join(qploidy_data, zscore[,-c(2,3)], c("MarkerName", "SampleName"))
@@ -307,11 +307,11 @@ standardize <- function(data = NULL,
                            data = qploidy_data), class = "qploidy_standardization")
 
   if(!is.null(out_filename)) {
-    vmsg("Writting QploidyApp input file: %s", verbose = verbose, level = 1, type = "INFO", out_filename)
+    vmsg("Writting QploidyApp input file: %s", verbose = verbose, level = 1, type = ">>", out_filename)
     write_qploidy_standardization(result, out_filename)
   }
 
-  vmsg("Done!", verbose = verbose, level = 1, type = "INFO")
+  vmsg("Done!", verbose = verbose, level = 1, type = ">>")
   return(result)
 }
 

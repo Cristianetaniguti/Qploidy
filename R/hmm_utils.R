@@ -319,7 +319,7 @@ define_z_limits <- function(z, z_window, cn_grid, exp_ploidy, z_range = NULL, ve
 
   if (is.null(z_range) || (length(z_range) == 1 && is.na(z_range))) {
     z_range <- (1/length(cn_grid)) * (as.numeric(quantile(z, probs = 0.75)) - as.numeric(quantile(z, probs = 0.25)))
-    if (verbose) cat(sprintf("    Estimated z_range from data: %f\n", z_range))
+    vmsg("Estimated z_range from data: %f", verbose = verbose, level = 2, type = ">>", z_range)
   }
   z_mean <- mean(z_window, na.rm = TRUE)
   if (z_range_out) {

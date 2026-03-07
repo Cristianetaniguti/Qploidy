@@ -133,6 +133,8 @@ hmm_estimate_CN <- function(
 ) {
 
   # --- input checks ---
+  vmsg("Preparing inputs and applying initial filters", verbose = verbose, level = 0, type = ">>")
+
   if (!is(qploidy_standarize_result, "qploidy_standardization")) {
     stop("Input must be a qploidy_standardization object as returned by standardize().")
   }
@@ -159,21 +161,25 @@ hmm_estimate_CN <- function(
   if(rm_outliers){
     n_na <- sum(is.na(d$z))
     d <- rm_outlier(d, z = TRUE, alpha= outlier_alpha)
-    if(verbose) cat("  Outliers removed from z-scores:", sum(is.na(d$z)) - n_na, "\n")
+    vmsg("Outliers removed from z-scores: %s", verbose = verbose, level = 1, type = ">>", sum(is.na(d$z)) - n_na)
   }
 
   # Remove markers with missing baf and z
   rm <- which(is.na(d[["z"]]))
   if(length(rm) > 0) d <- d[-rm, , drop = FALSE]
 
+  vmsg("Inputs good to go!", verbose = verbose, level = 1, type = ">>")
+
   # --- set expected ploidy ---
   # Calculate expected ploidy using sample-level BAF distribution
+  vmsg("Setting internal parameters", verbose = verbose, level = 0, type = ">>")
+
   if (!is.null(selected_model)) {
     if (!inherits(selected_model, "selected_BAF_model")) {
       stop("selected_model argument must be of class 'selected_BAF_model'.")
     }
     # Use user-provided selected_model
-    if (verbose) cat("  Using user-provided selected_model object.\n")
+    vmsg("Using user-provided selected_model object", verbose = verbose, level = 1, type = ">>")
   } else {
     selected_model <- select_best_baf_model(d$baf,
                                             cn_grid= cn_grid,
@@ -190,13 +196,14 @@ hmm_estimate_CN <- function(
   # Use exp_ploidy argument if provided, otherwise use selected_model$best$best_cn
   if (is.null(exp_ploidy) || (length(exp_ploidy) == 1 && is.na(exp_ploidy))) {
     exp_ploidy <- selected_model$best$best_cn
-    if(verbose) cat(sprintf("  exp_ploidy not provided, using best CN from BAF model: %s\n", exp_ploidy))
+    vmsg("exp_ploidy not provided, using best CN from BAF model: %s", verbose = verbose, level = 1, type = ">>", exp_ploidy)
   } else {
-    if(verbose) cat(sprintf("  exp_ploidy provided by user: %s\n", exp_ploidy))
+    vmsg("exp_ploidy provided by user: %s", verbose = verbose, level = 1, type = ">>", exp_ploidy)
   }
 
+  vmsg("Parameters ready", verbose = verbose, level = 1, type = ">>")
   # --- build windows ---
-  if (verbose) cat("Building windows...\n")
+  vmsg("Defining windows", verbose = verbose, level = 0, type = ">>")
   d <- d[order(d[["Chr"]], d[["Position"]]), ]
 
   if(is.null(min_snps_per_window)){
@@ -211,12 +218,12 @@ hmm_estimate_CN <- function(
 
   # Segmented z-score
   if (segment_zscore){
-    if (verbose) cat("  Segmenting z-scores to define windows.\n")
+    vmsg("Using z-scores changepoint detection to define windows", verbose = verbose, level = 1, type = ">>")
     d <- add_changepoint_windows(dat = d, minseglen = min_snps_per_window)
 
   } else {
     # simple fixed-size windows
-    if (verbose) cat("  Building fixed-size windows.\n")
+    vmsg("Using user-defined fixed-size intervals to define windows", verbose = verbose, level = 1, type = ">>")
     # equal-SNP windows within chromosome
     d$.__w__ <- with(
       d,
@@ -243,7 +250,7 @@ hmm_estimate_CN <- function(
   win_col <- ".__w__"
 
   # summarize per window
-  if (verbose) cat("Summarizing data by window...\n")
+  vmsg("Summarizing data by window", verbose = verbose, level = 1, type = ">>")
 
   win_df <- do.call(rbind, by(d, list(d[["Chr"]], d[[win_col]]), function(x) {
     if (is.null(x) || nrow(x) == 0) return(NULL)
@@ -266,7 +273,7 @@ hmm_estimate_CN <- function(
   # n_het is now filled later using vectorized dosages
   # Handle single-window case: assign CN by BAF likelihood only, skip HMM/EM
   if (sum(keep) == 1) {
-    if (verbose) cat("Only one window remains after filtering. Assigning CN by BAF likelihood only.\n")
+    vmsg("Only one window remains after filtering. Assigning CN by BAF likelihood only", verbose = verbose, level = 1, type = ">>")
     # Use BAF likelihoods to assign CN
     ll_baf_matrix <- do.call(rbind, lapply(baf_list, function(baf_vec) compute_baf_likelihoods(baf_vec,
                                                                                                cn_grid,
@@ -336,7 +343,7 @@ hmm_estimate_CN <- function(
     d$w_baf    <- result$w_baf[window_map]
     d$CN_call  <- result$CN_call[window_map]
     d$post_max <- result$post_max[window_map]
-    if(verbose) cat("Done!\n")
+    vmsg("Done!", verbose = verbose, level = 1, type = ">>")
     return(structure(list(by_window = result, by_marker = d, params = params), class = "hmm_CN"))
   }
 
@@ -361,11 +368,14 @@ hmm_estimate_CN <- function(
   z <- win_df$z_mean
   if (length(z) == 0 || all(is.na(z))) stop("No valid z values found in any window.")
 
+  vmsg("Windows ready", verbose = verbose, level = 1, type = ">>")
+
   # Generate BAF likelihoods and probabilities per window
   # Uses parameters from selected_model
   if(!z_only){
-    if(verbose) cat("Generating BAF likelihoods per window...\n")
+    vmsg("Generating BAF likelihoods by window", verbose = verbose, level = 0, type = ">>")
     grid1 <- unique(c(1,cn_grid)) # always test 1 for LOH loci
+
     baf_results <- lapply(baf_list, function(baf_vec) compute_baf_likelihoods(baf_vec,
                                                                               grid1,
                                                                               M = M,
@@ -379,21 +389,27 @@ hmm_estimate_CN <- function(
     ll_baf_matrix <- do.call(rbind, lapply(baf_results, function(res) res$ll_vec))
     ploidies_temp <- apply(ll_baf_matrix, 1, which.max)
     ploidies_temp <- grid1[ploidies_temp]
+    
+    colnames(ll_baf_matrix) <- paste0("CN", grid1)
+    if(!any(cn_grid == 1)) {
+      ll_baf_matrix <- ll_baf_matrix[, -which(colnames(ll_baf_matrix) == "CN1"), drop=FALSE]
+    }
+    vmsg("BAF likelihoods generated", verbose = verbose, level = 1, type = ">>")
 
+    vmsg("Generating BAF weights by window", verbose = verbose, level = 0, type = ">>")
+
+    vmsg("Calling dosages", verbose = verbose, level = 1, type = ">>")
     dosages <- mapply(function(x, y) call_BAF_dosages(x,
                                                       cn = y,
                                                       bw = selected_model$best$bw,
                                                       plot = FALSE,
                                                       dist = selected_model$best$dist,
                                                       add_uniform = selected_model$best$add_uniform,
-                                                      uniform_weight = selected_model$best$uniform_weight), baf_list, ploidies_temp, SIMPLIFY = FALSE)
-
-    colnames(ll_baf_matrix) <- paste0("CN", grid1)
-    if(!any(cn_grid == 1)) {
-      ll_baf_matrix <- ll_baf_matrix[, -which(colnames(ll_baf_matrix) == "CN1"), drop=FALSE]
-    }
+                                                      uniform_weight = selected_model$best$uniform_weight), 
+                                                      baf_list, ploidies_temp, SIMPLIFY = FALSE)
 
     # For each window, count heterozygotes: dosage != 0 & dosage != ploidies_temp & dosage_prob > 0.6
+    vmsg("Counting heterozygotes per window", verbose = verbose, level = 1, type = ">>")
     n_het_window <- vapply(seq_along(dosages), function(i) {
       sum(dosages[[i]]$data$dosage != 0 & dosages[[i]]$data$dosage != ploidies_temp[i] & dosages[[i]]$data$max_prob > 0.6, na.rm = TRUE)
     }, integer(1))
@@ -401,7 +417,6 @@ hmm_estimate_CN <- function(
     # Count number of markers with BAF values in each window
     n_baf <- sapply(baf_list, function(x) if(any(is.na(x))) length(x[-which(is.na(x))]) else length(x))
 
-    if(verbose) cat("Counting heterozygous to determine BAF weights...\n")
     # BAF weights from heterozygote counts
     # Lower the number of heterozygotes in the window, lower the weight of the BAF emission
     # If there are no heterozygous, only z-score will be considered
@@ -422,17 +437,17 @@ hmm_estimate_CN <- function(
     prob_baf_matrix <- matrix(0, nrow = W, ncol = length(cn_grid))
     w_baf <- rep(0, W)
   }
+  vmsg("BAF weights defined", verbose = verbose, level = 1, type = ">>")
 
   # --- HMM for all chromosomes together ---
   # fit a single HMM across all windows (all chromosomes)
-  if (verbose) cat("\nFitting HMM for all chromosomes together\n")
+  vmsg("Setting initial and transitions HMM matrices", verbose = verbose, level = 0, type = ">>")
 
   # Setup for all windows
   K <- length(cn_grid)
   state_ids <- as.character(cn_grid)
 
   # Transition matrix and initial state distribution
-  if(verbose) cat("  Setting transition matrices.\n")
   # A is K×K. Before normalizing, every off-diagonal entry is 0.001 (rare jumps), and the diagonal is 0.995 (strong tendency to stay in the same CN state).
   A <- matrix(1e-3, K, K); diag(A) <- transition_jump
   # A <- A / rowSums(A) makes each row sum to 1 (a valid Markov matrix). After this, values are almost unchanged (just scaled so each row sums exactly to 1).
@@ -453,22 +468,30 @@ hmm_estimate_CN <- function(
     pi0 <- rep(1/K, K) # fallback to uniform if best CN not found
   }
 
-  if(verbose) cat("  Defining z-score distribution templates.\n")
+  vmsg("Initial and transition HMM matrices ready", verbose = verbose, level = 1, type = ">>")
 
+
+  vmsg("Defining z-score distribution templates", verbose = verbose, level = 0, type = ">>")
   mu <- define_z_limits(d$z, z, cn_grid, exp_ploidy, z_range, verbose)
 
   # sig is the (shared) standard deviation of the z emission across states.
   # It starts at the sample SD of z, with a safety floor of 0.1 to avoid zero/near-zero variance that would blow up log-likelihoods.
   sig <- sd(z, na.rm = TRUE); if (!is.finite(sig) || sig <= 1e-6) sig <- 0.1
   W <- length(z)
-
+  vmsg("Initial z-score mean by state: %s", verbose = verbose, level = 2, type = ">>", paste0(round(mu,3), collapse = ", "))
+  vmsg("Initial z-score SD: %s", verbose = verbose, level = 2, type = ">>", sig)
+  
   # --- EM loop ---
-  if(verbose) cat("  Starting EM.\n")
+  vmsg("Starting EM loop", verbose = verbose, level = 0, type = ">>")
+
   rm_res <- em_hmm_cn(cn_grid, mu, K, state_ids, sig, z,
                       z_only, ll_baf_matrix, n_baf, w_baf,
                       correct_scale, A, pi0, W, max_iter, verbose)
 
   list2env(rm_res, envir = environment())
+  vmsg("Updated z-score mean by state: %s", verbose = verbose, level = 2, type = ">>", paste(sprintf("CN%d: %.3f", cn_grid, mu), collapse = "; "))
+  vmsg("Updated z-score SD: %s", verbose = verbose, level = 2, type = ">>", round(sig,3))
+
   # If z mean is not from the lowest to the highest follow lower ploidy to higher ploidy
   # It means that user tested unlikely ploidies, in this case, modify cn_grid and run again
   idx <- 0
@@ -520,13 +543,19 @@ hmm_estimate_CN <- function(
     pi0 <- pi0[valid_idx]
     state_ids <- state_ids[valid_idx]
     A <- A[valid_idx, valid_idx]
-    cat(paste0("Some ploidies were removed due to non-monotonic z means. cn_grid updated to ", paste(cn_grid, collapse=", "), " and estimation rerun.\n"))
+    vmsg("Some ploidies were removed due to non-monotonic z means", verbose = verbose, level = 2, type = ">>")
+    vmsg("Rerunning EM with updated cn_grid", verbose = verbose, level = 1, type = ">>")
     rm_res <- em_hmm_cn(cn_grid, mu, K, state_ids, sig, z,
                         z_only, as.matrix(ll_baf_matrix), n_baf, w_baf,
                         correct_scale, as.matrix(A), pi0, W, max_iter, verbose)
     list2env(rm_res, envir = environment())
+    vmsg("Updated z-score mean by state: %s", verbose = verbose, level = 2, type = ">>", paste(sprintf("CN%d: %.3f", cn_grid, mu), collapse = "; "))
+    vmsg("Updated z-score SD: %s", verbose = verbose, level = 2, type = ">>", sprintf("%.3f", sig))
   }
 
+  vmsg("EM loop complete", verbose = verbose, level = 1, type = ">>")
+
+  vmsg("Decoding Viterbi path", verbose = verbose, level = 0, type = ">>")
   # Decode Viterbi path
   vit_path <- viterbi(ll_em, log(A), log(pi0))
   cn_call <- cn_grid[vit_path]
@@ -534,7 +563,10 @@ hmm_estimate_CN <- function(
   # max posterior per window
   post_max <- apply(gamma, 1, max)
 
+  vmsg("Viterbi path decoded", verbose = verbose, level = 1, type = ">>")
+
   # Prepare output
+  vmsg("Preparing output", verbose = verbose, level = 0, type = ">>")
   post_df <- as.data.frame(gamma)
   names(post_df) <- paste0("post_CN", cn_grid)
   result <- cbind(
@@ -578,7 +610,6 @@ hmm_estimate_CN <- function(
     add_uniform = add_uniform,
     uniform_weight = selected_model$best$uniform_weight
   )
-  if(verbose) cat("\nDone!\n")
 
   if (!is.null(result) && !is.null(d)) {
     map_df <- result[, c("Chr", "WindowID", "w_baf", "CN_call", "post_max")]
@@ -587,6 +618,8 @@ hmm_estimate_CN <- function(
     d <- d[order(match(seq_len(nrow(d)), as.integer(rownames(d)))), ]
     rownames(d) <- NULL
   }
+
+  vmsg("Done!", verbose = verbose, level = 1, type = ">>")
 
   return(structure(list(by_window = result, by_marker = d, params = params), class = "hmm_CN"))
 }

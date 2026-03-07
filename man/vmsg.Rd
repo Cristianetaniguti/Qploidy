@@ -4,7 +4,7 @@
 \alias{vmsg}
 \title{Verbose Message Utility}
 \usage{
-vmsg(text, verbose = FALSE, level = 1, type = "INFO", ...)
+vmsg(text, verbose = FALSE, level = 1, type = ">>", ...)
 }
 \arguments{
 \item{text}{Character string, the message to print (supports sprintf formatting).}

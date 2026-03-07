@@ -93,8 +93,10 @@ export_VCF <- function(hmm_dosage_calls, file) {
 #' 
 #' @importFrom ggplot2 ggplot aes geom_density geom_point geom_vline scale_color_gradient labs theme_bw
 #' 
+#' 
 #' @return A data.frame with columns: BAF, dosage (integer), max_prob (probability), and a matrix of probabilities for each possible dosage. If plot=TRUE, returns a list with data and plot.
 #' @export
+ 
 call_BAF_dosages <- function(baf_vec, selected_model = NULL, bw = NULL, dist = NULL, 
                              add_uniform = NULL, uniform_weight = NULL, cn = NULL, plot = FALSE) {
   stopifnot(is.numeric(baf_vec))
@@ -167,15 +169,37 @@ call_BAF_dosages <- function(baf_vec, selected_model = NULL, bw = NULL, dist = N
   out <- cbind(out, prob_mat)
   if (plot) {
     df_plot <- out
-    plot_obj <- ggplot(df_plot, aes(x = BAF, y = ..density.., color = max_prob)) +
+    # Create rainbow palette for dosages
+    n_dosages <- length(unique(df_plot$dosage))
+    rainbow_cols <- rainbow(n_dosages)
+    names(rainbow_cols) <- sort(unique(df_plot$dosage))
+    # Function to blend color with gray by max_prob using base R only
+    blend_color <- function(dosage, max_prob) {
+      base_col <- rainbow_cols[as.character(dosage)]
+      gray_col <- "#000000" # darker gray for higher contrast
+      # Convert hex to RGB
+      hex_to_rgb <- function(hex) {
+        hex <- gsub("#", "", hex)
+        r <- strtoi(substr(hex, 1, 2), 16L)
+        g <- strtoi(substr(hex, 3, 4), 16L)
+        b <- strtoi(substr(hex, 5, 6), 16L)
+        c(r, g, b)
+      }
+      rgb_base <- hex_to_rgb(base_col)
+      rgb_gray <- hex_to_rgb(gray_col)
+      rgb_blend <- round(max_prob * rgb_base + (1 - max_prob) * rgb_gray)
+      sprintf("#%02X%02X%02X", rgb_blend[1], rgb_blend[2], rgb_blend[3])
+    }
+    df_plot$color_blend <- mapply(blend_color, df_plot$dosage, df_plot$max_prob)
+    plot_obj <- ggplot(df_plot, aes(x = BAF, y = after_stat(density))) +
       geom_density(data = df_plot, aes(x = BAF), color = NA, fill = "#848d98", alpha = 0.3) +
-      geom_point(aes(y = 0), size = 6) +
+      geom_point(aes(y = 0, color = color_blend), size = 6) +
       geom_vline(xintercept = peak_pos, color = "black", linetype = "dashed", size = 0.7) +
-      scale_color_gradient(low = "#848d98", high = "#6302f4") +
+      scale_color_identity() +
       labs(title = paste0("BAF Dosage Assignment (CN=", cn, ", dist=", dist, ")"),
            x = "BAF",
            y = "Density",
-           color = "Max Prob") +
+           color = "Dosage (rainbow, gray=low prob)") +
       theme_bw()
     out <- list(data = out, plot = plot_obj)
   } else {

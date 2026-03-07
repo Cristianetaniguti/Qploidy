@@ -457,7 +457,7 @@ hmm_estimate_CN <- function(
 
   if(verbose) cat("  Defining z-score distribution templates.\n")
 
-  mu <- define_z_limits(d$z, cn_grid, exp_ploidy, z_range, verbose)
+  mu <- define_z_limits(z, cn_grid, exp_ploidy, z_range, verbose)
 
   # sig is the (shared) standard deviation of the z emission across states.
   # It starts at the sample SD of z, with a safety floor of 0.1 to avoid zero/near-zero variance that would blow up log-likelihoods.

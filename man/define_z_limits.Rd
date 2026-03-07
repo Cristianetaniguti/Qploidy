@@ -4,7 +4,14 @@
 \alias{define_z_limits}
 \title{Initialize monotonic z-score means for HMM ploidy states}
 \usage{
-define_z_limits(z, cn_grid, exp_ploidy, z_range, verbose = FALSE)
+define_z_limits(
+  z,
+  cn_grid,
+  exp_ploidy,
+  z_range = NULL,
+  verbose = FALSE,
+  z_range_out = TRUE
+)
 }
 \arguments{
 \item{z}{Numeric vector. Window-level z-scores.}
@@ -16,6 +23,8 @@ define_z_limits(z, cn_grid, exp_ploidy, z_range, verbose = FALSE)
 \item{z_range}{Numeric. Padding added to min/max z for ramp initialization. If NULL, estimated from z interquartile range.}
 
 \item{verbose}{Logical. If TRUE, prints estimated z_range. Default FALSE.}
+
+\item{z_range_out}{Logical. If TRUE, expand range (min - z_range, max + z_range). If FALSE, reduce range (min + z_range, max - z_range).}
 }
 \value{
 Named numeric vector of z-score means (mu) for each ploidy state in cn_grid.

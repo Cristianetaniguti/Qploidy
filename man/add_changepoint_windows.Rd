@@ -4,7 +4,7 @@
 \alias{add_changepoint_windows}
 \title{Segment ordered genomic z-scores into changepoint-based windows}
 \usage{
-add_changepoint_windows(dat, minseglen = 5, verbose = TRUE, plot = FALSE)
+add_changepoint_windows(dat, minseglen = NULL, verbose = TRUE, plot = FALSE)
 }
 \arguments{
 \item{dat}{A `data.frame` containing marker-level data ordered or unordered.

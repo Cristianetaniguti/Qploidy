@@ -93,3 +93,66 @@ is_compressed_file <- function(file_path) {
     return(FALSE)  # Not a known compressed format
   }
 }
+
+
+#' print qploidy_area_ploidy_estimation object
+#'
+#' @param x qploidy_area_ploidy_estimation object
+#' @param ... print parameters
+#'
+#' @method print qploidy_area_ploidy_estimation
+#'
+#' @return No return value, called for side effects.
+#'
+#' @export
+print.qploidy_area_ploidy_estimation <- function(x, ...){
+
+  count_aneu <- get_aneuploids(x$ploidy)
+
+  df <- data.frame(c1 = c("Number of samples:",
+                          "Chromosomes:",
+                          "Tested ploidies:",
+                          "Number of euploid samples:",
+                          "Number of potential aneuploid samples:",
+                          "Number of highly inbred samples:"),
+                   c2 = c(dim(x$ploidy)[1],
+                          {if(!is.null(colnames(x$ploidy)))
+                            paste0(colnames(x$ploidy), collapse = ",") else
+                              paste0(x$chr, collapse = ",")},
+                          paste0(x$tested, collapse = ","),
+                          sum(!count_aneu, na.rm = TRUE),
+                          sum(count_aneu, na.rm = TRUE),
+                          x$n.inbred
+                   ))
+
+  colnames(df) <- rownames(df) <- NULL
+
+  cat("Object of class qploidy_area_ploidy_estimation")
+  print(format(df, justify = "left", digits = 2))
+}
+
+
+#' indexes for aneuploids
+#'
+#' @param ploidy_df ploidy table (chromosome in columns and individuals in rows)
+#'
+#' @return A logical vector where each element corresponds to an individual in the
+#'         input ploidy table. The value is `TRUE` if the individual is identified
+#'         as potentially aneuploid, and `FALSE` otherwise.
+#'
+#' @export
+get_aneuploids  <- function(ploidy_df){
+
+  if(any(grepl("/NA", ploidy_df) | grepl("NA/",ploidy_df))){
+    ploidy_df <- gsub("/NA", "", ploidy_df)
+    ploidy_df <- gsub("NA/", "", ploidy_df)
+  }
+
+  count_aneu <- !apply(ploidy_df, 1, function(y) {
+    if(any(is.na(y))) {
+      temp <- length(unique(y[-which(is.na(y))]))
+      if(temp == 1) TRUE else if(temp == 0) NA else FALSE
+    } else length(unique(y)) == 1
+  })
+  return(count_aneu)
+}

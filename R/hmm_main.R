@@ -16,8 +16,8 @@
 #'   kernels to keep mass within [0,1] (useful for gaussian).
 #' @param add_uniform Logical. If TRUE, add a uniform noise component to the
 #'   mixture before renormalization. Default FALSE.
-#' @param min_snps_per_window Integer. Minimum SNPs required to keep a window (windows with fewer SNPs are dropped). Default \code{100}.
-#' @param cn_grid Integer vector of copy-number states to consider (e.g., \code{2:8}).
+#' @param min_snps_per_window Integer. Minimum SNPs required to keep a window. If NULL, a dynamic value is chosen based on chromosome size (see code for details). Windows with fewer SNPs are dropped. Default: NULL (dynamic), or user-specified value.
+#' @param cn_grid Integer vector of copy-number states to consider (e.g., \code{1:4}). Unlikely values will be discarded during estimation if their z means are not monotonic with ploidy.
 #' @param M Integer. Number of BAF histogram bins on [0,1]. Default \code{121}.
 #' @param max_iter Integer. Maximum EM iterations. Default \code{60}.
 #' @param het_quantile Numeric. Quantile used to scale BAF emission weight based on heterozygote count. Default \code{0.8}.
@@ -100,7 +100,7 @@
 #' @importFrom dplyr filter
 #'
 #' @export
-  hmm_estimate_CN <- function(
+hmm_estimate_CN <- function(
     qploidy_standarize_result,
     sample_id,
     chr = NULL,
@@ -108,8 +108,8 @@
     add_uniform = FALSE,
     segment_zscore = TRUE,
     snps_per_window = 50,
-    min_snps_per_window = 20,
-    cn_grid = 2:8,
+    min_snps_per_window = NULL,
+    cn_grid = 1:4,
     M = 100,
     max_iter = 60,
     het_quantile = 0.8, # increase this value to reduce the weight of baf when few hets
@@ -130,7 +130,7 @@
     param_count = NULL,
     count_grid_as_params = TRUE,
     correct_scale = TRUE
-  ) {
+) {
 
   # --- input checks ---
   if (!is(qploidy_standarize_result, "qploidy_standardization")) {
@@ -166,14 +166,6 @@
   rm <- which(is.na(d[["z"]]))
   if(length(rm) > 0) d <- d[-rm, , drop = FALSE]
 
-  # If z_range is not provided, estimate from data
-  if (is.null(z_range) || (length(z_range) == 1 && is.na(z_range))) {
-    #z_range <- (1/length(cn_grid)) * (max(d$z) - min(d$z))
-    # Room for improvement here
-    z_range <- (1/length(cn_grid)) * (as.numeric(quantile(d$z, probs = 0.75)) - as.numeric(quantile(d$z, probs = 0.25)))
-    if (verbose) cat(sprintf("    Estimated z_range from data: %f\n", z_range))
-  }
-
   # --- set expected ploidy ---
   # Calculate expected ploidy using sample-level BAF distribution
   if (!is.null(selected_model)) {
@@ -207,10 +199,22 @@
   if (verbose) cat("Building windows...\n")
   d <- d[order(d[["Chr"]], d[["Position"]]), ]
 
+  if(is.null(min_snps_per_window)){
+    # If min_snp_per_window is not defined, the minimum will be set based on the smaller chromosome number
+    # This will not be used for window size if segment_zscore = TRUE but for next steps filtering
+    floor <- 5 # hard default
+    frac <- 0.1 # hard default
+    mk_by_chrom <- d %>% group_by(Chr) %>% summarize(n = n())
+    x <- min(mk_by_chrom$n)
+    m <- max(floor, floor(x * frac))
+    min_snps_per_window <- min(m, floor(x / 2))
+    min_by_chrom <- NULL # if segment_zscore = TRUE, the add_changepoint_windows will estimate the default size by chromosome (better approach)
+  } else min_by_chrom <- min_snps_per_window # if user define the argument, it is hard passed to the changepoint and all chromosome will have the same value
+
   # Segmented z-score
   if (segment_zscore){
     if (verbose) cat("  Segmenting z-scores to define windows.\n")
-    d <- add_changepoint_windows(d, minseglen = min_snps_per_window)
+    d <- add_changepoint_windows(dat = d, minseglen = min_by_chrom)
 
   } else {
     # simple fixed-size windows
@@ -267,14 +271,14 @@
     if (verbose) cat("Only one window remains after filtering. Assigning CN by BAF likelihood only.\n")
     # Use BAF likelihoods to assign CN
     ll_baf_matrix <- do.call(rbind, lapply(baf_list, function(baf_vec) compute_baf_likelihoods(baf_vec,
-                                                                              cn_grid,
-                                                                              M = M,
-                                                                              bw = selected_model$best$bw,
-                                                                              plot = FALSE,
-                                                                              dist = selected_model$best$dist,
-                                                                              reflect = reflect,
-                                                                              add_uniform = selected_model$best$add_uniform,
-                                                                              uniform_weight = selected_model$best$uniform_weight)))[keep,,drop=FALSE]
+                                                                                               cn_grid,
+                                                                                               M = M,
+                                                                                               bw = selected_model$best$bw,
+                                                                                               plot = FALSE,
+                                                                                               dist = selected_model$best$dist,
+                                                                                               reflect = reflect,
+                                                                                               add_uniform = selected_model$best$add_uniform,
+                                                                                               uniform_weight = selected_model$best$uniform_weight)))[keep,,drop=FALSE]
     cn_call <- cn_grid[apply(ll_baf_matrix, 1, which.max)]
     post_max <- rep(1, 1)
     post_df <- as.data.frame(matrix(0, nrow=1, ncol=length(cn_grid)))
@@ -282,12 +286,12 @@
     post_df[1, which.max(ll_baf_matrix[1, ])] <- 1
     # n_het is now calculated using dosages
     dosages <- mapply(function(x, y) call_BAF_dosages(x,
-                     cn = y,
-                     bw = selected_model$best$bw,
-                     plot = FALSE,
-                     dist = selected_model$best$dist,
-                     add_uniform = selected_model$best$add_uniform,
-                     uniform_weight = selected_model$best$uniform_weight), baf_list[keep], cn_call, SIMPLIFY = FALSE)
+                                                      cn = y,
+                                                      bw = selected_model$best$bw,
+                                                      plot = FALSE,
+                                                      dist = selected_model$best$dist,
+                                                      add_uniform = selected_model$best$add_uniform,
+                                                      uniform_weight = selected_model$best$uniform_weight), baf_list[keep], cn_call, SIMPLIFY = FALSE)
     n_het <- sum(dosages[[1]]$dosage != 0 & dosages[[1]]$dosage != cn_call[1], na.rm = TRUE)
     result <- cbind(
       data.frame(
@@ -379,12 +383,12 @@
     ploidies_temp <- grid1[ploidies_temp]
 
     dosages <- mapply(function(x, y) call_BAF_dosages(x,
-                     cn = y,
-                     bw = selected_model$best$bw,
-                     plot = FALSE,
-                     dist = selected_model$best$dist,
-                     add_uniform = selected_model$best$add_uniform,
-                     uniform_weight = selected_model$best$uniform_weight), baf_list, ploidies_temp, SIMPLIFY = FALSE)
+                                                      cn = y,
+                                                      bw = selected_model$best$bw,
+                                                      plot = FALSE,
+                                                      dist = selected_model$best$dist,
+                                                      add_uniform = selected_model$best$add_uniform,
+                                                      uniform_weight = selected_model$best$uniform_weight), baf_list, ploidies_temp, SIMPLIFY = FALSE)
 
     colnames(ll_baf_matrix) <- paste0("CN", grid1)
     if(!any(cn_grid == 1)) {
@@ -415,6 +419,7 @@
     w_baf[!is.finite(w_baf)] <- 0
     w_baf <- w_baf * baf_weight
   } else {
+    n_het_window <- NA
     ll_baf_matrix <- matrix(0, nrow = W, ncol = length(cn_grid))
     prob_baf_matrix <- matrix(0, nrow = W, ncol = length(cn_grid))
     w_baf <- rep(0, W)
@@ -451,127 +456,78 @@
   }
 
   if(verbose) cat("  Defining z-score distribution templates.\n")
-  # z mean init (monotone ramp)
-  # z where is the mean z per window
-  # this subtracts 0.2 and add 0.2 to the min and max of z, and splits it in K values
-  # The small padding ±0.2 keeps edge states from starting exactly at the extremes, which helps EM avoid collapsing to boundary values.
-  # Because CN is ordered (2 < 3 < 4 …) and z increases with CN, this guarantees an ordered starting guess for means.
-  # the maximum value + 0.2 will be referring to the highest CN state - what I am not sure if it is a correct assumption
-  # the mean z value will reffer to the expected ploidy provided
-  z_mean <- mean(z, na.rm = TRUE)
-  z_lo   <- min(z, na.rm = TRUE) - z_range
-  z_hi   <- max(z, na.rm = TRUE) + z_range
-  cmin <- min(cn_grid)
-  cmax <- max(cn_grid)
 
-  # Choose a single linear step so extremes fit within [z_lo, z_hi]
-  # We need:
-  #   z_mean + step*(cmin - exp_ploidy) <= z_lo
-  #   z_mean + step*(cmax - exp_ploidy) >= z_hi
-  # Solve for step and take the max magnitude to satisfy both.
-  step_lo <- if (exp_ploidy > cmin) (z_mean - z_lo) / (exp_ploidy - cmin) else 0
-  step_hi <- if (exp_ploidy < cmax) (z_hi  - z_mean) / (cmax - exp_ploidy) else 0
-  step    <- max(step_lo, step_hi, 1e-6)
-
-  # Monotone, baseline-centered initialization:
-  mu_vec <- z_mean + step * (as.numeric(cn_grid) - exp_ploidy)
-  mu     <- setNames(mu_vec, as.character(cn_grid))
-  # If state_ids are strings of cn_grid, this aligns. If not, reorder:
-  mu <- mu[state_ids]
+  mu <- define_z_limits(d$z, cn_grid, exp_ploidy, z_range, verbose)
 
   # sig is the (shared) standard deviation of the z emission across states.
   # It starts at the sample SD of z, with a safety floor of 0.1 to avoid zero/near-zero variance that would blow up log-likelihoods.
   sig <- sd(z, na.rm = TRUE); if (!is.finite(sig) || sig <= 1e-6) sig <- 0.1
-
-  ll_hist <- numeric(max_iter)
   W <- length(z)
+
   # --- EM loop ---
   if(verbose) cat("  Starting EM.\n")
-  for (iter in 1:max_iter) {
-    # Emissions
-    ll_em <- matrix(NA_real_, nrow=W, ncol=K, dimnames=list(NULL, state_ids))
-    for (k in seq_len(K)) {
-      c <- cn_grid[k]
-      llz <- dnorm(z, mean=mu[as.character(c)], sd=sig, log=TRUE)
-      if(any(is.nan(llz))) llz[which(is.nan(llz))] <- 0
-      if (z_only) {
-        ll_em[,k] <- llz
-      } else {
-        llb <- ll_baf_matrix[,k]
-        if(correct_scale) {
-          llb <- llb/ n_baf
+  rm_res <- em_hmm_cn(cn_grid, mu, K, state_ids, sig, z,
+            z_only, ll_baf_matrix, n_baf, w_baf,
+            correct_scale, A, pi0, W, max_iter, verbose)
+
+  list2env(rm_res, envir = environment())
+  # If z mean is not from the lowest to the highest follow lower ploidy to higher ploidy
+  # It means that user tested unlikely ploidies, in this case, modify cn_grid and run again
+  idx <- 0
+  while(any(mu != sort(mu)) & idx < 10) {
+    # Avoid infinite loop
+    idx <- idx + 1
+    # Identify valid ploidies - for lower ploidies than the expected should have lower mu, higher ploidies than expect should have higher mu
+    # If not, the ploidy is not valid and should be removed from the grid, and the estimation should be rerun
+    exp_idx <- which(as.numeric(names(mu)) == as.numeric(exp_ploidy))
+    mu_exp <- mu[exp_idx]
+    # For lower ploidies, keep only those with strictly decreasing mu
+    lower_ploidies <- which(as.numeric(names(mu)) < as.numeric(exp_ploidy))
+    keep_lower <- lower_ploidies[order(-as.numeric(names(mu)[lower_ploidies]))] # descending order
+    if (length(keep_lower) > 0) {
+      last_mu <- mu_exp
+      valid_lower <- c()
+      for (idx in keep_lower) {
+        if (mu[idx] < last_mu) {
+          valid_lower <- c(valid_lower, idx)
+          last_mu <- mu[idx]
         }
-        ll_em[, k] <- (1-w_baf) * llz + w_baf * llb
       }
+      lower_idx <- valid_lower
+    } else {
+      lower_idx <- integer(0)
     }
-
-    if (!all(is.finite(ll_em))) {
-      bad_w <- which(!is.finite(rowSums(ll_em)))[1]
-      bad_k <- which(!is.finite(ll_em[bad_w, ]))
-      stop(sprintf("Non-finite emission at window %d, states: %s.",
-                   bad_w, paste(colnames(ll_em)[bad_k], collapse=", ")))
-    }
-
-    logA <- log(A); logpi0 <- log(pi0)
-    log_alpha <- matrix(-Inf, W, K); log_beta <- matrix(0, W, K)
-
-    # forward
-    log_alpha[1, ] <- logpi0 + ll_em[1, ]
-    for (i in 2:W) {
-      for (k in 1:K) {
-        log_alpha[i,k] <- ll_em[i,k] + logsumexp(log_alpha[i-1, ] + logA[,k])
+    # For higher ploidies, keep only those with strictly increasing mu
+    higher_ploidies <- which(as.numeric(names(mu)) > as.numeric(exp_ploidy))
+    keep_higher <- higher_ploidies[order(as.numeric(names(mu)[higher_ploidies]))]
+    if (length(keep_higher) > 0) {
+      last_mu <- mu_exp
+      valid_higher <- c()
+      for (idx in keep_higher) {
+        if (mu[idx] > last_mu) {
+          valid_higher <- c(valid_higher, idx)
+          last_mu <- mu[idx]
+        }
       }
+      higher_idx <- valid_higher
+    } else {
+      higher_idx <- integer(0)
     }
-    # backward
-    for (i in (W-1):1) {
-      for (k in 1:K) {
-        log_beta[i,k] <- logsumexp(logA[k, ] + ll_em[i+1, ] + log_beta[i+1, ])
-      }
-    }
-    loglik <- logsumexp(log_alpha[W, ])
-    ll_hist[iter] <- loglik
-
-    # E-step: posteriors
-    log_gamma <- log_alpha + log_beta
-    log_gamma <- sweep(log_gamma, 1, apply(log_gamma, 1, logsumexp), "-")
-    gamma <- exp(log_gamma)
-
-    # pairwise
-    xi_sum <- matrix(0, K, K)
-    for (i in 1:(W-1)) {
-      M_ij <- outer(log_alpha[i, ], log_beta[i+1, ], "+") +
-        logA + matrix(ll_em[i+1, ], K, K, byrow=TRUE)
-      M_ij <- M_ij - logsumexp(as.vector(M_ij))
-      xi_sum <- xi_sum + exp(M_ij)
-    }
-
-    # M-step: update parameters
-    pi0 <- gamma[1, ] / sum(gamma[1, ])
-    A <- xi_sum / pmax(rowSums(xi_sum), 1e-12)
-    A[!is.finite(A)] <- 0
-    A <- sweep(A, 1, pmax(rowSums(A), 1e-12), "/")
-    A <- pmax(A, 1e-12); A <- sweep(A, 1, rowSums(A), "/")
-
-    # update mu and sigma
-    mu <- numeric(K)
-    for (k in 1:K) {
-      w <- gamma[,k]
-      mu[k] <- sum(w * z) / pmax(sum(w), 1e-12)
-    }
-    mu <- setNames(mu, as.character(cn_grid))
-    mu <- mu[state_ids]
-
-    # update shared sigma
-    sig <- sqrt(sum(gamma * (matrix(z, W, K) - rep(mu, each=W))^2) /
-                  pmax(sum(gamma), 1e-12))
-    sig <- max(sig, 1e-3)
-
-    # Convergence check
-    if (iter > 4 && is.finite(ll_hist[iter]) && is.finite(ll_hist[iter-1]) &&
-        abs(ll_hist[iter] - ll_hist[iter-1]) < 1e-4) break
+    valid_idx <- c(lower_idx, exp_idx, higher_idx)
+    valid_idx <- sort(valid_idx)
+    cn_grid <- cn_grid[valid_idx]
+    mu <- define_z_limits(d$z, cn_grid, exp_ploidy, z_range_out = FALSE, verbose) # redefine mu with the new cn_grid, but without z_range to avoid changing the limits too much and keep the same order of the ploidies, which is already checked in the previous steps
+    K <- length(cn_grid)
+    ll_baf_matrix <- ll_baf_matrix[,valid_idx]
+    pi0 <- pi0[valid_idx]
+    state_ids <- state_ids[valid_idx]
+    A <- A[valid_idx, valid_idx]
+    cat(paste0("Some ploidies were removed due to non-monotonic z means. cn_grid updated to ", paste(cn_grid, collapse=", "), " and estimation rerun."))
+    rm_res <- em_hmm_cn(cn_grid, mu, K, state_ids, sig, z,
+              z_only, as.matrix(ll_baf_matrix), n_baf, w_baf,
+              correct_scale, as.matrix(A), pi0, W, max_iter, verbose)
+    list2env(rm_res, envir = environment())
   }
-
-  if(verbose) cat(sprintf("  EM converged in %d iterations. Final log-likelihood: %.2f\n", iter, ll_hist[iter]))
 
   # Decode Viterbi path
   vit_path <- viterbi(ll_em, log(A), log(pi0))
@@ -600,30 +556,30 @@
     ),
     post_df
   )
-    params <- list(
-      cn_grid = cn_grid,
-      distribution = selected_model$best$dist,
-      mu = mu,
-      sigma = sig,
-      A = A,
-      pi0 = pi0,
-      bins = M,
-      bw = selected_model$best$bw,
-      loglik = ll_hist[iter],
-      z_range = z_range,
-      het_quantile = het_quantile,
-      baf_weight = baf_weight,
-      transition_jump = transition_jump,
-      z_only = z_only,
-      exp_ploidy = exp_ploidy,
-      rm_outliers = rm_outliers,
-      outlier_alpha = outlier_alpha,
-      segment_zscore = segment_zscore,
-      snps_per_window = snps_per_window,
-      min_snps_per_window = min_snps_per_window,
-      add_uniform = add_uniform,
-      uniform_weight = selected_model$best$uniform_weight
-    )
+  params <- list(
+    cn_grid = cn_grid,
+    distribution = selected_model$best$dist,
+    mu = mu,
+    sigma = sig,
+    A = A,
+    pi0 = pi0,
+    bins = M,
+    bw = selected_model$best$bw,
+    loglik = ll_hist[length(ll_hist)],
+    z_range = z_range,
+    het_quantile = het_quantile,
+    baf_weight = baf_weight,
+    transition_jump = transition_jump,
+    z_only = z_only,
+    exp_ploidy = exp_ploidy,
+    rm_outliers = rm_outliers,
+    outlier_alpha = outlier_alpha,
+    segment_zscore = segment_zscore,
+    snps_per_window = snps_per_window,
+    min_snps_per_window = min_snps_per_window,
+    add_uniform = add_uniform,
+    uniform_weight = selected_model$best$uniform_weight
+  )
   if(verbose) cat("\nDone!\n")
 
   if (!is.null(result) && !is.null(d)) {
@@ -649,6 +605,7 @@
 #' @return A data.frame with results for all samples, as returned by hmm_estimate_CN$by_window, combined.
 #'
 #' @importFrom parallel makeCluster parLapply stopCluster clusterExport
+#' @importFrom dplyr bind_rows
 #'
 #' @export
 hmm_estimate_CN_multi <- function(qploidy_standarize_result,
@@ -704,8 +661,8 @@ hmm_estimate_CN_multi <- function(qploidy_standarize_result,
   by_window <- Filter(Negate(is.null), by_window)
   if (length(by_window) == 0) stop("No results returned for any sample.")
 
-  by_window <- do.call(rbind, by_window)
-  by_marker <- do.call(rbind, by_marker)
+  by_window <- bind_rows(by_window)
+  by_marker <- bind_rows(by_marker)
   rownames(by_window) <- NULL
   return(structure(list(by_window =by_window, by_marker = by_marker, params_samples = parameters), class = "hmm_CN"))
 }
@@ -737,6 +694,7 @@ print.hmm_CN <- function(x, ...) {
   cat("hmm_CN result\n")
   cat("  Copy-number grid:", paste(params$cn_grid, collapse=", "), "\n")
   cat("  Expected ploidy:", params$exp_ploidy, "\n")
+  cat("  Minimum SNPs per window:", params$min_snps_per_window, "\n")
   cat("  Initial state probabilities (pi0):", paste(round(params$pi0, 3), collapse=", "), "\n")
   cat("  Estimated z means per CN:", paste(round(sort(params$mu), 3), collapse=", "), "\n")
   cat("  Estimated z mean:", mean(x$by_window$z , na.rm=TRUE), "\n")

@@ -499,7 +499,7 @@ rm_outlier <- function(data, alpha=0.05, z=FALSE){
 standardize <- function(data = NULL,
                         genos = NULL,
                         geno.pos = NULL,
-                        threshold.missing.geno=0.90,
+                        threshold.missing.geno=0.9,
                         threshold.geno.prob=0.8,
                         ploidy.standardization = NULL,
                         threshold.n.clusters = NULL,
@@ -745,7 +745,7 @@ print.qploidy_standardization <- function(x, ...){
                             "Minimum genotype probability:"),
                      c2 = c(x$info["type"], x$info["ploidy.standardization"],
                             x$info["threshold.n.clusters"],
-                            1 - as.numeric(x$info["threshold.missing.geno"]),
+                            as.numeric(x$info["threshold.missing.geno"]),
                             x$info["threshold.geno.prob"]))
 
   format.df <- data.frame(c1 = c("Number of markers at raw data:",

@@ -1,3 +1,4 @@
+##' @keywords internal
 # Suppress global variable warnings for non-standard evaluation in dplyr/ggplot2
 globalVariables(c(
   "Sample", "Chr", "Start", "End", "CN_call", "prob_call", "w_baf", "Mid",
@@ -292,4 +293,51 @@ merge_cn_summary_with_estimates <- function(hmm_summarized,
 
   rownames(out) <- NULL
   out
+}
+
+##' Initialize monotonic z-score means for HMM ploidy states
+##'
+##' Computes a monotonic ramp of z-score means (mu) for each ploidy state, centered on the expected ploidy, with padding to avoid boundary collapse.
+##' Used for initializing HMM emission parameters in ploidy estimation.
+##'
+##' @param z Numeric vector. Window-level z-scores.
+##' @param cn_grid Integer vector. Copy-number states to consider.
+##' @param exp_ploidy Numeric. Expected ploidy value (center of ramp).
+##' @param z_range Numeric. Padding added to min/max z for ramp initialization. If NULL, estimated from z interquartile range.
+##' @param verbose Logical. If TRUE, prints estimated z_range. Default FALSE.
+##' @param z_range_out Logical. If TRUE, expand range (min - z_range, max + z_range). If FALSE, reduce range (min + z_range, max - z_range).
+##'
+##' @return Named numeric vector of z-score means (mu) for each ploidy state in cn_grid.
+##'
+##' @details
+##' The ramp is constructed as: mu_c = z_mean + step * (c - exp_ploidy), where step is chosen so the lowest and highest ploidy states fit within the padded z range.
+##' Ensures monotonic initialization for EM fitting.
+##' @keywords internal
+##' @export
+define_z_limits <- function(z, cn_grid, exp_ploidy, z_range = NULL, verbose = FALSE, z_range_out = TRUE) {
+  state_ids <- as.character(cn_grid)
+
+  if (is.null(z_range) || (length(z_range) == 1 && is.na(z_range))) {
+    z_range <- (1/length(cn_grid)) * (as.numeric(quantile(z, probs = 0.75)) - as.numeric(quantile(z, probs = 0.25)))
+    if (verbose) cat(sprintf("    Estimated z_range from data: %f\n", z_range))
+  }
+  z_mean <- mean(z, na.rm = TRUE)
+  if (z_range_out) {
+    z_lo <- min(z, na.rm = TRUE) - z_range
+    z_hi <- max(z, na.rm = TRUE) + z_range
+  } else {
+    z_lo <- min(z, na.rm = TRUE) + z_range
+    z_hi <- max(z, na.rm = TRUE) - z_range
+  }
+  cmin <- min(cn_grid)
+  cmax <- max(cn_grid)
+
+  step_lo <- if (exp_ploidy > cmin) (z_mean - z_lo) / (exp_ploidy - cmin) else 0
+  step_hi <- if (exp_ploidy < cmax) (z_hi  - z_mean) / (cmax - exp_ploidy) else 0
+  step    <- max(step_lo, step_hi, 1e-6)
+
+  mu_vec <- z_mean + step * (as.numeric(cn_grid) - exp_ploidy)
+  mu     <- setNames(mu_vec, as.character(cn_grid))
+  mu <- mu[state_ids]
+  return(mu)
 }

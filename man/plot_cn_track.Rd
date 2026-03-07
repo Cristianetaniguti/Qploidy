@@ -19,6 +19,7 @@ plot_cn_track(
   heights = c(2, 2.5),
   z_by_mean = TRUE,
   chr = NULL,
+  summarized = FALSE,
   depth_zero_as_x = FALSE
 )
 }
@@ -42,6 +43,8 @@ plot_cn_track(
 \item{z_by_mean}{Logical. If TRUE, plot horizontal black lines for mean z per window using geom_segment; otherwise, use geom_smooth as before.}
 
 \item{chr}{Character vector. If provided, only these chromosomes are displayed in the plots.}
+
+\item{summarized}{Logical. If TRUE, only summary lines/polygons are plotted (no individual points). Default is FALSE.}
 
 \item{depth_zero_as_x}{Logical. If TRUE, markers with R == 0 are shown as 'x' in the z-score panel; otherwise, they are shown as normal dots. Default is FALSE.}
 }

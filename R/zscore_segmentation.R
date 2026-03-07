@@ -72,7 +72,7 @@
 #'
 #' @export
 add_changepoint_windows <- function(dat,
-                                    minseglen = 5,
+                                    minseglen = NULL,
                                     verbose = TRUE,
                                     plot = FALSE) {
   # Required columns
@@ -104,6 +104,13 @@ add_changepoint_windows <- function(dat,
         message(sprintf("[changepoint] %s: 1 window (insufficient data)", chr))
       }
       next
+    }
+
+    if(is.null(minseglen)){
+      floor <- 5 # hard default
+      frac <- 0.1 # hard default
+      m <- max(floor, floor(length(z) * frac))
+      minseglen <- min(m, floor(length(z) / 2))
     }
 
     fit <- cpt.meanvar(

@@ -96,6 +96,6 @@ em_hmm_cn <- function(cn_grid, mu, K, state_ids, sig, z, z_only, ll_baf_matrix, 
     if (iter > 4 && is.finite(ll_hist[iter]) && is.finite(ll_hist[iter-1]) &&
         abs(ll_hist[iter] - ll_hist[iter-1]) < 1e-4) break
   }
-  if(verbose) cat(sprintf("  EM converged in %d iterations. Final log-likelihood: %.2f\n", iter, ll_hist[iter]))
+    if(verbose) cat(sprintf("  --Testing CN grid %s: EM converged in %d iterations. Final log-likelihood: %.2f\n", paste(cn_grid, collapse=", "), iter, ll_hist[iter]))
   return(list(mu=mu, cn_grid=cn_grid, K=K, state_ids=state_ids, sig=sig, gamma=gamma, ll_em=ll_em, pi0=pi0, A=A, ll_hist=ll_hist))
 }

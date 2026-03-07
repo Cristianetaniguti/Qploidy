@@ -201,20 +201,18 @@ hmm_estimate_CN <- function(
 
   if(is.null(min_snps_per_window)){
     # If min_snp_per_window is not defined, the minimum will be set based on the smaller chromosome number
-    # This will not be used for window size if segment_zscore = TRUE but for next steps filtering
     floor <- 5 # hard default
     frac <- 0.1 # hard default
     mk_by_chrom <- d %>% group_by(Chr) %>% summarize(n = n())
     x <- min(mk_by_chrom$n)
     m <- max(floor, floor(x * frac))
     min_snps_per_window <- min(m, floor(x / 2))
-    min_by_chrom <- NULL # if segment_zscore = TRUE, the add_changepoint_windows will estimate the default size by chromosome (better approach)
-  } else min_by_chrom <- min_snps_per_window # if user define the argument, it is hard passed to the changepoint and all chromosome will have the same value
+  }
 
   # Segmented z-score
   if (segment_zscore){
     if (verbose) cat("  Segmenting z-scores to define windows.\n")
-    d <- add_changepoint_windows(dat = d, minseglen = min_by_chrom)
+    d <- add_changepoint_windows(dat = d, minseglen = min_snps_per_window)
 
   } else {
     # simple fixed-size windows
@@ -516,13 +514,13 @@ hmm_estimate_CN <- function(
     valid_idx <- c(lower_idx, exp_idx, higher_idx)
     valid_idx <- sort(valid_idx)
     cn_grid <- cn_grid[valid_idx]
-    mu <- define_z_limits(d$z, cn_grid, exp_ploidy, z_range_out = FALSE, verbose) # redefine mu with the new cn_grid, but without z_range to avoid changing the limits too much and keep the same order of the ploidies, which is already checked in the previous steps
+    mu <- define_z_limits(d$z, z, cn_grid, exp_ploidy, z_range_out = FALSE, verbose) # redefine mu with the new cn_grid, but without z_range to avoid changing the limits too much and keep the same order of the ploidies, which is already checked in the previous steps
     K <- length(cn_grid)
     ll_baf_matrix <- ll_baf_matrix[,valid_idx]
     pi0 <- pi0[valid_idx]
     state_ids <- state_ids[valid_idx]
     A <- A[valid_idx, valid_idx]
-    cat(paste0("Some ploidies were removed due to non-monotonic z means. cn_grid updated to ", paste(cn_grid, collapse=", "), " and estimation rerun."))
+    cat(paste0("Some ploidies were removed due to non-monotonic z means. cn_grid updated to ", paste(cn_grid, collapse=", "), " and estimation rerun.\n"))
     rm_res <- em_hmm_cn(cn_grid, mu, K, state_ids, sig, z,
                         z_only, as.matrix(ll_baf_matrix), n_baf, w_baf,
                         correct_scale, as.matrix(A), pi0, W, max_iter, verbose)
@@ -696,7 +694,7 @@ print.hmm_CN <- function(x, ...) {
   cat("  Expected ploidy:", params$exp_ploidy, "\n")
   cat("  Minimum SNPs per window:", params$min_snps_per_window, "\n")
   cat("  Initial state probabilities (pi0):", paste(round(params$pi0, 3), collapse=", "), "\n")
-  cat("  Estimated z means per CN:", paste(round(sort(params$mu), 3), collapse=", "), "\n")
+  cat("  Estimated z means per CN:", paste(round(params$mu, 3), collapse=", "), "\n")
   cat("  Estimated z mean:", mean(x$by_window$z , na.rm=TRUE), "\n")
   cat("  Estimated z sigma:", round(params$sigma, 3), "\n")
   cat("  BAF Emission distribution:", if(!is.null(params$distribution)) params$distribution else "(not specified)", "\n")

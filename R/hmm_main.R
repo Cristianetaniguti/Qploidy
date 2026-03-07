@@ -457,7 +457,7 @@ hmm_estimate_CN <- function(
 
   if(verbose) cat("  Defining z-score distribution templates.\n")
 
-  mu <- define_z_limits(z, cn_grid, exp_ploidy, z_range, verbose)
+  mu <- define_z_limits(d$z, z, cn_grid, exp_ploidy, z_range, verbose)
 
   # sig is the (shared) standard deviation of the z emission across states.
   # It starts at the sample SD of z, with a safety floor of 0.1 to avoid zero/near-zero variance that would blow up log-likelihoods.
@@ -467,8 +467,8 @@ hmm_estimate_CN <- function(
   # --- EM loop ---
   if(verbose) cat("  Starting EM.\n")
   rm_res <- em_hmm_cn(cn_grid, mu, K, state_ids, sig, z,
-            z_only, ll_baf_matrix, n_baf, w_baf,
-            correct_scale, A, pi0, W, max_iter, verbose)
+                      z_only, ll_baf_matrix, n_baf, w_baf,
+                      correct_scale, A, pi0, W, max_iter, verbose)
 
   list2env(rm_res, envir = environment())
   # If z mean is not from the lowest to the highest follow lower ploidy to higher ploidy
@@ -524,8 +524,8 @@ hmm_estimate_CN <- function(
     A <- A[valid_idx, valid_idx]
     cat(paste0("Some ploidies were removed due to non-monotonic z means. cn_grid updated to ", paste(cn_grid, collapse=", "), " and estimation rerun."))
     rm_res <- em_hmm_cn(cn_grid, mu, K, state_ids, sig, z,
-              z_only, as.matrix(ll_baf_matrix), n_baf, w_baf,
-              correct_scale, as.matrix(A), pi0, W, max_iter, verbose)
+                        z_only, as.matrix(ll_baf_matrix), n_baf, w_baf,
+                        correct_scale, as.matrix(A), pi0, W, max_iter, verbose)
     list2env(rm_res, envir = environment())
   }
 

@@ -156,3 +156,46 @@ get_aneuploids  <- function(ploidy_df){
   })
   return(count_aneu)
 }
+
+##' Verbose Message Utility
+##'
+##' Prints a formatted verbose message with timestamp, indentation, and type label, if verbose is TRUE.
+##'
+##' @param text Character string, the message to print (supports sprintf formatting).
+##' @param verbose Logical. If TRUE, prints the message; if FALSE, suppresses output.
+##' @param level Integer, indentation level (0=header, 1=main step, 2=detail, 3=sub-detail).
+##' @param type Character string, message type (e.g., "INFO", "WARN", "ERROR"). Only shown for level 0.
+##' @param ... Additional arguments passed to sprintf for formatting.
+##'
+##' @details Use the verbose argument to control message output. Typically, pass the function's verbose parameter to vmsg.
+##'
+##' @return No return value, called for side effects.
+##' @export
+vmsg <- function(text, verbose = FALSE, level = 1, type = "INFO", ...) {
+  if (!verbose) return(invisible())
+  # Format timestamp
+  timestamp <- format(Sys.time(), "[%H:%M:%S]")
+
+  # Create indentation based on level
+  indent <- switch(as.character(level),
+    "0" = "",           # Section headers
+    "1" = "  • ",       # Main steps  
+    "2" = "    - ",     # Details
+    "3" = "      > ",   # Sub-details
+    paste0(paste(rep("  ", level), collapse = ""), "• ")  # Fallback for level > 3
+  )
+
+  # Format type label (only show for level 0)
+  type_label <- if (level == 0) sprintf("%-5s: ", type) else ""
+
+  # Format message text
+  dots <- list(...)
+  if(length(dots) == 0) {
+    msg_text <- text
+  } else {
+    msg_text <- sprintf(text, ...)
+  }
+  # Combine everything
+  formatted_msg <- sprintf("%s %s%s%s", timestamp, type_label, indent, msg_text)
+  message(formatted_msg)
+}

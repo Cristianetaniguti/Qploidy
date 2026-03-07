@@ -6,6 +6,7 @@
 \usage{
 define_z_limits(
   z,
+  z_window,
   cn_grid,
   exp_ploidy,
   z_range = NULL,

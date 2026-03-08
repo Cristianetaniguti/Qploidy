@@ -430,12 +430,17 @@ hmm_estimate_CN <- function(
       w_baf <- rep(0, W)
     }
     w_baf[!is.finite(w_baf)] <- 0
+    if(round(exp_ploidy, 0) == 1) w_baf <- rep(1, W) # if expected ploidy is 1, we don't expect heterozygotes, so BAF likelihood should be taken fully into account regardless of heterozygote count
     w_baf <- w_baf * baf_weight
   } else {
     n_het_window <- NA
     ll_baf_matrix <- matrix(0, nrow = W, ncol = length(cn_grid))
     prob_baf_matrix <- matrix(0, nrow = W, ncol = length(cn_grid))
     w_baf <- rep(0, W)
+    if(round(exp_ploidy, 0) == 1) {
+      w_baf <- rep(1, W) # if expected ploidy is 1, we don't expect heterozygotes, so BAF likelihood should be taken fully into account regardless of heterozygote count
+      w_baf <- w_baf * baf_weight
+    }
   }
   vmsg("BAF weights defined", verbose = verbose, level = 1, type = ">>")
 

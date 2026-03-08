@@ -3,9 +3,10 @@
 * Enhanced console messages for standardization and HMM steps, improving clarity and user feedback.
 * Improved CN grid selection: unlike CN values are now removed after the EM loop by checking z-score means. The CN grid is reordered from lower to higher ploidy, and EM is rerun if disruptive CN values are detected.
 * The min_snp_per_window argument now defaults to 10% of the smallest chromosome size, with a minimum of 5 SNPs, for more adaptive windowing.
-* Added an argument to define z-score intervals by subtracting z_range (instead of adding), resulting in smaller and more precise intervals.
+* Added an argument to define z-score intervals by subtracting z_range (instead of adding), resulting in smaller intervals.
 * Refactored EM loop into a dedicated function for better modularity and maintainability.
 * Updated dosage call plot colors for improved visual distinction and interpretability.
+* Exception created in HMM when expected ploidy = 1. In this case, heterozygous are not expected so the BAF weight is set to 0.5 regardless if heterozygous are present or not. Parameter can still be controled by baf_weight argument (default 1).
 
 # Qploidy 1.7.1
 

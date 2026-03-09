@@ -330,7 +330,7 @@ print.qploidy_standardization <- function(x, ...){
 
   info <- data.frame(c1 = c("Standardization type:", "Ploidy:",
                             "Min # of heterozygous classes (clusters) present:",
-                            "Max # of missing genotype by marker:",
+                            "Max proportion of missing genotype by marker:",
                             "Min genotype probability:"),
                      c2 = c(x$info["type"], x$info["ploidy.standardization"],
                             x$info["threshold.n.clusters"],

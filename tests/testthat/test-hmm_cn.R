@@ -176,10 +176,4 @@ test_that("hmm_estimate_CN, plot_cn_track, and other HMM functions work as expec
 
   expect_true("gg" %in% class(p))
 
-  # Test merge_cn_summary_with_estimates
-  #dummy_area <- area_estimate_ploidy(simu_data_standardized, samples = "all", level = "sample", ploidies = c(2,3,4))
-
-  #merged <- merge_cn_summary_with_estimates(summ, dummy_area, level = "sample")
-  #expect_true(is.data.frame(merged))
-  #expect_true("CN_HMM" %in% names(merged))
 })

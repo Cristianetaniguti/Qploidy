@@ -51,7 +51,7 @@ mixture before renormalization. Default FALSE.}
 
 \item{segment_zscore}{Logical. If \code{TRUE}, segment z-scores using changepoint detection to define windows instead of fixed SNP counts. Default \code{TRUE}.}
 
-\item{snps_per_window}{Integer. Number of SNPs per window when windows are created. Default \code{500}.}
+\item{snps_per_window}{Integer. Number of SNPs per window when windows are created. Default \code{50}.}
 
 \item{min_snps_per_window}{Integer. Minimum SNPs required to keep a window. If NULL, a dynamic value is chosen based on chromosome size (see code for details). Windows with fewer SNPs are dropped. Default: NULL (dynamic), or user-specified value.}
 

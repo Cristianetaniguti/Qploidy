@@ -16,6 +16,8 @@ generate_baf_template(
 )
 }
 \arguments{
+\item{cn}{Integer. Copy number (e.g., 2 for diploid, 4 for tetraploid).}
+
 \item{M}{Integer. Number of bins over [0,1]. Default is 101.}
 
 \item{bw}{Numeric. Bandwidth / concentration control (interpretation depends
@@ -37,8 +39,6 @@ mixture before renormalization. Default FALSE.}
 
 \item{uniform_weight}{Numeric in [0,1]. Mixture weight of the uniform
 component when \code{add_uniform = TRUE}. Default 0.05.}
-
-\item{c}{Integer. Copy number (e.g., 2 for diploid, 4 for tetraploid).}
 }
 \value{
 Numeric vector of length \code{M} summing to 1.

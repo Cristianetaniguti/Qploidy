@@ -169,8 +169,6 @@ if(getRversion() >= "2.15.1") utils::globalVariables(c(
 #'
 #' @import ggplot2
 #' @importFrom tidyr pivot_longer
-#' @importFrom dplyr mutate
-#' @importFrom purrr map
 #'
 #' @export
 #' @author Cristiane Taniguti
@@ -268,10 +266,12 @@ compute_baf_likelihoods <- function(baf_vec, cn_grid, M = 100, bw = 0.03,
 #' @param plot Logical. If TRUE, returns a ggplot object for the best model only (default FALSE).
 #' @param param_count Optional named integer vector. Number of free parameters per distribution (for BIC penalty). If NULL, defaults to 0 for all.
 #' @param count_grid_as_params Logical. If TRUE (default), adds +1 to BIC penalty for each hyperparameter tuned by grid search (bw, and uniform_weight if used).
+#' @param min_het_frac Numeric in [0,1]. Threshold for the fraction of BAF values in \code{het_range} considered heterozygous. If the observed heterozygous fraction exceeds this value, CN=1 is excluded from \code{cn_grid}, as a meaningful proportion of heterozygous loci makes haploid (CN=1) implausible. Default 0.05.
+#' @param het_range Numeric vector of length 2. BAF interval used to define heterozygous loci (default \code{c(0.2, 0.8)}). Values outside this range are treated as homozygous for the purpose of the \code{min_het_frac} filter.
 #'
 #' @return A list with the following elements:
 #'   \item{n_obs}{Number of usable BAF observations (after filtering NA/out-of-range).}
-#'   \item{best}{A list describing the best model configuration (distribution, bw, uniform settings, best CN, log-likelihood, probability, BIC, n_obs).}
+#'   \item{best}{A list describing the best model configuration: \code{dist}, \code{bw}, \code{add_uniform}, \code{uniform_weight}, \code{best_cn}, \code{logLik}, \code{prob}, \code{BIC}, \code{n_obs}, \code{het_frac} (observed heterozygous fraction), and \code{cn_grid_used} (CN states actually evaluated after filtering).}
 #'   \item{grid_results}{A data.frame summarizing all grid search results (one row per configuration).}
 #'   \item{plot}{(If plot=TRUE) ggplot object for the best model.}
 #'   \item{note}{(If no usable data or all models fail) diagnostic message.}
@@ -305,12 +305,30 @@ select_best_baf_model <- function(
   M = 100,
   plot = FALSE,
   param_count = NULL,
-  count_grid_as_params = TRUE
+  count_grid_as_params = TRUE,
+  min_het_frac = 0.05,
+  het_range = c(0.2, 0.8)
 ) {
   stopifnot(is.numeric(baf_vec))
   stopifnot(is.numeric(cn_grid) || is.integer(cn_grid))
   cn_grid <- as.integer(cn_grid)
   stopifnot(length(cn_grid) >= 1)
+
+  # Exclude CN=1 from the grid when the data has sufficient heterozygosity (het_frac > min_het_frac),
+  # as a meaningful proportion of heterozygous loci makes haploid (CN=1) implausible.
+  stopifnot(is.numeric(het_range), length(het_range) == 2, all(is.finite(het_range)))
+  stopifnot(is.numeric(min_het_frac), length(min_het_frac) == 1, min_het_frac >= 0, min_het_frac <= 1)
+  usable_baf <- baf_vec[!is.na(baf_vec) & baf_vec >= 0 & baf_vec <= 1]
+  het_frac <- NA_real_
+  if (length(usable_baf) > 0) {
+    het_frac <- mean(usable_baf >= het_range[1] & usable_baf <= het_range[2])
+    if (het_frac > min_het_frac) {
+      cn_grid <- cn_grid[!cn_grid %in% 1L]
+      if (length(cn_grid) == 0) stop(
+        sprintf("All CN states removed after heterozygous fraction filter (het_frac=%.3f > min_het_frac=%.3f). Consider expanding cn_grid or lowering min_het_frac.", het_frac, min_het_frac)
+      )
+    }
+  }
   stopifnot(is.character(dists), length(dists) >= 1)
   stopifnot(is.numeric(bw_grid), all(is.finite(bw_grid)), all(bw_grid > 0))
   stopifnot(is.logical(add_uniform_grid), length(add_uniform_grid) >= 1)
@@ -320,7 +338,7 @@ select_best_baf_model <- function(
             all(uniform_weight_grid <= 1))
 
   # n = number of usable observations for BIC penalty
-  n_obs <- if (length(baf_vec) == 0) 0L else sum(!is.na(baf_vec) & baf_vec >= 0 & baf_vec <= 1)
+  n_obs <- length(usable_baf)
 
   # Default parameter counts per distribution
   D <- length(dists)
@@ -445,7 +463,9 @@ select_best_baf_model <- function(
     logLik = best_row$logLik,
     prob = best_row$prob,
     BIC = best_row$BIC,
-    n_obs = n_obs
+    n_obs = n_obs,
+    het_frac = het_frac,
+    cn_grid_used = cn_grid
   )
 
   out <- list(
@@ -483,7 +503,7 @@ select_best_baf_model <- function(
 #' Optionally, the template can be extended with a uniform noise component to
 #' capture "off-comb" BAF values (e.g., mapping bias, noisy loci).
 #'
-#' @param c Integer. Copy number (e.g., 2 for diploid, 4 for tetraploid).
+#' @param cn Integer. Copy number (e.g., 2 for diploid, 4 for tetraploid).
 #' @param M Integer. Number of bins over [0,1]. Default is 101.
 #' @param bw Numeric. Bandwidth / concentration control (interpretation depends
 #'   on \code{dist}). For \code{gaussian}, it is sd on the BAF scale.

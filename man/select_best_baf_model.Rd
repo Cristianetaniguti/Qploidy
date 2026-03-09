@@ -15,7 +15,9 @@ select_best_baf_model(
   M = 100,
   plot = FALSE,
   param_count = NULL,
-  count_grid_as_params = TRUE
+  count_grid_as_params = TRUE,
+  min_het_frac = 0.05,
+  het_range = c(0.2, 0.8)
 )
 }
 \arguments{
@@ -40,11 +42,15 @@ select_best_baf_model(
 \item{param_count}{Optional named integer vector. Number of free parameters per distribution (for BIC penalty). If NULL, defaults to 0 for all.}
 
 \item{count_grid_as_params}{Logical. If TRUE (default), adds +1 to BIC penalty for each hyperparameter tuned by grid search (bw, and uniform_weight if used).}
+
+\item{min_het_frac}{Numeric in [0,1]. Threshold for the fraction of BAF values in \code{het_range} considered heterozygous. If the observed heterozygous fraction exceeds this value, CN=1 is excluded from \code{cn_grid}, as a meaningful proportion of heterozygous loci makes haploid (CN=1) implausible. Default 0.05.}
+
+\item{het_range}{Numeric vector of length 2. BAF interval used to define heterozygous loci (default \code{c(0.2, 0.8)}). Values outside this range are treated as homozygous for the purpose of the \code{min_het_frac} filter.}
 }
 \value{
 A list with the following elements:
   \item{n_obs}{Number of usable BAF observations (after filtering NA/out-of-range).}
-  \item{best}{A list describing the best model configuration (distribution, bw, uniform settings, best CN, log-likelihood, probability, BIC, n_obs).}
+  \item{best}{A list describing the best model configuration: \code{dist}, \code{bw}, \code{add_uniform}, \code{uniform_weight}, \code{best_cn}, \code{logLik}, \code{prob}, \code{BIC}, \code{n_obs}, \code{het_frac} (observed heterozygous fraction), and \code{cn_grid_used} (CN states actually evaluated after filtering).}
   \item{grid_results}{A data.frame summarizing all grid search results (one row per configuration).}
   \item{plot}{(If plot=TRUE) ggplot object for the best model.}
   \item{note}{(If no usable data or all models fail) diagnostic message.}

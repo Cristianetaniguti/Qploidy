@@ -51,13 +51,13 @@ mixture before renormalization. Default FALSE.}
 
 \item{segment_zscore}{Logical. If \code{TRUE}, segment z-scores using changepoint detection to define windows instead of fixed SNP counts. Default \code{TRUE}.}
 
-\item{snps_per_window}{Integer. Number of SNPs per window when windows are created. Default \code{500}.}
+\item{snps_per_window}{Integer. Number of SNPs per window when windows are created. Default \code{50}.}
 
 \item{min_snps_per_window}{Integer. Minimum SNPs required to keep a window. If NULL, a dynamic value is chosen based on chromosome size (see code for details). Windows with fewer SNPs are dropped. Default: NULL (dynamic), or user-specified value.}
 
 \item{cn_grid}{Integer vector of copy-number states to consider (e.g., \code{1:4}). Unlikely values will be discarded during estimation if their z means are not monotonic with ploidy.}
 
-\item{M}{Integer. Number of BAF histogram bins on [0,1]. Default \code{121}.}
+\item{M}{Integer. Number of BAF histogram bins on [0,1]. Default \code{100}.}
 
 \item{max_iter}{Integer. Maximum EM iterations. Default \code{60}.}
 

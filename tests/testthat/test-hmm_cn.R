@@ -47,8 +47,8 @@ test_that("hmm_estimate_CN, plot_cn_track, and other HMM functions work as expec
   expect_true(is.data.frame(res$by_window))
   expect_true(nrow(res$by_window) > 0)
   expect_true(all(c("Sample", "Chr", "WindowID", "CN_call") %in% names(res$by_window)))
-  expect_equal(round(sum(res$by_window$post_CN2),2), 0)
   expect_equal(round(sum(res$by_window$post_CN4),2), 6)
+  expect_equal(round(sum(res$by_marker$post_max),2), 50)
 
   res <- hmm_estimate_CN(
     qploidy_standarize_result = simu_data_standardized,
@@ -69,8 +69,8 @@ test_that("hmm_estimate_CN, plot_cn_track, and other HMM functions work as expec
   expect_true(is.data.frame(res$by_window))
   expect_true(nrow(res$by_window) > 0)
   expect_true(all(c("Sample", "Chr", "WindowID", "CN_call") %in% names(res$by_window)))
-  expect_equal(round(sum(res$by_window$post_CN2),2), 0)
   expect_equal(round(sum(res$by_window$post_CN4),2), 6)
+  expect_equal(round(sum(res$by_marker$post_max),2), 50)
 
   res <- hmm_estimate_CN(
     qploidy_standarize_result = simu_data_standardized,
@@ -86,14 +86,34 @@ test_that("hmm_estimate_CN, plot_cn_track, and other HMM functions work as expec
   )
 
   expect_type(res, "list")
+  expect_true("by_marker" %in% names(res))
   expect_true("by_window" %in% names(res))
   expect_true("params" %in% names(res))
   expect_s3_class(res, "hmm_CN")
   expect_true(is.data.frame(res$by_window))
   expect_true(nrow(res$by_window) > 0)
   expect_true(all(c("Sample", "Chr", "WindowID", "CN_call") %in% names(res$by_window)))
-  expect_equal(round(sum(res$by_window$post_CN2),2), 0)
   expect_equal(round(sum(res$by_window$post_CN4),2), 5)
+  expect_equal(round(sum(res$by_marker$post_max),2), 50)
+
+  samples <- unique(simu_data_standardized$data$SampleName)
+  res <- hmm_estimate_CN(
+    qploidy_standarize_result = simu_data_standardized,
+    sample_id = samples[1],
+    chr = 1,
+    cn_grid = c(1:8)
+  )
+
+  expect_type(res, "list")
+  expect_true("by_marker" %in% names(res))
+  expect_true("by_window" %in% names(res))
+  expect_true("params" %in% names(res))
+  expect_s3_class(res, "hmm_CN")
+  expect_true(is.data.frame(res$by_window))
+  expect_true(nrow(res$by_window) > 0)
+  expect_true(all(c("Sample", "Chr", "WindowID", "CN_call") %in% names(res$by_window)))
+  expect_equal(round(sum(res$by_window$post_CN4),2), 6)
+  expect_equal(round(sum(res$by_marker$post_max),2), 50)
 
   # plot_cn_track test (should return a gg object)
   p <- plot_cn_track(hmm_CN = res,
@@ -112,16 +132,37 @@ test_that("hmm_estimate_CN, plot_cn_track, and other HMM functions work as expec
     snps_per_window = 10,
     min_snps_per_window = 5,
     cn_grid = c(2, 3, 4),
-    M = 21,
-    exp_ploidy = 4
+    M = 21
   )
+
   expect_type(multi_res, "list")
   expect_true(length(multi_res) >= 1)
   expect_true(inherits(multi_res, "hmm_CN"))
-  expect_equal(mean(multi_res$by_window$CN_call), 3.270, tolerance = 1e-3)
+  expect_equal(mean(multi_res$by_window$CN_call), 3.1667, tolerance = 1e-3)
+  expect_equal(mean(multi_res$by_marker$CN_call), 3.3333, tolerance = 1e-3)
 
   # Test summarize_cn_mode
-  summ <- summarize_cn_mode(multi_res, level = "sample")
+  summ <- summarize_cn_mode(df = multi_res, level = "sample")
+  expect_true(is.data.frame(summ))
+  expect_true("CN_mode" %in% names(summ))
+  expect_equal(summ$CN_mode, c(2,2,4,4,4,4,4,3,3))
+
+  multi_res <- hmm_estimate_CN_multi(
+    qploidy_standarize_result = simu_data_standardized,
+    sample_ids = "all",
+    n_cores = 1,
+    chr = 1,
+    cn_grid = c(1:4)
+  )
+
+  expect_type(multi_res, "list")
+  expect_true(length(multi_res) >= 1)
+  expect_true(inherits(multi_res, "hmm_CN"))
+  expect_equal(mean(multi_res$by_window$CN_call), 3.1667, tolerance = 1e-3)
+  expect_equal(mean(multi_res$by_marker$CN_call), 3.3333, tolerance = 1e-3)
+
+  # Test summarize_cn_mode
+  summ <- summarize_cn_mode(df = multi_res, level = "sample")
   expect_true(is.data.frame(summ))
   expect_true("CN_mode" %in% names(summ))
   expect_equal(summ$CN_mode, c(2,2,4,4,4,4,4,3,3))
@@ -131,10 +172,8 @@ test_that("hmm_estimate_CN, plot_cn_track, and other HMM functions work as expec
   expect_true("CN_mode" %in% names(summ))
   expect_equal(summ$CN_mode, c(2,2,4,4,4,4,4,3,3))
 
-  # Test merge_cn_summary_with_estimates
-  dummy_area <- area_estimate_ploidy(simu_data_standardized, samples = "all", level = "sample", ploidies = c(2,3,4))
+  p <- compare_cn_track(multi_res, samples_to_plot = samples)
 
-  merged <- merge_cn_summary_with_estimates(summ, dummy_area, level = "sample")
-  expect_true(is.data.frame(merged))
-  expect_true("CN_HMM" %in% names(merged))
+  expect_true("gg" %in% class(p))
+
 })

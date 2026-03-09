@@ -27,6 +27,7 @@ if (getRversion() >= "2.15.1") utils::globalVariables(
 ##' @param z_by_mean Logical. If TRUE, plot horizontal black lines for mean z per window using geom_segment; otherwise, use geom_smooth as before.
 ##' @param chr Character vector. If provided, only these chromosomes are displayed in the plots.
 ##' @param depth_zero_as_x Logical. If TRUE, markers with R == 0 are shown as 'x' in the z-score panel; otherwise, they are shown as normal dots. Default is FALSE.
+##' @param summarized Logical. If TRUE, only summary lines/polygons are plotted (no individual points). Default is FALSE.
 ##'
 ##' @return A \code{ggplot} object (from ggpubr::ggarrange). Print to render, or add layers/scales as needed.
 ##'
@@ -82,6 +83,7 @@ plot_cn_track <- function(hmm_CN,
                           heights = c(2, 2.5),
                           z_by_mean = TRUE,
                           chr = NULL,
+                          summarized = FALSE,
                           depth_zero_as_x = FALSE) {
 
   stopifnot(inherits(hmm_CN, "hmm_CN"))
@@ -254,7 +256,37 @@ plot_cn_track <- function(hmm_CN,
     }
   }
 
-  if (z_by_mean) {
+  if (summarized) {
+    # Only plot z means (no points)
+    z_means <- hmm_CN$by_window %>%
+      filter(Sample == sample_id & !is.na(Chr) & Chr %in% chr_order) %>%
+      select(Chr, WindowID, Start, End, w_baf, z_mean = z) %>%
+      arrange(factor(Chr, levels = chr_order), Start)
+    z_means$Chr <- factor(z_means$Chr, levels = chr_order)
+    p_z <- ggplot() +
+      geom_segment(
+        data = z_means,
+        aes(x = Start, xend = End, y = z_mean, yend = z_mean, group = WindowID),
+        color = "black", linewidth = 0.7
+      ) +
+      geom_blank(
+        data = chrom_ghost,
+        inherit.aes = FALSE,
+        aes(x = Position, y = min(z_means$z_mean, na.rm = TRUE))
+      ) +
+      facet_wrap(~ Chr, scales = "free_x", nrow = 1) +
+      labs(x = NULL, y = "z") +
+      theme_bw(base_size = 12) +
+      theme(
+        panel.grid.major.x = element_blank(),
+        panel.grid.minor   = element_blank(),
+        strip.background   = element_rect(fill = "grey95"),
+        legend.position    = "none",
+        axis.title.x       = element_blank(),
+        axis.text.x        = element_text(angle = 30, vjust = 1, hjust = 1, size = 8)
+      ) +
+      scale_x_continuous(labels = scales::scientific_format())
+  } else if (z_by_mean) {
     z_means <- hmm_CN$by_window %>%
       filter(Sample == sample_id & !is.na(Chr) & Chr %in% chr_order) %>%
       select(Chr, WindowID, Start, End, w_baf, z_mean = z) %>%
@@ -295,8 +327,9 @@ plot_cn_track <- function(hmm_CN,
         strip.background   = element_rect(fill = "grey95"),
         legend.position    = "none",
         axis.title.x       = element_blank(),
-        axis.text.x        = element_text(angle = 30, vjust = 1, hjust = 1)
-      )
+        axis.text.x        = element_text(angle = 30, vjust = 1, hjust = 1, size = 8)
+      ) +
+      scale_x_continuous(labels = scales::scientific_format())
   } else {
     p_z <- ggplot(marker_df, aes(x = Position, y = z, color = w_baf)) +
       geom_point(size = 1.2, alpha = 0.8, mapping = shape_aes) +
@@ -329,8 +362,9 @@ plot_cn_track <- function(hmm_CN,
         strip.background   = element_rect(fill = "grey95"),
         legend.position    = "none",
         axis.title.x       = element_blank(),
-        axis.text.x        = element_text(angle = 30, vjust = 1, hjust = 1)
-      )
+        axis.text.x        = element_text(angle = 30, vjust = 1, hjust = 1, size = 8)
+      ) +
+      scale_x_continuous(labels = scales::scientific_format())
   }
 
   # -------- bottom panel: CN segments (color = P(CN call)) --------
@@ -375,8 +409,9 @@ plot_cn_track <- function(hmm_CN,
       panel.grid.minor   = element_blank(),
       strip.background   = element_rect(fill = "grey95"),
       legend.position    = "bottom",
-      axis.text.x        = element_text(angle = 30, vjust = 1, hjust = 1)
-    )
+      axis.text.x        = element_text(angle = 30, vjust = 1, hjust = 1, size = 8)
+    ) +
+    scale_x_continuous(labels = scales::scientific_format())
 
   # -------- BAF panel (color = w_baf; uses SAME tagging/join as z panel) --------
   plot_df <- data_sample2 %>%
@@ -396,41 +431,82 @@ plot_cn_track <- function(hmm_CN,
   })
   dens_df <- do.call(rbind, dens_list)
 
-  p_baf <- ggplot(plot_df, aes(x = Position, y = baf, color = w_baf)) +
-    geom_blank(
-      data = chrom_ghost,
-      inherit.aes = FALSE,
-      aes(x = Position, y = 0)
-    ) +
-    # Add density polygon on y-axis (background)
-    geom_polygon(
-      data = dens_df,
-      aes(x = min(plot_df$Position, na.rm = TRUE) +
-                (max(plot_df$Position, na.rm = TRUE) - min(plot_df$Position, na.rm = TRUE)) * density / max(density, na.rm = TRUE),
-          y = y, group = Chr),
-      fill = "#848d98", alpha = 0.3, color = NA,
-      inherit.aes = FALSE
-    ) +
-    geom_point(alpha = 0.7, size = 1)
-  if (show_window_lines) {
-    p_baf <- p_baf + geom_vline(data = vlines, aes(xintercept = Start),
-               color = line_color, alpha = line_alpha,
-               linewidth = line_width, linetype = line_linetype)
+  # Add per-chromosome Position range to dens_df
+  chrom_pos_range <- plot_df %>%
+    group_by(Chr) %>%
+    summarise(pos_min = min(Position, na.rm = TRUE), pos_max = max(Position, na.rm = TRUE), .groups = "drop")
+  dens_df <- dens_df %>%
+    left_join(chrom_pos_range, by = "Chr")
+
+  if (summarized) {
+    # Only plot the BAF polygon (no points)
+    p_baf <- ggplot() +
+      geom_blank(
+        data = chrom_ghost,
+        inherit.aes = FALSE,
+        aes(x = Position, y = 0)
+      ) +
+      geom_polygon(
+        data = dens_df,
+        aes(x = min(plot_df$Position, na.rm = TRUE) +
+                  (max(plot_df$Position, na.rm = TRUE) - min(plot_df$Position, na.rm = TRUE)) * density / max(density, na.rm = TRUE),
+            y = y, group = Chr),
+        fill = "#848d98", alpha = 0.3, color = NA,
+        inherit.aes = FALSE
+      )
+    if (show_window_lines) {
+      p_baf <- p_baf + geom_vline(data = vlines, aes(xintercept = Start),
+                 color = line_color, alpha = line_alpha,
+                 linewidth = line_width, linetype = line_linetype)
+    }
+    p_baf <- p_baf +
+      facet_wrap(~Chr, scales = "free_x", nrow = 1) +
+      theme_bw() +
+      ylab("BAF") +
+      theme(
+        axis.text.x        = element_text(angle = 30, vjust = 1, hjust = 1, size = 8),
+        legend.position    = "top",
+        text               = element_text(size = 12),
+        axis.title.x       = element_blank()
+      ) +
+    scale_x_continuous(labels = scales::scientific_format())
+  } else {
+    p_baf <- ggplot(plot_df, aes(x = Position, y = baf, color = w_baf)) +
+      geom_blank(
+        data = chrom_ghost,
+        inherit.aes = FALSE,
+        aes(x = Position, y = 0)
+      ) +
+      # Add density polygon on y-axis (background)
+      geom_polygon(
+        data = dens_df,
+        aes(x = pos_min + (pos_max - pos_min) * density / max(density, na.rm = TRUE),
+            y = y, group = Chr),
+        fill = "#848d98", alpha = 0.3, color = NA,
+        inherit.aes = FALSE
+      ) +
+      geom_point(alpha = 0.7, size = 1)
+    if (show_window_lines) {
+      p_baf <- p_baf + geom_vline(data = vlines, aes(xintercept = Start),
+                 color = line_color, alpha = line_alpha,
+                 linewidth = line_width, linetype = line_linetype)
+    }
+    p_baf <- p_baf +
+      facet_wrap(~Chr, scales = "free_x", nrow = 1) +
+      theme_bw() +
+      ylab("BAF") +
+      scale_color_viridis_c(option = "plasma", direction = -1,
+                            limits = c(0, 1),
+                            oob = squish,
+                            name = "BAF weight") +
+      theme(
+        axis.text.x        = element_text(angle = 30, vjust = 1, hjust = 1, size = 8),
+        legend.position    = "top",
+        text               = element_text(size = 12),
+        axis.title.x       = element_blank()
+      ) +
+    scale_x_continuous(labels = scales::scientific_format())
   }
-  p_baf <- p_baf +
-    facet_wrap(~Chr, scales = "free_x", nrow = 1) +
-    theme_bw() +
-    ylab("BAF") +
-    scale_color_viridis_c(option = "plasma", direction = -1,
-                          limits = c(0, 1),
-                          oob = squish,
-                          name = "BAF weight") +
-    theme(
-      axis.text.x        = element_text(angle = 30, vjust = 1, hjust = 1),
-      legend.position    = "top",
-      text               = element_text(size = 12),
-      axis.title.x       = element_blank()
-    )
 
   # -------- stack with ggpubr (no patchwork needed) --------
   # BAF distribution plot (all markers, all chromosomes/windows)
@@ -468,10 +544,12 @@ plot_cn_track <- function(hmm_CN,
   sigma <- if (!is.null(params$sigma)) paste(round(params$sigma, 3), collapse = ", ") else "NA"
   sample_name <- if (!is.null(sample_id)) as.character(sample_id) else "NA"
   loglik <- if (!is.null(params$loglik)) round(params$loglik, 3) else "NA"
+  min_snps <- if (!is.null(params$min_snps_per_window)) round(params$min_snps_per_window, 3) else "NA"
   param_text <- paste0(
     "Sample Name: ", sample_name, "\n",
     "Log-likelihood: ", loglik, "\n",
     "CN grid: ", cn_grid, "\n",
+    "Min SNPs p/window: ", min_snps, "\n",
     "Distribution: ", dist, "\n",
     "Sigma: ", sigma
   )

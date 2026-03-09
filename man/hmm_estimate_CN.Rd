@@ -57,7 +57,7 @@ mixture before renormalization. Default FALSE.}
 
 \item{cn_grid}{Integer vector of copy-number states to consider (e.g., \code{1:4}). Unlikely values will be discarded during estimation if their z means are not monotonic with ploidy.}
 
-\item{M}{Integer. Number of BAF histogram bins on [0,1]. Default \code{121}.}
+\item{M}{Integer. Number of BAF histogram bins on [0,1]. Default \code{100}.}
 
 \item{max_iter}{Integer. Maximum EM iterations. Default \code{60}.}
 

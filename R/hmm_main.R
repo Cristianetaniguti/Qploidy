@@ -389,7 +389,7 @@ hmm_estimate_CN <- function(
     ll_baf_matrix <- do.call(rbind, lapply(baf_results, function(res) res$ll_vec))
     ploidies_temp <- apply(ll_baf_matrix, 1, which.max)
     ploidies_temp <- grid1[ploidies_temp]
-    
+
     colnames(ll_baf_matrix) <- paste0("CN", grid1)
     if(!any(cn_grid == 1)) {
       ll_baf_matrix <- ll_baf_matrix[, -which(colnames(ll_baf_matrix) == "CN1"), drop=FALSE]
@@ -405,7 +405,7 @@ hmm_estimate_CN <- function(
                                                       plot = FALSE,
                                                       dist = selected_model$best$dist,
                                                       add_uniform = selected_model$best$add_uniform,
-                                                      uniform_weight = selected_model$best$uniform_weight), 
+                                                      uniform_weight = selected_model$best$uniform_weight),
                                                       baf_list, ploidies_temp, SIMPLIFY = FALSE)
 
     # For each window, count heterozygotes: dosage != 0 & dosage != ploidies_temp & dosage_prob > 0.6
@@ -477,7 +477,8 @@ hmm_estimate_CN <- function(
 
 
   vmsg("Defining z-score distribution templates", verbose = verbose, level = 0, type = ">>")
-  mu <- define_z_limits(d$z, z, cn_grid, exp_ploidy, z_range, verbose)
+  mu <- define_z_limits(z = d$z, z_window = z, cn_grid = cn_grid,
+                        exp_ploidy = exp_ploidy, z_range = z_range, verbose = verbose)
 
   # sig is the (shared) standard deviation of the z emission across states.
   # It starts at the sample SD of z, with a safety floor of 0.1 to avoid zero/near-zero variance that would blow up log-likelihoods.
@@ -485,7 +486,7 @@ hmm_estimate_CN <- function(
   W <- length(z)
   vmsg("Initial z-score mean by state: %s", verbose = verbose, level = 2, type = ">>", paste0(round(mu,3), collapse = ", "))
   vmsg("Initial z-score SD: %s", verbose = verbose, level = 2, type = ">>", sig)
-  
+
   # --- EM loop ---
   vmsg("Starting EM loop", verbose = verbose, level = 0, type = ">>")
 
@@ -542,7 +543,8 @@ hmm_estimate_CN <- function(
     valid_idx <- c(lower_idx, exp_idx, higher_idx)
     valid_idx <- sort(valid_idx)
     cn_grid <- cn_grid[valid_idx]
-    mu <- define_z_limits(d$z, z, cn_grid, exp_ploidy, z_range_out = FALSE, verbose) # redefine mu with the new cn_grid, but without z_range to avoid changing the limits too much and keep the same order of the ploidies, which is already checked in the previous steps
+    mu <- define_z_limits(z = d$z, z_window = z, cn_grid = cn_grid,
+                          exp_ploidy = exp_ploidy, z_range_out = FALSE, verbose = verbose) # redefine mu with the new cn_grid, but without z_range to avoid changing the limits too much and keep the same order of the ploidies, which is already checked in the previous steps
     K <- length(cn_grid)
     ll_baf_matrix <- ll_baf_matrix[,valid_idx]
     pi0 <- pi0[valid_idx]

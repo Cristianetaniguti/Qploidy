@@ -5,7 +5,8 @@
 \title{Select the Best BAF Template Model via Grid Search and BIC}
 \usage{
 select_best_baf_model(
-  baf_vec,
+  qploidy_standardization,
+  sample,
   cn_grid,
   dists = c("gaussian", "beta", "beta_binomial", "negative_binomial"),
   reflect = TRUE,
@@ -21,7 +22,9 @@ select_best_baf_model(
 )
 }
 \arguments{
-\item{baf_vec}{Numeric vector. BAF values for a single window (should be in [0,1]).}
+\item{qploidy_standardization}{An object of class \code{qploidy_standardization} containing standardized BAF values and related info. The function will extract the relevant BAF vector for the specified sample from this object.}
+
+\item{sample}{Character. Sample name.}
 
 \item{cn_grid}{Integer vector. Copy-number states to test (e.g., 2:6).}
 

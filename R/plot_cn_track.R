@@ -547,6 +547,7 @@ plot_cn_track <- function(hmm_CN,
   min_snps <- if (!is.null(params$min_snps_per_window)) round(params$min_snps_per_window, 3) else "NA"
   param_text <- paste0(
     "Sample Name: ", sample_name, "\n",
+    "Est. overall ploidy: ", if (!is.null(params$exp_ploidy)) params$exp_ploidy else "NA", "\n",
     "Log-likelihood: ", loglik, "\n",
     "CN grid: ", cn_grid, "\n",
     "Min SNPs p/window: ", min_snps, "\n",

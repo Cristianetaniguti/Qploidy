@@ -129,7 +129,10 @@ hmm_estimate_CN <- function(
     uniform_weight_grid = c(0.01, 0.03, 0.05, 0.10, 0.15),
     param_count = NULL,
     count_grid_as_params = TRUE,
-    correct_scale = TRUE
+    correct_scale = TRUE,
+    min_het_frac = 0.05,
+    het_range = c(0.2,0.8),
+    dosage_threshold = 0.6
 ) {
 
   # --- input checks ---
@@ -182,6 +185,7 @@ hmm_estimate_CN <- function(
     vmsg("Using user-provided selected_model object", verbose = verbose, level = 1, type = ">>")
   } else {
     selected_model <- select_best_baf_model(d$baf,
+                                            sample = sample_id,
                                             cn_grid= cn_grid,
                                             dists = dists,
                                             M = M,
@@ -190,7 +194,9 @@ hmm_estimate_CN <- function(
                                             add_uniform_grid = add_uniform_grid,
                                             uniform_weight_grid = uniform_weight_grid,
                                             param_count = param_count,
-                                            count_grid_as_params = count_grid_as_params)
+                                            count_grid_as_params = count_grid_as_params,
+                                            min_het_frac = min_het_frac,
+                                            het_range = het_range)
   }
 
   # Use exp_ploidy argument if provided, otherwise use selected_model$best$best_cn
@@ -283,7 +289,9 @@ hmm_estimate_CN <- function(
                                                                                                dist = selected_model$best$dist,
                                                                                                reflect = reflect,
                                                                                                add_uniform = selected_model$best$add_uniform,
-                                                                                               uniform_weight = selected_model$best$uniform_weight)))[keep,,drop=FALSE]
+                                                                                               uniform_weight = selected_model$best$uniform_weight,
+                                                                                               min_het_frac = min_het_frac,
+                                                                                               het_range = het_range)))[keep,,drop=FALSE]
     cn_call <- cn_grid[apply(ll_baf_matrix, 1, which.max)]
     post_max <- rep(1, 1)
     post_df <- as.data.frame(matrix(0, nrow=1, ncol=length(cn_grid)))
@@ -384,7 +392,9 @@ hmm_estimate_CN <- function(
                                                                               dist = selected_model$best$dist,
                                                                               reflect = reflect,
                                                                               add_uniform = selected_model$best$add_uniform,
-                                                                              uniform_weight = selected_model$best$uniform_weight))
+                                                                              uniform_weight = selected_model$best$uniform_weight,
+                                                                              het_range = het_range,
+                                                                              min_het_frac = min_het_frac))
 
     ll_baf_matrix <- do.call(rbind, lapply(baf_results, function(res) res$ll_vec))
     ploidies_temp <- apply(ll_baf_matrix, 1, which.max)
@@ -411,7 +421,7 @@ hmm_estimate_CN <- function(
     # For each window, count heterozygotes: dosage != 0 & dosage != ploidies_temp & dosage_prob > 0.6
     vmsg("Counting heterozygotes per window", verbose = verbose, level = 1, type = ">>")
     n_het_window <- vapply(seq_along(dosages), function(i) {
-      sum(dosages[[i]]$data$dosage != 0 & dosages[[i]]$data$dosage != ploidies_temp[i] & dosages[[i]]$data$max_prob > 0.6, na.rm = TRUE)
+      sum(dosages[[i]]$data$dosage != 0 & dosages[[i]]$data$dosage != ploidies_temp[i] & dosages[[i]]$data$max_prob > dosage_threshold, na.rm = TRUE)
     }, integer(1))
 
     # Count number of markers with BAF values in each window

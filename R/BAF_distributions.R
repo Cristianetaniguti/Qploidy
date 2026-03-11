@@ -159,6 +159,8 @@ if(getRversion() >= "2.15.1") utils::globalVariables(c(
 #'   mixture before renormalization. Default FALSE.
 #' @param uniform_weight Numeric in [0,1]. Mixture weight of the uniform
 #'   component when \code{add_uniform = TRUE}. Default 0.05.
+#' @param min_het_frac Numeric in [0,1]. Threshold for the fraction of BAF values in \code{het_range} considered heterozygous. If the observed heterozygous fraction exceeds this value, CN=1 is excluded from \code{cn_grid}, as a meaningful proportion of heterozygous loci makes haploid (CN=1) implausible. Default 0.05.
+#' @param het_range Numeric vector of length 2. BAF interval used to define heterozygous loci (default \code{c(0.2, 0.8)}). Values outside this range are treated as homozygous for the purpose of the \code{min_het_frac} filter.
 #' @param plot Logical. If TRUE, return a ggplot object showing observed and template distributions with likelihood and probability text for each CN. Default FALSE.
 #'
 #' @return A list containing:
@@ -174,7 +176,26 @@ if(getRversion() >= "2.15.1") utils::globalVariables(c(
 #' @author Cristiane Taniguti
 compute_baf_likelihoods <- function(baf_vec, cn_grid, M = 100, bw = 0.03,
                                    plot = FALSE, dist="gaussian", reflect = TRUE,
-                                   add_uniform = FALSE, uniform_weight = 0.05) {
+                                   add_uniform = FALSE, uniform_weight = 0.05,
+                                   min_het_frac = 0.05,
+                                   het_range = c(0.2, 0.8)) {
+
+  # Exclude CN=1 from the grid when the data has sufficient heterozygosity (het_frac > min_het_frac),
+  # as a meaningful proportion of heterozygous loci makes haploid (CN=1) implausible.
+  usable_baf <- baf_vec[!is.na(baf_vec) & baf_vec >= 0 & baf_vec <= 1]
+  no_one <- FALSE
+  het_frac <- NA_real_
+  if (length(usable_baf) > 0) {
+    het_frac <- mean(usable_baf >= het_range[1] & usable_baf <= het_range[2])
+    if (het_frac > min_het_frac) {
+      if(any(cn_grid %in% 1L)) no_one <- TRUE
+      cn_grid <- cn_grid[!cn_grid %in% 1L]
+      if (length(cn_grid) == 0) stop(
+        sprintf("All CN states removed after heterozygous fraction filter (het_frac=%.3f > min_het_frac=%.3f). Consider expanding cn_grid or lowering min_het_frac.", het_frac, min_het_frac)
+      )
+    }
+  }
+
   K <- length(cn_grid)
   breaks <- seq(0, 1, length.out = M + 1)
   if (length(baf_vec) == 0 || all(is.na(baf_vec))) {
@@ -238,10 +259,17 @@ compute_baf_likelihoods <- function(baf_vec, cn_grid, M = 100, bw = 0.03,
         linetype = guide_legend(order = 1)
       )
   }
-  out <- list(
-    ll_vec = ll_vec,
-    prob_vec = prob_vec
-  )
+  if(no_one){
+    out <- list(
+      ll_vec = c(min(ll_vec),ll_vec),
+      prob_vec = c(0, prob_vec)
+    )
+  } else {
+    out <- list(
+      ll_vec = ll_vec,
+      prob_vec = prob_vec
+    )
+  }
   if (!is.null(plot_obj)) out$plot <- plot_obj
   return(out)
 }
@@ -255,7 +283,9 @@ compute_baf_likelihoods <- function(baf_vec, cn_grid, M = 100, bw = 0.03,
 #' Criterion (BIC). The function returns the best model configuration, a summary of all grid results,
 #' and (optionally) a plot for the best model.
 #'
-#' @param baf_vec Numeric vector. BAF values for a single window (should be in [0,1]).
+#' @param qploidy_standardization An object of class \code{qploidy_standardization} containing standardized BAF values and related info. The function will extract the relevant BAF vector for the specified sample from this object. Either this (together with \code{sample}) or \code{baf_vec} must be provided.
+#' @param sample Character. Sample name. Required when \code{qploidy_standardization} is provided; may be omitted when \code{baf_vec} is supplied directly.
+#' @param baf_vec Optional numeric vector of BAF values. If provided, \code{qploidy_standardization} and \code{sample} may be omitted. Mutually exclusive with the \code{qploidy_standardization}/\code{sample} pair: if \code{baf_vec} is \code{NULL}, the BAF vector is extracted from the standardization object.
 #' @param cn_grid Integer vector. Copy-number states to test (e.g., 2:6).
 #' @param dists Character vector. Distribution families to test (e.g., c("gaussian", "beta", ...)).
 #' @param reflect Logical. If TRUE (default), applies reflection for continuous kernels to keep mass within [0,1]. Passed to `generate_baf_template()`.
@@ -295,7 +325,9 @@ compute_baf_likelihoods <- function(baf_vec, cn_grid, M = 100, bw = 0.03,
 #' @export
 #' @author Cristiane Taniguti
 select_best_baf_model <- function(
-  baf_vec,
+  qploidy_standardization = NULL,
+  sample = NULL,
+  baf_vec = NULL,
   cn_grid,
   dists = c("gaussian", "beta", "beta_binomial", "negative_binomial"),
   reflect = TRUE,
@@ -309,27 +341,66 @@ select_best_baf_model <- function(
   min_het_frac = 0.05,
   het_range = c(0.2, 0.8)
 ) {
-  stopifnot(is.numeric(baf_vec))
+  # --- Input validation ---
+  if (is.null(baf_vec)) {
+    # Extract baf_vec from qploidy_standardization + sample
+    if (!inherits(qploidy_standardization, "qploidy_standardization"))
+      stop("'qploidy_standardization' must be an object of class 'qploidy_standardization' (or provide 'baf_vec' directly).")
+    if (is.null(qploidy_standardization$data) || !is.data.frame(qploidy_standardization$data))
+      stop("'qploidy_standardization$data' must be a data.frame.")
+    required_cols <- c("SampleName", "baf")
+    missing_cols <- setdiff(required_cols, names(qploidy_standardization$data))
+    if (length(missing_cols) > 0)
+      stop(sprintf("'qploidy_standardization$data' is missing required columns: %s", paste(missing_cols, collapse = ", ")))
+
+    if (!is.character(sample) || length(sample) != 1)
+      stop("'sample' must be a single character string when 'qploidy_standardization' is used.")
+
+    available_samples <- unique(qploidy_standardization$data$SampleName)
+    if (!sample %in% available_samples)
+      stop(sprintf(
+        "Sample '%s' not found in the dataset. Available samples are:\n  %s",
+        sample, paste(available_samples, collapse = ", ")
+      ))
+
+    one_sample <- qploidy_standardization$data[qploidy_standardization$data$SampleName == sample, ]
+    baf_vec <- one_sample$baf
+  } else {
+    # baf_vec provided directly; qploidy_standardization and sample may be omitted
+    if (!is.numeric(baf_vec) || length(baf_vec) == 0)
+      stop("'baf_vec' must be a non-empty numeric vector.")
+  }
+
   stopifnot(is.numeric(cn_grid) || is.integer(cn_grid))
   cn_grid <- as.integer(cn_grid)
-  stopifnot(length(cn_grid) >= 1)
+  if (length(cn_grid) < 1 || any(cn_grid < 1L))
+    stop("'cn_grid' must be a non-empty integer vector with all values >= 1.")
 
-  # Exclude CN=1 from the grid when the data has sufficient heterozygosity (het_frac > min_het_frac),
-  # as a meaningful proportion of heterozygous loci makes haploid (CN=1) implausible.
   stopifnot(is.numeric(het_range), length(het_range) == 2, all(is.finite(het_range)))
+  if (het_range[1] >= het_range[2])
+    stop("'het_range[1]' must be strictly less than 'het_range[2]'.")
+
   stopifnot(is.numeric(min_het_frac), length(min_het_frac) == 1, min_het_frac >= 0, min_het_frac <= 1)
-  usable_baf <- baf_vec[!is.na(baf_vec) & baf_vec >= 0 & baf_vec <= 1]
-  het_frac <- NA_real_
-  if (length(usable_baf) > 0) {
-    het_frac <- mean(usable_baf >= het_range[1] & usable_baf <= het_range[2])
-    if (het_frac > min_het_frac) {
-      cn_grid <- cn_grid[!cn_grid %in% 1L]
-      if (length(cn_grid) == 0) stop(
-        sprintf("All CN states removed after heterozygous fraction filter (het_frac=%.3f > min_het_frac=%.3f). Consider expanding cn_grid or lowering min_het_frac.", het_frac, min_het_frac)
-      )
-    }
-  }
-  stopifnot(is.character(dists), length(dists) >= 1)
+
+  allowed_dists <- c("gaussian", "beta", "beta_binomial", "negative_binomial")
+  if (!is.character(dists) || length(dists) < 1)
+    stop("'dists' must be a non-empty character vector.")
+  invalid_dists <- setdiff(dists, allowed_dists)
+  if (length(invalid_dists) > 0)
+    stop(sprintf("Invalid distribution(s) in 'dists': %s. Allowed values: %s.",
+                 paste(invalid_dists, collapse = ", "), paste(allowed_dists, collapse = ", ")))
+
+  if (!is.logical(reflect) || length(reflect) != 1)
+    stop("'reflect' must be a single logical value (TRUE or FALSE).")
+  if (!is.logical(plot) || length(plot) != 1)
+    stop("'plot' must be a single logical value (TRUE or FALSE).")
+  if (!is.logical(count_grid_as_params) || length(count_grid_as_params) != 1)
+    stop("'count_grid_as_params' must be a single logical value (TRUE or FALSE).")
+
+  if (!is.numeric(M) || length(M) != 1 || M < 2 || M != as.integer(M))
+    stop("'M' must be a single integer >= 2.")
+  M <- as.integer(M)
+
   stopifnot(is.numeric(bw_grid), all(is.finite(bw_grid)), all(bw_grid > 0))
   stopifnot(is.logical(add_uniform_grid), length(add_uniform_grid) >= 1)
   stopifnot(is.numeric(uniform_weight_grid),
@@ -337,7 +408,10 @@ select_best_baf_model <- function(
             all(uniform_weight_grid >= 0),
             all(uniform_weight_grid <= 1))
 
+  stopifnot(is.numeric(baf_vec))
+
   # n = number of usable observations for BIC penalty
+  usable_baf <- baf_vec[!is.na(baf_vec) & baf_vec >= 0 & baf_vec <= 1]
   n_obs <- length(usable_baf)
 
   # Default parameter counts per distribution
@@ -410,7 +484,9 @@ select_best_baf_model <- function(
       dist = dist_g,
       reflect = reflect,
       add_uniform = add_u,
-      uniform_weight = uw_g
+      uniform_weight = uw_g,
+      het_range = het_range,
+      min_het_frac = min_het_frac
     )
 
     ll <- res$ll_vec
@@ -464,7 +540,7 @@ select_best_baf_model <- function(
     prob = best_row$prob,
     BIC = best_row$BIC,
     n_obs = n_obs,
-    het_frac = het_frac,
+    min_het_frac = min_het_frac,
     cn_grid_used = cn_grid
   )
 
@@ -485,9 +561,19 @@ select_best_baf_model <- function(
       dist = best$dist,
       reflect = reflect,
       add_uniform = best$add_uniform,
-      uniform_weight = best$uniform_weight
+      uniform_weight = best$uniform_weight,
+      min_het_frac = min_het_frac,
+      het_range = het_range
     )
     out$plot <- best_plot_res$plot
+  }
+
+  if (length(unique(out$grid_results$best_cn[1:3])) > 1) {
+    warn_msg <- if (!is.null(sample))
+      paste0("Sample ", sample, ": Top 3 models differ on estimated CN. Inspect plot for quality control.")
+    else
+      "Top 3 models differ on estimated CN. Inspect plot for quality control."
+    warning(warn_msg)
   }
 
   class(out) <- "selected_BAF_model"

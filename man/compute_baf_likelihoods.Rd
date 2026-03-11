@@ -13,7 +13,9 @@ compute_baf_likelihoods(
   dist = "gaussian",
   reflect = TRUE,
   add_uniform = FALSE,
-  uniform_weight = 0.05
+  uniform_weight = 0.05,
+  min_het_frac = 0.05,
+  het_range = c(0.2, 0.8)
 )
 }
 \arguments{
@@ -37,6 +39,10 @@ mixture before renormalization. Default FALSE.}
 
 \item{uniform_weight}{Numeric in [0,1]. Mixture weight of the uniform
 component when \code{add_uniform = TRUE}. Default 0.05.}
+
+\item{min_het_frac}{Numeric in [0,1]. Threshold for the fraction of BAF values in \code{het_range} considered heterozygous. If the observed heterozygous fraction exceeds this value, CN=1 is excluded from \code{cn_grid}, as a meaningful proportion of heterozygous loci makes haploid (CN=1) implausible. Default 0.05.}
+
+\item{het_range}{Numeric vector of length 2. BAF interval used to define heterozygous loci (default \code{c(0.2, 0.8)}). Values outside this range are treated as homozygous for the purpose of the \code{min_het_frac} filter.}
 }
 \value{
 A list containing:

@@ -49,7 +49,7 @@ standardize(
 
 \item{ploidy.standardization}{Integer. The ploidy level of the reference panel used for standardization.}
 
-\item{threshold.n.clusters}{Integer. Minimum number of expected dosage clusters per marker. For diploid data, this is typically 3 (corresponding to genotypes 0, 1, and 2).}
+\item{threshold.n.clusters}{Integer. Minimum number of expected dosage clusters per marker. For diploid data, this is typically 3 (corresponding to genotypes 0, 1, and 2). Cannot exceed `ploidy.standardization + 1`.}
 
 \item{n.cores}{Integer. Number of cores to use in parallel computations (e.g., for cluster center estimation and BAF generation).}
 

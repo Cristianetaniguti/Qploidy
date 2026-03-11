@@ -46,7 +46,7 @@ globalVariables(c("theta", "R", "geno", "Var1", "array.id",
 ##' @param threshold.missing.geno Numeric (0–1). Maximum fraction of missing genotype data allowed per marker. Markers with a higher fraction will be removed.
 ##' @param threshold.geno.prob Numeric (0–1). Minimum genotype call probability threshold. Genotypes with lower probability will be treated as missing.
 ##' @param ploidy.standardization Integer. The ploidy level of the reference panel used for standardization.
-##' @param threshold.n.clusters Integer. Minimum number of expected dosage clusters per marker. For diploid data, this is typically 3 (corresponding to genotypes 0, 1, and 2).
+##' @param threshold.n.clusters Integer. Minimum number of expected dosage clusters per marker. For diploid data, this is typically 3 (corresponding to genotypes 0, 1, and 2). Cannot exceed `ploidy.standardization + 1`.
 ##' @param n.cores Integer. Number of cores to use in parallel computations (e.g., for cluster center estimation and BAF generation).
 ##' @param out_filename Optional. Path to save the final standardized dataset to disk as a CSV file (suitable for Qploidy).
 ##' @param type Character. Type of data used for clustering: "intensities" (array-based), "counts" (sequencing), or "updog" (set automatically if `multidog_obj` is provided).
@@ -104,6 +104,57 @@ standardize <- function(data = NULL,
      is.null(ploidy.standardization) || is.null(threshold.n.clusters)) {
     stop("Not all required inputs were defined.")
   }
+
+  # Scalar type checks
+  if (!is.data.frame(data))     stop("'data' must be a data.frame.")
+  if (!is.data.frame(genos))    stop("'genos' must be a data.frame.")
+  if (!is.data.frame(geno.pos)) stop("'geno.pos' must be a data.frame.")
+  if (nrow(data) == 0)     stop("'data' has no rows.")
+  if (nrow(genos) == 0)    stop("'genos' has no rows.")
+  if (nrow(geno.pos) == 0) stop("'geno.pos' has no rows.")
+
+  if (!is.numeric(threshold.missing.geno) || length(threshold.missing.geno) != 1 ||
+      threshold.missing.geno < 0 || threshold.missing.geno > 1)
+    stop("'threshold.missing.geno' must be a single numeric value in [0, 1].")
+
+  if (!is.numeric(threshold.geno.prob) || length(threshold.geno.prob) != 1 ||
+      threshold.geno.prob < 0 || threshold.geno.prob > 1)
+    stop("'threshold.geno.prob' must be a single numeric value in [0, 1].")
+
+  if (!is.numeric(ploidy.standardization) || length(ploidy.standardization) != 1 ||
+      ploidy.standardization < 1 || ploidy.standardization != as.integer(ploidy.standardization))
+    stop("'ploidy.standardization' must be a single positive integer.")
+
+  if (!is.null(threshold.n.clusters) &&
+      (!is.numeric(threshold.n.clusters) || length(threshold.n.clusters) != 1 ||
+       threshold.n.clusters < 1 || threshold.n.clusters != as.integer(threshold.n.clusters)))
+    stop("'threshold.n.clusters' must be a single positive integer.")
+
+  if (!is.null(threshold.n.clusters) && threshold.n.clusters > ploidy.standardization + 1)
+    stop(sprintf("'threshold.n.clusters' cannot be higher than ploidy.standardization + 1 (%d).",
+                 ploidy.standardization + 1L))
+
+  if (!is.numeric(n.cores) || length(n.cores) != 1 || n.cores < 1 || n.cores != as.integer(n.cores))
+    stop("'n.cores' must be a single positive integer.")
+
+  if (!is.null(out_filename) && (!is.character(out_filename) || length(out_filename) != 1))
+    stop("'out_filename' must be a single character string or NULL.")
+
+  allowed_types <- c("intensities", "counts", "updog")
+  if (!is.character(type) || length(type) != 1 || !type %in% allowed_types)
+    stop(sprintf("'type' must be one of: %s.", paste(allowed_types, collapse = ", ")))
+
+  allowed_parallel <- c("FORK", "PSOCK")
+  if (!is.character(parallel.type) || length(parallel.type) != 1 || !parallel.type %in% allowed_parallel)
+    stop(sprintf("'parallel.type' must be one of: %s.", paste(allowed_parallel, collapse = ", ")))
+
+  if (!is.logical(verbose)       || length(verbose) != 1)       stop("'verbose' must be a single logical value.")
+  if (!is.logical(rm_outlier)    || length(rm_outlier) != 1)    stop("'rm_outlier' must be a single logical value.")
+  if (!is.logical(cluster_median)|| length(cluster_median) != 1) stop("'cluster_median' must be a single logical value.")
+  if (!is.logical(filter_R)      || length(filter_R) != 1)      stop("'filter_R' must be a single logical value.")
+
+  if (!is.null(multidog_obj) && !inherits(multidog_obj, "multidog"))
+    stop("'multidog_obj' must be an object of class 'multidog' (from the updog package) or NULL.")
 
   # Check column names and order for data
   required_data_cols <- c("MarkerName", "SampleName", "X", "Y", "R", "ratio")

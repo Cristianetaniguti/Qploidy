@@ -33,7 +33,9 @@ hmm_estimate_CN(
   uniform_weight_grid = c(0.01, 0.03, 0.05, 0.1, 0.15),
   param_count = NULL,
   count_grid_as_params = TRUE,
-  correct_scale = TRUE
+  correct_scale = TRUE,
+  min_het_frac = 0.05,
+  het_range = c(0.2, 0.8)
 )
 }
 \arguments{

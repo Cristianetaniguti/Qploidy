@@ -184,7 +184,7 @@ hmm_estimate_CN <- function(
     # Use user-provided selected_model
     vmsg("Using user-provided selected_model object", verbose = verbose, level = 1, type = ">>")
   } else {
-    selected_model <- select_best_baf_model(d$baf,
+    selected_model <- select_best_baf_model(baf_vec = d$baf,
                                             sample = sample_id,
                                             cn_grid= cn_grid,
                                             dists = dists,
@@ -418,11 +418,38 @@ hmm_estimate_CN <- function(
                                                       uniform_weight = selected_model$best$uniform_weight),
                                                       baf_list, ploidies_temp, SIMPLIFY = FALSE)
 
-    # For each window, count heterozygotes: dosage != 0 & dosage != ploidies_temp & dosage_prob > 0.6
+    # For each window, count heterozygotes: dosage != 0 & dosage != ploidies_temp & dosage_prob > dosage_threshold
     vmsg("Counting heterozygotes per window", verbose = verbose, level = 1, type = ">>")
-    n_het_window <- vapply(seq_along(dosages), function(i) {
-      sum(dosages[[i]]$data$dosage != 0 & dosages[[i]]$data$dosage != ploidies_temp[i] & dosages[[i]]$data$max_prob > dosage_threshold, na.rm = TRUE)
+
+    n_het_before_thresh <- vapply(seq_along(dosages), function(i) {
+      sum(dosages[[i]]$data$dosage != 0 &
+          dosages[[i]]$data$dosage != ploidies_temp[i], na.rm = TRUE)
     }, integer(1))
+
+    n_het_window <- vapply(seq_along(dosages), function(i) {
+      sum(dosages[[i]]$data$dosage != 0 & 
+      dosages[[i]]$data$dosage != ploidies_temp[i] & 
+      dosages[[i]]$data$max_prob > dosage_threshold, na.rm = TRUE)
+    }, integer(1))
+
+    # Warn about windows where all heterozygotes were discarded by the dosage_threshold filter
+    prob_filtered_idx <- which(n_het_before_thresh > 0 & n_het_window == 0)
+    if (length(prob_filtered_idx) > 0) {
+      prob_filtered_labels <- paste0(
+        win_df$Chr[prob_filtered_idx], ":", win_df$WindowID[prob_filtered_idx]
+      )
+      vmsg(
+        paste0(
+          "Warning: %d window(s) had all heterozygous markers discarded due to low dosage ",
+          "probability (< dosage_threshold = %.2f), resulting in BAF weight = 0 for those windows. ",
+          "Only z-score will contribute to CN calling there.\n  Affected windows (Chr:WindowID): %s"
+        ),
+        verbose = verbose, level = 2, type = ">>",
+        length(prob_filtered_idx),
+        dosage_threshold,
+        paste(prob_filtered_labels, collapse = ", ")
+      )
+    }
 
     # Count number of markers with BAF values in each window
     n_baf <- sapply(baf_list, function(x) if(any(is.na(x))) length(x[-which(is.na(x))]) else length(x))
@@ -649,6 +676,7 @@ hmm_estimate_CN <- function(
 #' @param qploidy_standarize_result An object of class qploidy_standardization as returned by standardize().
 #' @param sample_ids Character vector of sample IDs to analyze, or "all" for all samples in the data.
 #' @param n_cores Number of cores to use (default: 2).
+#' @param parallel_type Character. Parallel backend to use: \code{"FORK"}, \code{"PSOCK"}, or \code{"auto"} (default). \code{"auto"} selects \code{"FORK"} on Unix/macOS (faster; workers inherit the parent environment automatically) and \code{"PSOCK"} on Windows (the only option available there). Use \code{"PSOCK"} explicitly if you need cross-platform reproducibility or are debugging worker crashes.
 #' @param ... Additional arguments passed to hmm_estimate_CN (e.g., chr, snps_per_window, etc).
 #' @return A data.frame with results for all samples, as returned by hmm_estimate_CN$by_window, combined.
 #'
@@ -659,11 +687,19 @@ hmm_estimate_CN <- function(
 hmm_estimate_CN_multi <- function(qploidy_standarize_result,
                                   sample_ids = "all",
                                   n_cores = 2,
+                                  parallel_type = "auto",
                                   ...) {
   # sanity check
   if (!inherits(qploidy_standarize_result, "qploidy_standardization")) {
     stop("Input must be a qploidy_standardization object as returned by standardize().")
   }
+
+  # resolve parallel backend
+  allowed_types <- c("auto", "FORK", "PSOCK")
+  if (!parallel_type %in% allowed_types)
+    stop(sprintf("'parallel_type' must be one of: %s.", paste(allowed_types, collapse = ", ")))
+  if (parallel_type == "auto")
+    parallel_type <- if (.Platform$OS.type == "windows") "PSOCK" else "FORK"
 
   df <- as.data.frame(qploidy_standarize_result$data)
   all_samples <- unique(df$SampleName)
@@ -678,28 +714,33 @@ hmm_estimate_CN_multi <- function(qploidy_standarize_result,
   # capture dots ONCE
   dots <- list(...)
 
-  cl <- makeCluster(n_cores)
+  cl <- makeCluster(n_cores, type = parallel_type)
   on.exit(stopCluster(cl), add = TRUE)
 
-  clusterEvalQ(cl, {
-    ## make errors surface promptly
-    options(warn = 1)
-    ## packages that define hmm_estimate_CN, classes, and helpers
-    library(methods)    # important for S4 on PSOCK clusters
-    library(Qploidy)
-    # library(dplyr)
-    # library(tidyr)
-    NULL
-  })
-
-  # make sure workers can see hmm_estimate_CN (and any helpers it needs)
-  clusterExport(cl,
-                varlist = c("worker", "hmm_estimate_CN", "generate_baf_template", "baf_log_likelihood", "logsumexp", "viterbi"),
-                envir = environment()
-  )
+  if (parallel_type == "PSOCK") {
+    # PSOCK workers are blank R processes: must reload packages and export symbols
+    clusterEvalQ(cl, {
+      options(warn = 1)
+      library(methods)
+      library(Qploidy)
+      NULL
+    })
+    clusterExport(cl,
+                  varlist = c("worker", "hmm_estimate_CN", "generate_baf_template",
+                              "baf_log_likelihood", "logsumexp", "viterbi"),
+                  envir = environment()
+    )
+  }
+  # FORK workers inherit everything from the parent process — no export needed
 
   results_list <- parLapply(cl, sample_ids, worker,
                             qploidy_standarize_result, dots)
+
+  # Re-issue warnings collected inside workers on the main session
+  for (worker_res in results_list) {
+    for (w in worker_res$warnings) warning(w, call. = FALSE)
+  }
+  results_list <- lapply(results_list, `[[`, "result")
 
   parameters <- lapply(results_list, function(x) x$params)
   names(parameters) <- sample_ids

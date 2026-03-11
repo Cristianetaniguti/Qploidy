@@ -42,7 +42,10 @@ test_that("select_best_baf_model returns best model and grid results", {
   set.seed(2)
   baf_vec <- rbeta(200, 2, 2)
   cn_grid <- 2:4
-  res <- select_best_baf_model(baf_vec, cn_grid, dists = c("gaussian", "beta"), bw_grid = c(0.02, 0.03), add_uniform_grid = c(FALSE, TRUE), uniform_weight_grid = c(0.01, 0.05), M = 21, plot = FALSE)
+  res <- select_best_baf_model(baf_vec = baf_vec,cn_grid =  cn_grid,
+                               dists = c("gaussian", "beta"), bw_grid = c(0.02, 0.03),
+                               add_uniform_grid = c(FALSE, TRUE), uniform_weight_grid = c(0.01, 0.05),
+                               M = 21, plot = FALSE)
   expect_type(res, "list")
   expect_true(all(c("n_obs", "best", "grid_results") %in% names(res)))
   expect_true(is.data.frame(res$grid_results))
@@ -54,7 +57,10 @@ test_that("select_best_baf_model returns best model and grid results", {
   expect_true(res$best$add_uniform %in% c(FALSE, TRUE))
   expect_true(res$best$uniform_weight %in% c(0))
   # If plot=TRUE, returns a ggplot object
-  res_plot <- select_best_baf_model(baf_vec, cn_grid, dists = c("gaussian"), bw_grid = 0.03, add_uniform_grid = FALSE, uniform_weight_grid = 0, M = 21, plot = TRUE)
+  res_plot <- select_best_baf_model(baf_vec = baf_vec, cn_grid = cn_grid,
+                                    dists = c("gaussian"), bw_grid = 0.03,
+                                    add_uniform_grid = FALSE, uniform_weight_grid = 0,
+                                    M = 21, plot = TRUE)
   expect_true("plot" %in% names(res_plot))
   expect_true(any(class(res_plot$plot) %in% c("gg", "ggplot")))
 })

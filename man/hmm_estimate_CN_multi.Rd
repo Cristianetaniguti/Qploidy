@@ -8,6 +8,7 @@ hmm_estimate_CN_multi(
   qploidy_standarize_result,
   sample_ids = "all",
   n_cores = 2,
+  parallel_type = "auto",
   ...
 )
 }
@@ -17,6 +18,8 @@ hmm_estimate_CN_multi(
 \item{sample_ids}{Character vector of sample IDs to analyze, or "all" for all samples in the data.}
 
 \item{n_cores}{Number of cores to use (default: 2).}
+
+\item{parallel_type}{Character. Parallel backend to use: \code{"FORK"}, \code{"PSOCK"}, or \code{"auto"} (default). \code{"auto"} selects \code{"FORK"} on Unix/macOS (faster; workers inherit the parent environment automatically) and \code{"PSOCK"} on Windows (the only option available there). Use \code{"PSOCK"} explicitly if you need cross-platform reproducibility or are debugging worker crashes.}
 
 \item{...}{Additional arguments passed to hmm_estimate_CN (e.g., chr, snps_per_window, etc).}
 }

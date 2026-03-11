@@ -35,7 +35,8 @@ hmm_estimate_CN(
   count_grid_as_params = TRUE,
   correct_scale = TRUE,
   min_het_frac = 0.05,
-  het_range = c(0.2, 0.8)
+  het_range = c(0.2, 0.8),
+  dosage_threshold = 0.6
 )
 }
 \arguments{

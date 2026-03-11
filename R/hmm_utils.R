@@ -79,14 +79,27 @@ viterbi <- function(ll_em, logA, logpi0) {
 #' @keywords internal
 #' @noRd
 worker <- function(sid, obj, dots) {
-  tryCatch({
-    res <- do.call(hmm_estimate_CN,
-                   c(list(obj, sample_id = sid), dots))
-    res
-  }, error = function(e) {
-    warning(sprintf("Sample '%s' failed: %s", sid, conditionMessage(e)))
-    NULL
-  })
+  collected_warnings <- character(0)
+  result <- withCallingHandlers(
+    tryCatch({
+      do.call(hmm_estimate_CN,
+              c(list(obj, sample_id = sid), dots))
+    }, error = function(e) {
+      collected_warnings <<- c(
+        collected_warnings,
+        sprintf("Sample '%s' failed: %s", sid, conditionMessage(e))
+      )
+      NULL
+    }),
+    warning = function(w) {
+      collected_warnings <<- c(
+        collected_warnings,
+        sprintf("[Sample '%s'] %s", sid, conditionMessage(w))
+      )
+      invokeRestart("muffleWarning")
+    }
+  )
+  list(result = result, warnings = collected_warnings)
 }
 
 #' Summarize copy number mode and posterior probability

@@ -5,13 +5,14 @@
 \title{Select the Best BAF Template Model via Grid Search and BIC}
 \usage{
 select_best_baf_model(
-  qploidy_standardization,
-  sample,
+  qploidy_standardization = NULL,
+  sample = NULL,
+  baf_vec = NULL,
   cn_grid,
   dists = c("gaussian", "beta", "beta_binomial", "negative_binomial"),
   reflect = TRUE,
   bw_grid = c(0.02, 0.03, 0.04),
-  add_uniform_grid = c(FALSE, TRUE),
+  add_uniform_grid = FALSE,
   uniform_weight_grid = c(0.01, 0.03, 0.05, 0.1, 0.15),
   M = 100,
   plot = FALSE,
@@ -22,9 +23,11 @@ select_best_baf_model(
 )
 }
 \arguments{
-\item{qploidy_standardization}{An object of class \code{qploidy_standardization} containing standardized BAF values and related info. The function will extract the relevant BAF vector for the specified sample from this object.}
+\item{qploidy_standardization}{An object of class \code{qploidy_standardization} containing standardized BAF values and related info. The function will extract the relevant BAF vector for the specified sample from this object. Either this (together with \code{sample}) or \code{baf_vec} must be provided.}
 
-\item{sample}{Character. Sample name.}
+\item{sample}{Character. Sample name. Required when \code{qploidy_standardization} is provided; may be omitted when \code{baf_vec} is supplied directly.}
+
+\item{baf_vec}{Optional numeric vector of BAF values. If provided, \code{qploidy_standardization} and \code{sample} may be omitted. Mutually exclusive with the \code{qploidy_standardization}/\code{sample} pair: if \code{baf_vec} is \code{NULL}, the BAF vector is extracted from the standardization object.}
 
 \item{cn_grid}{Integer vector. Copy-number states to test (e.g., 2:6).}
 

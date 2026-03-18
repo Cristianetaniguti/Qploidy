@@ -38,6 +38,10 @@
 #' @param param_count Optional named integer vector. Number of free parameters per distribution (for BIC penalty in BAF model selection). If NULL, defaults to 0 for all.
 #' @param count_grid_as_params Logical. If TRUE (default), adds +1 to BIC penalty for each hyperparameter tuned by grid search (bw, and uniform_weight if used).
 #' @param plot Logical. If TRUE, returns a ggplot object for the best BAF model only (default FALSE).
+#' @param correct_scale Logical. If TRUE (default), the BAF log-likelihood is corrected by the number of markers with valid BAF values in each window, so that windows with different numbers of markers contribute equally to the combined emission. Prevents windows with many markers from dominating the HMM via the BAF term alone.
+#' @param min_het_frac Numeric in [0,1]. Threshold for the fraction of BAF values in \code{het_range} considered heterozygous. If the observed heterozygous fraction exceeds this value, CN=1 is excluded from \code{cn_grid} during BAF model selection and per-window likelihood computation, as a meaningful proportion of heterozygous loci makes haploid (CN=1) implausible. Default \code{0.05}.
+#' @param het_range Numeric vector of length 2. BAF interval used to define heterozygous loci (default \code{c(0.2, 0.8)}). Used by the \code{min_het_frac} filter and by \code{plot_heterozygosity}.
+#' @param dosage_threshold Numeric in [0,1]. Minimum posterior probability required for a dosage call to be counted as a heterozygote when computing the BAF emission weight (\code{w_baf}) per window. Markers whose maximum dosage posterior falls below this threshold are excluded from the heterozygote count. Default \code{0.6}.
 #'
 #' @return An object of class \code{hmm_CN}, a list with two elements:
 #'   \describe{

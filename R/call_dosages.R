@@ -104,7 +104,8 @@ call_BAF_dosages <- function(baf_vec, selected_model = NULL, bw = NULL, dist = N
     stopifnot(inherits(selected_model, "selected_BAF_model"))
     best <- selected_model$best
     if (is.null(best)) stop("selected_model$best is NULL; no model selected.")
-    cn <- as.integer(best$best_cn)
+    if(is.null(cn)) cn <- as.integer(best$best_cn)
+    if(length(cn) > 1) stop("Provide a single CN value")
     bw <- best$bw
     dist <- best$dist
     add_uniform <- best$add_uniform

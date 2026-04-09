@@ -610,8 +610,8 @@ select_best_baf_model <- function(
 #'
 #' @export
 #' @importFrom stats dnorm dbeta dbinom dnbinom
+#' 
 #' @author Cristiane Taniguti
-
 generate_baf_template <- function(cn, M = 101, bw = 0.03, floor_eps = 1e-8,
                          dist = c("gaussian","beta","beta_binomial","negative_binomial"),
                          reflect = TRUE,
@@ -770,5 +770,63 @@ baf_log_likelihood <- function(counts, templ, eps=1e-8) {
   idx <- counts > 0L
   if (!any(idx)) return(0)  # empty histogram contributes nothing
   sum(counts[idx] * log(templ[idx] + eps))
+}
+
+
+#' Print method for selected_BAF_model objects
+#'
+#' Prints a concise summary of the best BAF model selected by
+#' \code{select_best_baf_model()}, including the winning configuration,
+#' goodness-of-fit statistics, and a short overview of the full grid search.
+#'
+#' @param x An object of class \code{'selected_BAF_model'}.
+#' @param ... Additional arguments (ignored).
+#'
+#' @method print selected_BAF_model
+#'
+#' @export
+print.selected_BAF_model <- function(x, ...) {
+  if (!inherits(x, "selected_BAF_model"))
+    stop("Object is not of class 'selected_BAF_model'.")
+
+  cat("selected_BAF_model\n")
+  cat("  Usable BAF observations:", x$n_obs, "\n")
+
+  if (!is.null(x$note)) {
+    cat("  Note:", x$note, "\n")
+    return(invisible(x))
+  }
+
+  b <- x$best
+  cat("\nBest model\n")
+  cat("  CN:               ", b$best_cn, "\n")
+  cat("  Distribution:     ", b$dist, "\n")
+  cat("  Bandwidth (bw):   ", b$bw, "\n")
+  cat("  Uniform component:", b$add_uniform)
+  if (isTRUE(b$add_uniform))
+    cat(sprintf("  (weight = %.3f)", b$uniform_weight))
+  cat("\n")
+  cat("  log-Likelihood:   ", round(b$logLik, 3), "\n")
+  cat("  Probability:      ", round(b$prob, 4), "\n")
+  cat("  BIC:              ", round(b$BIC, 3), "\n")
+
+  cat("\nGrid search summary (", nrow(x$grid_results), " configurations evaluated)\n", sep = "")
+  gr <- x$grid_results[!is.na(x$grid_results$BIC), ]
+  if (nrow(gr) > 0) {
+    cn_tab <- sort(table(gr$best_cn), decreasing = TRUE)
+    cat("  CN votes across grid:", paste(names(cn_tab), cn_tab, sep = "x", collapse = "  "), "\n")
+    cat("  BIC range: [", round(min(gr$BIC), 2), ",", round(max(gr$BIC), 2), "]\n")
+    top3 <- head(gr[order(gr$BIC), c("dist", "bw", "add_uniform", "best_cn", "BIC")], 3)
+    cat("  Top 3 configurations:\n")
+    for (i in seq_len(nrow(top3))) {
+      cat(sprintf("    %d. CN=%d  dist=%-20s  bw=%.3f  uniform=%s  BIC=%.2f\n",
+                  i, top3$best_cn[i], top3$dist[i], top3$bw[i],
+                  top3$add_uniform[i], top3$BIC[i]))
+    }
+  }
+
+  if (!is.null(x$plot)) print(x$plot)
+
+  invisible(x)
 }
 

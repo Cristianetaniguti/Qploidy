@@ -166,6 +166,7 @@ plot_baf <- function(data_sample,
 #' histogram. Default is FALSE.
 #' @param font_size Numeric value for the font size of plot labels. Default is
 #' 12.
+#' @param bins Integer specifying the number of histogram bins. Default is 100.
 #' @return A ggplot object representing the BAF histogram.
 #'
 #' @import ggplot2
@@ -182,7 +183,8 @@ plot_baf_hist <- function(data_sample,
                           BAF_hist_overall = FALSE,
                           ratio = FALSE,
                           rm_homozygous = FALSE,
-                          font_size = 12) {
+                          font_size = 12,
+                          bins = 100) {
   if ((add_estimated_peaks || add_expected_peaks || colors) &&
     !all(is.na(ploidy))) {
     if (length(ploidy) == 1) {
@@ -254,23 +256,40 @@ plot_baf_hist <- function(data_sample,
   if (rm_homozygous) data_sample2 <- data_sample2 %>% filter(sample != 0 & sample != 1)
   if (ratio) data_sample2$sample <- data_sample2$ratio
 
+  # Colorblind-friendly palette (Okabe-Ito)
+  col_inside   <- "#009E73"   # bluish green  – inside area
+  col_outside  <- "#D55E00"   # vermillion    – outside area
+  col_bar      <- "#0072B2"   # blue          – default bar fill
+  col_expected <- "#D55E00"   # vermillion    – expected peak
+  col_estimated <- "#56B4E9"  # sky blue      – estimated peak
+  x_label <- if (ratio) "Ratio" else "BAF"
+
   if (!BAF_hist_overall) {
     p_hist <- data_sample2 %>% ggplot(aes(x = sample)) +
       {
-        if (colors) geom_histogram(aes(fill = color)) else geom_histogram()
+        if (colors) {
+          geom_histogram(
+            aes(fill = color), bins = bins,
+            colour = "white", linewidth = 0.15
+          )
+        } else {
+          geom_histogram(
+            fill = col_bar, colour = "white",
+            linewidth = 0.15, bins = bins
+          )
+        }
       } +
-      # scale_x_continuous(breaks = round(seq(0, 1, 1/ploidy),2)) +
       {
         if (add_estimated_peaks) {
           geom_vline(
             data = modes.df3[which(modes.df3$name == "estimated"), ],
             aes(
               xintercept = value,
-              color = name,
+              colour = name,
               linetype = name,
               alpha = alpha
             ),
-            linewidth = 0.8
+            linewidth = 0.9
           )
         }
       } +
@@ -280,58 +299,72 @@ plot_baf_hist <- function(data_sample,
             data = modes.df3[which(modes.df3$name == "expected"), ],
             aes(
               xintercept = value,
-              color = name,
+              colour = name,
               linetype = name,
               alpha = alpha
             ),
-            linewidth = 0.8
+            linewidth = 0.9
           )
         }
       } +
       {
-        if (colors) scale_fill_manual(values = c("red", "black"))
+        if (colors) {
+          scale_fill_manual(
+            values = c("inside area" = col_inside, "outside area" = col_outside),
+            name = "Area"
+          )
+        }
       } +
       {
         if (add_expected_peaks || add_estimated_peaks) {
-          scale_color_manual(values = c("blue", "purple"))
+          scale_colour_manual(
+            values = c("expected" = col_expected, "estimated" = col_estimated),
+            name   = "Peaks"
+          )
         }
       } +
-      scale_linetype_manual(values = c("dashed", "solid"), guide = "none") +
+      scale_linetype_manual(values = c("expected" = "solid", "estimated" = "dashed"), guide = "none") +
       scale_alpha(range = c(0.7, 1), guide = "none") +
       facet_grid(~Chr, scales = "free_x") +
-      theme_bw() +
-      xlab("BAF") +
+      theme_bw(base_size = font_size) +
+      xlab(x_label) +
+      ylab("Count") +
       theme(
-        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
-        legend.position = "bottom", text = element_text(size = font_size)
-      ) +
-      {
-        if (add_expected_peaks || add_estimated_peaks) labs(color = "Peaks")
-      } +
-      {
-        if (colors) labs(fill = "Area")
-      }
+        axis.text.x   = element_text(angle = 90, vjust = 0.5, hjust = 1),
+        legend.position  = "bottom",
+        strip.background = element_rect(fill = "grey92", colour = NA),
+        strip.text       = element_text(face = "bold"),
+        panel.grid.minor = element_blank()
+      )
   } else {
     if (rm_homozygous) data_sample <- data_sample %>% filter(sample != 0 & sample != 1)
     if (ratio) data_sample$sample <- data_sample$ratio
 
-    p_hist_all <- data_sample %>% ggplot(aes(x = sample)) +
-      geom_histogram() +
+    p_hist <- data_sample %>% ggplot(aes(x = sample)) +
       {
-        if (colors) geom_histogram(aes(fill = color)) else geom_histogram()
+        if (colors) {
+          geom_histogram(
+            aes(fill = color), bins = bins,
+            colour = "white", linewidth = 0.15
+          )
+        } else {
+          geom_histogram(
+            fill = col_bar, colour = "white",
+            linewidth = 0.15, bins = bins
+          )
+        }
       } +
-      # scale_x_continuous(breaks = round(seq(0, 1, 1/ploidy),2)) +
       {
         if (add_estimated_peaks) {
           geom_vline(
             data = modes.df3[which(modes.df3$name == "estimated"), ],
             aes(
               xintercept = value,
-              color = name,
+              colour = name,
               linetype = name,
               alpha = alpha
             ),
-            linewidth = 0.8
+            linewidth = 0.9
           )
         }
       } +
@@ -341,40 +374,40 @@ plot_baf_hist <- function(data_sample,
             data = modes.df3[which(modes.df3$name == "expected"), ],
             aes(
               xintercept = value,
-              color = name,
+              colour = name,
               linetype = name,
               alpha = alpha
             ),
-            linewidth = 0.8
+            linewidth = 0.9
           )
         }
       } +
       {
-        if (colors) scale_fill_manual(values = c("red", "black"))
+        if (colors) {
+          scale_fill_manual(
+            values = c("inside area" = col_inside, "outside area" = col_outside),
+            name = "Area"
+          )
+        }
       } +
       {
         if (add_expected_peaks || add_estimated_peaks) {
-          scale_color_manual(values = c("blue", "purple"))
+          scale_colour_manual(
+            values = c("expected" = col_expected, "estimated" = col_estimated),
+            name   = "Peaks"
+          )
         }
       } +
-      scale_linetype_manual(values = c("dashed", "solid"), guide = "none") +
+      scale_linetype_manual(values = c("expected" = "solid", "estimated" = "dashed"), guide = "none") +
       scale_alpha(range = c(0.7, 1), guide = "none") +
-      theme_bw() +
-      {
-        if (ratio) xlab("ratio") else xlab("BAF")
-      } +
+      theme_bw(base_size = font_size) +
+      xlab(x_label) +
+      ylab("Count") +
       theme(
-        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
-        legend.position = "bottom", text = element_text(size = font_size)
-      ) +
-      {
-        if (add_expected_peaks || add_estimated_peaks) labs(color = "Peaks")
-      } +
-      {
-        if (colors) labs(fill = "Area")
-      }
-
-    p_hist <- p_hist_all
+        axis.text.x      = element_text(angle = 90, vjust = 0.5, hjust = 1),
+        legend.position  = "bottom",
+        panel.grid.minor = element_blank()
+      )
   }
 
   return(p_hist)
@@ -391,16 +424,22 @@ plot_baf_hist <- function(data_sample,
 #' @param chr Character or numeric vector specifying the chromosomes to plot.
 #' Default is NULL (plots all chromosomes).
 #' @param type Character vector defining the plot types. Options include:
-#'   - "all": Generates all available plot types.
-#'   - "het": Plots heterozygous locus counts across genomic windows.
-#'   - "BAF": Plots B-allele frequency (BAF) for each chromosome.
-#'   - "zscore": Plots z-scores for each chromosome.
-#'   - "BAF_hist": Plots BAF histograms for each chromosome.
-#'   - "BAF_hist_overall": Plots a BAF histogram for the entire genome.
-#'   - "Ratio_hist_overall": Plots a histogram of raw ratios for the entire
-#'   genome.
-#'   - "ratio": Plots raw ratios for each chromosome.
-#'   Default is "all".
+#'   - `"all"`: Generates all available plot types.
+#'   - `"het"` / `"heterozygosity"` / `"heterozygous"`: Plots heterozygous
+#'   locus counts across genomic windows.
+#'   - `"BAF"` / `"baf"`: Plots B-allele frequency (BAF) for each chromosome.
+#'   - `"zscore"` / `"z"` / `"z-score"`: Plots z-scores for each chromosome.
+#'   - `"BAF_hist"` / `"baf_hist"` / `"baf_histogram"`: Plots BAF histograms
+#'   for each chromosome.
+#'   - `"Ratio_hist"` / `"ratio_hist"` / `"ratio_histogram"` /
+#'   `"Ratio_histogram"`: Plots ratio histograms for each chromosome.
+#'   - `"BAF_hist_overall"` / `"baf_hist_overall"` / `"baf_hist_sample"` /
+#'   `"baf_histogram_overall"`: Plots a BAF histogram for the entire genome.
+#'   - `"Ratio_hist_overall"` / `"ratio_hist_overall"` /
+#'   `"ratio_histogram_overall"`: Plots a histogram of raw ratios for the
+#'   entire genome.
+#'   - `"ratio"`: Plots raw ratios for each chromosome.
+#'   Default is `"all"`.
 #' @param area_single Numeric value defining the area around the expected peak
 #' to be considered. Default is 0.75.
 #' @param ploidy Integer specifying the expected ploidy. Default is 4.
@@ -424,6 +463,8 @@ plot_baf_hist <- function(data_sample,
 #' heterozygous. Default is 0.1.
 #' @param rm_homozygous Logical. If TRUE, removes homozygous calls from BAF
 #' histogram plots. Default is FALSE.
+#' @param bins Integer specifying the number of bins in histogram plots.
+#' Default is 100.
 #' @param ... Additional plot parameters.
 #' @return A ggarrange object containing the requested plots.
 #'
@@ -442,6 +483,8 @@ plot_baf_hist <- function(data_sample,
 #' providing a summary of allele frequency distributions.
 #' - **BAF_hist_overall**: Plots a single histogram of BAF values for the
 #' entire genome, summarizing allele frequency distributions genome-wide.
+#' - **Ratio_hist**: Plots histograms of raw ratio values per chromosome,
+#' analogous to `BAF_hist` but using the `ratio` column.
 #' - **Ratio_hist_overall**: Plots a histogram of raw ratios for the entire
 #' genome, useful for visualizing overall ratio distributions.
 #' - **ratio**: Plots raw ratios for each chromosome, showing the distribution
@@ -459,7 +502,7 @@ plot_qploidy_standardization <- function(x,
                                          chr = NULL,
                                          type = c(
                                            "all", "het", "BAF", "zscore",
-                                           "BAF_hist", "ratio", "R",
+                                           "BAF_hist", "Ratio_hist", "ratio", "R",
                                            "BAF_hist_overall",
                                            "Ratio_hist_overall"
                                          ),
@@ -474,12 +517,34 @@ plot_qploidy_standardization <- function(x,
                                          colors = FALSE,
                                          window_size = 2000000,
                                          het_interval = 0.1,
-                                         rm_homozygous = FALSE, ...) {
+                                         rm_homozygous = FALSE,
+                                         bins = 100, ...) {
   if (!inherits(x, "qploidy_standardization")) {
     stop("Object is not of class qploidy_standardization")
   }
 
   if (is.null(sample)) stop("Define sample ID")
+
+  # Normalize type aliases to canonical names
+  type_aliases <- c(
+    "het" = "het", "heterozygosity" = "het", "heterozygous" = "het",
+    "BAF" = "BAF", "baf" = "BAF",
+    "zscore" = "zscore", "z" = "zscore", "z-score" = "zscore",
+    "BAF_hist" = "BAF_hist", "baf_hist" = "BAF_hist", "baf_histogram" = "BAF_hist",
+    "Ratio_hist" = "Ratio_hist", "ratio_hist" = "Ratio_hist",
+    "ratio_histogram" = "Ratio_hist", "Ratio_histogram" = "Ratio_hist",
+    "BAF_hist_overall" = "BAF_hist_overall", "baf_hist_overall" = "BAF_hist_overall",
+    "baf_hist_sample" = "BAF_hist_overall", "baf_histogram_overall" = "BAF_hist_overall",
+    "Ratio_hist_overall" = "Ratio_hist_overall", "ratio_hist_overall" = "Ratio_hist_overall",
+    "ratio_histogram_overall" = "Ratio_hist_overall",
+    "ratio" = "ratio", "R" = "R", "all" = "all"
+  )
+  type_resolved <- type_aliases[type]
+  unknown <- is.na(type_resolved)
+  if (any(unknown)) {
+    warning("Unknown plot type(s) ignored: ", paste(type[unknown], collapse = ", "))
+  }
+  type <- unique(unname(type_resolved[!unknown]))
 
   data_sample <- x$data[which(x$data$SampleName == sample), ]
 
@@ -515,7 +580,7 @@ plot_qploidy_standardization <- function(x,
 
   colnames(baf_sample)[ncol(baf_sample)] <- "sample"
 
-  baf_point <- baf_hist <- p_z <- raw_ratio <- het_rate <- baf_hist_overall <-
+  baf_point <- baf_hist <- ratio_hist <- p_z <- raw_ratio <- het_rate <- baf_hist_overall <-
     ratio_hist_overall <- NULL
 
   if (any(type == "all" | type == "BAF")) {
@@ -574,7 +639,8 @@ plot_qploidy_standardization <- function(x,
       add_expected_peaks,
       BAF_hist_overall = FALSE,
       rm_homozygous = rm_homozygous,
-      font_size = font_size
+      font_size = font_size,
+      bins = bins
     )
   }
 
@@ -588,7 +654,24 @@ plot_qploidy_standardization <- function(x,
       add_expected_peaks,
       BAF_hist_overall = TRUE,
       rm_homozygous = rm_homozygous,
-      font_size = font_size
+      font_size = font_size,
+      bins = bins
+    )
+  }
+
+  if (any(type == "all" | type == "Ratio_hist")) {
+    ratio_hist <- plot_baf_hist(
+      data_sample = baf_sample,
+      area_single,
+      ploidy,
+      colors,
+      add_estimated_peaks,
+      add_expected_peaks,
+      BAF_hist_overall = FALSE,
+      ratio = TRUE,
+      rm_homozygous = rm_homozygous,
+      font_size = font_size,
+      bins = bins
     )
   }
 
@@ -603,11 +686,12 @@ plot_qploidy_standardization <- function(x,
       BAF_hist_overall = TRUE,
       ratio = TRUE,
       rm_homozygous = rm_homozygous,
-      font_size = font_size
+      font_size = font_size,
+      bins = bins
     )
   }
 
-  if (any(type == "zscore")) {
+  if (any(type == "all" | type == "zscore")) {
     colnames(zscore_sample)[ncol(zscore_sample)] <- "z"
     p_z <- zscore_sample %>%
       ggplot(aes(x = Position, y = z)) +
@@ -622,7 +706,7 @@ plot_qploidy_standardization <- function(x,
   }
 
   # Add R plot (like zscore, but for R column)
-  if (any(type == "R")) {
+  if (any(type == "all" | type == "R")) {
     R_sample <- data_sample %>% pivot_wider(names_from = SampleName, values_from = R)
     colnames(R_sample)[ncol(R_sample)] <- "R"
     p_R <- R_sample %>%
@@ -639,7 +723,7 @@ plot_qploidy_standardization <- function(x,
     p_R <- NULL
   }
 
-  if (any(type == "ratio")) {
+  if (any(type == "all" | type == "ratio")) {
     raw_ratio <- data_sample %>% ggplot(aes(x = Position, y = ratio)) +
       geom_point(alpha = 0.7, size = dot.size) +
       facet_grid(. ~ Chr, scales = "free") +
@@ -650,12 +734,14 @@ plot_qploidy_standardization <- function(x,
       )
   }
 
-  if (any(type == "het")) {
+  if (any(type == "all" | type == "het")) {
+    # Use ratio for heterozygosity detection; fall back to baf when ratio is unavailable
+    het_var <- if (!all(is.na(data_sample$ratio))) data_sample$ratio else data_sample$baf
     data_sample$het_rate <- NA
-    data_sample$het_rate[which(data_sample$ratio <= 0 + het_interval |
-      data_sample$ratio >= 1 - het_interval)] <- 0
-    data_sample$het_rate[which(data_sample$ratio > 0 + het_interval &
-      data_sample$ratio < 1 - het_interval)] <- 1
+    data_sample$het_rate[which(het_var <= 0 + het_interval |
+      het_var >= 1 - het_interval)] <- 0
+    data_sample$het_rate[which(het_var > 0 + het_interval &
+      het_var < 1 - het_interval)] <- 1
 
     data_sample_lst <- split.data.frame(data_sample, data_sample$Chr)
 
@@ -699,7 +785,7 @@ plot_qploidy_standardization <- function(x,
   }
 
   p_all <- list(
-    het_rate, raw_ratio, baf_point, baf_hist, baf_hist_overall,
+    het_rate, raw_ratio, baf_point, baf_hist, ratio_hist, baf_hist_overall,
     ratio_hist_overall, p_z, p_R
   )
 

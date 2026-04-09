@@ -36,20 +36,20 @@ standardize(
 - MarkerName: Marker identifiers
 - SampleName: Sample identifiers
 - geno: Estimated dosage (0, 1, 2, ...)
-- prob: Genotype call probability (used for filtering low-confidence genotypes)}
+- prob: Genotype call probability (used for filtering low-confidence datapoints)}
 
 \item{geno.pos}{A `data.frame` with marker position metadata, with columns:
 - MarkerName: Marker identifiers
 - Chromosome: Chromosome names
 - Position: Base-pair positions on the genome}
 
-\item{threshold.missing.geno}{Numeric (0–1). Maximum fraction of missing genotype data allowed per marker. Markers with a higher fraction will be removed.}
+\item{threshold.missing.geno}{Numeric (0–1). Maximum fraction of missing datapoints allowed per marker. Markers with a higher fraction will be removed.}
 
-\item{threshold.geno.prob}{Numeric (0–1). Minimum genotype call probability threshold. Genotypes with lower probability will be treated as missing.}
+\item{threshold.geno.prob}{Numeric (0–1). Minimum genotype call probability threshold. Datapoints with lower probability will be treated as missing.}
 
 \item{ploidy.standardization}{Integer. The ploidy level of the reference panel used for standardization.}
 
-\item{threshold.n.clusters}{Integer. Minimum number of expected dosage clusters per marker. For diploid data, this is typically 3 (corresponding to genotypes 0, 1, and 2). Cannot exceed `ploidy.standardization + 1`.}
+\item{threshold.n.clusters}{Integer. Minimum number of expected dosage clusters per marker. For diploid data, this is typically 3 (corresponding to dosages 0, 1, and 2). Cannot exceed `ploidy.standardization + 1`.}
 
 \item{n.cores}{Integer. Number of cores to use in parallel computations (e.g., for cluster center estimation and BAF generation).}
 
@@ -87,8 +87,8 @@ The function applies marker and genotype-level quality filters, uses parallel co
 a final annotated output suitable for CNV or dosage variation analyses.
 
 Filtering steps include:
-  1. Genotype probability filter: Genotypes with probability below `threshold.geno.prob` are set to missing.
-  2. Marker missingness filter: Markers with fraction of missing genotypes above `threshold.missing.geno` are removed.
+  1. Genotype probability filter: datapoints with probability below `threshold.geno.prob` are set to missing.
+  2. Marker missingness filter: Markers with fraction of missing datapoints above `threshold.missing.geno` are removed.
   3. Cluster number filter: Markers with fewer than `threshold.n.clusters` clusters are removed.
   4. Genomic info filter: Markers lacking chromosome or position info are removed.
 

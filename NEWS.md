@@ -1,3 +1,9 @@
+# Qploidy 1.8.2
+
+* BUGfix on read vcf functions when there are duplicated markers and lack of marker ID
+* Adjustments in the plot_standardization
+
+
 # Qploidy 1.8.1
 
 * Added cross-parameter validation in `standardize()`: `threshold.n.clusters` is now checked to not exceed `ploidy.standardization + 1`, with an informative error message.

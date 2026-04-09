@@ -1,6 +1,6 @@
 Package: Qploidy
 Title: Estimation of Ploidy and Detection of Aneuploidy Using Genotyping Data
-Version: 1.8.1
+Version: 1.8.2
 Authors@R: c(person(given='Cristiane', 
                     family='Taniguti', 
                     email = 'ctaniguti@ufl.edu', 
@@ -64,7 +64,8 @@ Suggests:
     rmdformats,
     knitr (>= 1.10),
     rmarkdown,
-    testthat (>= 3.0.0)
+    testthat (>= 3.0.0),
+    plotly
 Config/testthat/edition: 3
 Language: en-US
 VignetteBuilder: knitr

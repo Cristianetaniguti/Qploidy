@@ -49,7 +49,7 @@ re_standardize(
 
 \item{threshold.geno.prob}{Numeric (0–1). Minimum genotype call probability. Default is 0.5.}
 
-\item{threshold.missing.geno}{Numeric (0–1). Maximum fraction of missing genotypes per marker. Default is 0.90.}
+\item{threshold.missing.geno}{Numeric (0–1). Maximum fraction of missing datapoints per marker. Default is 0.90.}
 
 \item{out_filename}{Optional. Path to save the standardized dataset (CSV/TSV).}
 
@@ -86,8 +86,8 @@ It extracts the relevant marker-level and dosage data, applies quality filters, 
 computes BAF and Z-scores, and merges all results into a standardized data frame suitable for downstream analysis or Shiny app input.
 
 Filtering steps include:
-  1. Genotype probability filter: Genotypes with probability below `threshold.geno.prob` are set to missing.
-  2. Marker missingness filter: Markers with fraction of missing genotypes above `threshold.missing.geno` are removed.
+  1. Genotype probability filter: datapoints with probability below `threshold.geno.prob` are set to missing.
+  2. Marker missingness filter: Markers with fraction of missing datapoints above `threshold.missing.geno` are removed.
   3. Cluster number filter: Markers with fewer than `threshold.n.clusters` clusters are removed.
   4. Genomic info filter: Markers lacking chromosome or position info are removed.
 }

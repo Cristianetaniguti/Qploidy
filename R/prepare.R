@@ -34,10 +34,17 @@ qploidy_read_vcf <- function(vcf_file, geno = FALSE, geno.pos = FALSE) {
   }
 
   # Check if the required checks are FALSE
-  required_not <- c("multiallelics", "phased_GT")
+  required_not <- c("multiallelics", "phased_GT", "duplicated_markers")
   if(any(checks$checks[required_not])) {
     stop(paste(checks$message[2,required_not][which(checks$checks[required_not])],
                collapse = "\n"))
+  }
+
+  # warning
+  warnings <- c("marker_id")
+  if(!all(checks$checks[warnings])) {
+    warning(paste(checks$message[1,warnings][which(!checks$checks[warnings])],
+                  collapse = "\n"))
   }
 
   vcf <- read.vcfR(vcf_file,  verbose = FALSE)
@@ -98,7 +105,9 @@ qploidy_read_vcf <- function(vcf_file, geno = FALSE, geno.pos = FALSE) {
     data_qploidy$prob <- as.numeric(data_qploidy$prob)
 
   } else if(geno.pos){
-    data_qploidy <- data.frame("MarkerName" = vcf@fix[,3],
+    if(all(is.na(vcf@fix[,3]))) mkname <- paste0(vcf@fix[,1], "_", vcf@fix[,2]) else mkname <- vcf@fix[,3]
+
+    data_qploidy <- data.frame("MarkerName" = mkname,
                                "Chromosome" = vcf@fix[,1],
                                "Position" = vcf@fix[,2])
 

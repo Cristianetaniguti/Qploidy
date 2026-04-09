@@ -15,8 +15,8 @@ globalVariables(c("theta", "R", "geno", "Var1", "array.id",
 ##' a final annotated output suitable for CNV or dosage variation analyses.
 ##'
 ##' Filtering steps include:
-##'   1. Genotype probability filter: Genotypes with probability below `threshold.geno.prob` are set to missing.
-##'   2. Marker missingness filter: Markers with fraction of missing genotypes above `threshold.missing.geno` are removed.
+##'   1. Genotype probability filter: datapoints with probability below `threshold.geno.prob` are set to missing.
+##'   2. Marker missingness filter: Markers with fraction of missing datapoints above `threshold.missing.geno` are removed.
 ##'   3. Cluster number filter: Markers with fewer than `threshold.n.clusters` clusters are removed.
 ##'   4. Genomic info filter: Markers lacking chromosome or position info are removed.
 ##'
@@ -36,17 +36,17 @@ globalVariables(c("theta", "R", "geno", "Var1", "array.id",
 ##'   - MarkerName: Marker identifiers
 ##'   - SampleName: Sample identifiers
 ##'   - geno: Estimated dosage (0, 1, 2, ...)
-##'   - prob: Genotype call probability (used for filtering low-confidence genotypes)
+##'   - prob: Genotype call probability (used for filtering low-confidence datapoints)
 ##'
 ##' @param geno.pos A `data.frame` with marker position metadata, with columns:
 ##'   - MarkerName: Marker identifiers
 ##'   - Chromosome: Chromosome names
 ##'   - Position: Base-pair positions on the genome
 ##'
-##' @param threshold.missing.geno Numeric (0–1). Maximum fraction of missing genotype data allowed per marker. Markers with a higher fraction will be removed.
-##' @param threshold.geno.prob Numeric (0–1). Minimum genotype call probability threshold. Genotypes with lower probability will be treated as missing.
+##' @param threshold.missing.geno Numeric (0–1). Maximum fraction of missing datapoints allowed per marker. Markers with a higher fraction will be removed.
+##' @param threshold.geno.prob Numeric (0–1). Minimum genotype call probability threshold. Datapoints with lower probability will be treated as missing.
 ##' @param ploidy.standardization Integer. The ploidy level of the reference panel used for standardization.
-##' @param threshold.n.clusters Integer. Minimum number of expected dosage clusters per marker. For diploid data, this is typically 3 (corresponding to genotypes 0, 1, and 2). Cannot exceed `ploidy.standardization + 1`.
+##' @param threshold.n.clusters Integer. Minimum number of expected dosage clusters per marker. For diploid data, this is typically 3 (corresponding to dosages 0, 1, and 2). Cannot exceed `ploidy.standardization + 1`.
 ##' @param n.cores Integer. Number of cores to use in parallel computations (e.g., for cluster center estimation and BAF generation).
 ##' @param out_filename Optional. Path to save the final standardized dataset to disk as a CSV file (suitable for Qploidy).
 ##' @param type Character. Type of data used for clustering: "intensities" (array-based), "counts" (sequencing), or "updog" (set automatically if `multidog_obj` is provided).
@@ -201,7 +201,7 @@ standardize <- function(data = NULL,
     if(!is.na(prob.rm["TRUE"])) prob.rm <- round(as.numeric(prob.rm["TRUE"]/sum(prob.rm)*100),2) else prob.rm <- 0
     idx <- which(idx)
     if(length(idx) > 0) genos$geno[idx] <- NA
-    vmsg("Percentage of genotypes turned into missing data because of low genotype probability: %s", verbose = verbose, level = 2, type = ">>", prob.rm)
+    vmsg("Percentage of datapoints turned into missing data because of low genotype probability: %s", verbose = verbose, level = 2, type = ">>", prob.rm)
   } else {
     prob.rm <- 0
     vmsg("No 'prob' column in genos: skipping genotype probability filtering.", verbose = verbose, level = 1, type = ">>")
@@ -389,7 +389,7 @@ print.qploidy_standardization <- function(x, ...){
                             x$info["threshold.geno.prob"]))
 
   format.df <- data.frame(c1 = c("# markers at raw data:",
-                                 "% genotypes filtered by low probability:",
+                                 "% datapoints filtered by low probability:",
                                  "# markers filtered by missing data:",
                                  "# markers filtered by min number of clusters:",
                                  "# markers filtered by lack of genomic information:",
@@ -570,7 +570,7 @@ write_qploidy_standardization <- function(qploidy_standardization_object, out_fi
 ##' @param threshold.n.clusters Integer. Minimum number of expected dosage clusters per marker. Defaults to ploidy + 1.
 ##' @param n.cores Integer. Number of cores for parallel computation. Default is 1.
 ##' @param threshold.geno.prob Numeric (0–1). Minimum genotype call probability. Default is 0.5.
-##' @param threshold.missing.geno Numeric (0–1). Maximum fraction of missing genotypes per marker. Default is 0.90.
+##' @param threshold.missing.geno Numeric (0–1). Maximum fraction of missing datapoints per marker. Default is 0.90.
 ##' @param out_filename Optional. Path to save the standardized dataset (CSV/TSV).
 ##' @param type Character. Data type for clustering: "intensities" (default), "counts", or "updog".
 ##' @param multidog_obj Optional. updog multidog object for cluster center estimation.
@@ -590,8 +590,8 @@ write_qploidy_standardization <- function(qploidy_standardization_object, out_fi
 ##' computes BAF and Z-scores, and merges all results into a standardized data frame suitable for downstream analysis or Shiny app input.
 ##'
 ##' Filtering steps include:
-##'   1. Genotype probability filter: Genotypes with probability below `threshold.geno.prob` are set to missing.
-##'   2. Marker missingness filter: Markers with fraction of missing genotypes above `threshold.missing.geno` are removed.
+##'   1. Genotype probability filter: datapoints with probability below `threshold.geno.prob` are set to missing.
+##'   2. Marker missingness filter: Markers with fraction of missing datapoints above `threshold.missing.geno` are removed.
 ##'   3. Cluster number filter: Markers with fewer than `threshold.n.clusters` clusters are removed.
 ##'   4. Genomic info filter: Markers lacking chromosome or position info are removed.
 ##'

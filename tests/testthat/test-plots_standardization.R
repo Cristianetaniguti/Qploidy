@@ -172,7 +172,7 @@ test_that("plot_qploidy_standardization works for each canonical type", {
              "BAF_hist_overall", "Ratio_hist_overall", "ratio", "R", "het")
 
   for (tp in types) {
-    p <- plot_qploidy_standardization(std, sample = "S2", type = tp, ploidy = 2)
+    p <- plot_qploidy_standardization(std, sample = "S1", type = tp, ploidy = 2)
   }
 })
 

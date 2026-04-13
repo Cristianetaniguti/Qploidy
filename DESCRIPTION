@@ -65,7 +65,8 @@ Suggests:
     knitr (>= 1.10),
     rmarkdown,
     testthat (>= 3.0.0),
-    plotly
+    plotly,
+    AGHmatrix
 Config/testthat/edition: 3
 Language: en-US
 VignetteBuilder: knitr

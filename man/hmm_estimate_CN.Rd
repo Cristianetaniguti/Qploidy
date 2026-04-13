@@ -5,8 +5,11 @@
 \title{Polyploid copy-number HMM (z + BAF) per sample and window}
 \usage{
 hmm_estimate_CN(
-  qploidy_standarize_result,
+  qploidy_standarize_result = NULL,
   sample_id,
+  data = NULL,
+  geno.pos = NULL,
+  use_values = c("BAF", "zscore"),
   chr = NULL,
   reflect = TRUE,
   add_uniform = FALSE,
@@ -20,7 +23,7 @@ hmm_estimate_CN(
   baf_weight = 0.5,
   z_range = NULL,
   transition_jump = 0.995,
-  initial_prob = 0.95,
+  initial_prob = 0.995,
   z_only = FALSE,
   verbose = TRUE,
   exp_ploidy = NA,
@@ -40,9 +43,15 @@ hmm_estimate_CN(
 )
 }
 \arguments{
-\item{qploidy_standarize_result}{An object of class \code{qploidy_standardization} as returned by \code{standardize()}. Contains standardized SNP-level data for all samples and chromosomes.}
+\item{qploidy_standarize_result}{An object of class \code{qploidy_standardization} as returned by \code{standardize()}, or \code{NULL}. When \code{NULL}, raw data must be supplied via \code{data} and \code{geno.pos}.}
 
 \item{sample_id}{Character scalar. Sample identifier to analyze; rows are filtered as \code{SampleName == sample_id}.}
+
+\item{data}{Optional. A \code{data.frame} with columns \code{MarkerName}, \code{SampleName}, \code{X}, \code{Y}, \code{R}, and \code{ratio}. Required when \code{qploidy_standarize_result} is \code{NULL}.}
+
+\item{geno.pos}{Optional. A \code{data.frame} with columns \code{MarkerName}, \code{Chromosome}, and \code{Position}. Required when \code{qploidy_standarize_result} is \code{NULL}.}
+
+\item{use_values}{Character vector of length 2 specifying which columns to use as the BAF-like and depth-like signals. When \code{qploidy_standarize_result} is provided, the first element can be \code{"BAF"} (uses column \code{baf}) or \code{"ratio"} (uses column \code{ratio}), and the second element can be \code{"zscore"} (uses column \code{z}) or \code{"R"} (uses column \code{R}). All four combinations are accepted: \code{c("BAF", "zscore")} (default), \code{c("BAF", "R")}, \code{c("ratio", "zscore")}, \code{c("ratio", "R")}. When \code{qploidy_standarize_result} is \code{NULL}, the only accepted value is \code{c("ratio", "R")}.}
 
 \item{chr}{Optional. Character or integer vector specifying chromosomes to include. If \code{NULL}, all chromosomes are used.}
 

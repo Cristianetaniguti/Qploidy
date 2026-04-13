@@ -7,7 +7,10 @@
 #' ready for plotting (e.g., with \code{\link{plot_cn_track}}) or merging across
 #' chromosomes/batches.
 #'
-#' @param qploidy_standarize_result An object of class \code{qploidy_standardization} as returned by \code{standardize()}. Contains standardized SNP-level data for all samples and chromosomes.
+#' @param qploidy_standarize_result An object of class \code{qploidy_standardization} as returned by \code{standardize()}, or \code{NULL}. When \code{NULL}, raw data must be supplied via \code{data} and \code{geno.pos}.
+#' @param data Optional. A \code{data.frame} with columns \code{MarkerName}, \code{SampleName}, \code{X}, \code{Y}, \code{R}, and \code{ratio}. Required when \code{qploidy_standarize_result} is \code{NULL}.
+#' @param geno.pos Optional. A \code{data.frame} with columns \code{MarkerName}, \code{Chromosome}, and \code{Position}. Required when \code{qploidy_standarize_result} is \code{NULL}.
+#' @param use_values Character vector of length 2 specifying which columns to use as the BAF-like and depth-like signals. When \code{qploidy_standarize_result} is provided, the first element can be \code{"BAF"} (uses column \code{baf}) or \code{"ratio"} (uses column \code{ratio}), and the second element can be \code{"zscore"} (uses column \code{z}) or \code{"R"} (uses column \code{R}). All four combinations are accepted: \code{c("BAF", "zscore")} (default), \code{c("BAF", "R")}, \code{c("ratio", "zscore")}, \code{c("ratio", "R")}. When \code{qploidy_standarize_result} is \code{NULL}, the only accepted value is \code{c("ratio", "R")}.
 #' @param sample_id Character scalar. Sample identifier to analyze; rows are filtered as \code{SampleName == sample_id}.
 #' @param chr Optional. Character or integer vector specifying chromosomes to include. If \code{NULL}, all chromosomes are used.
 #' @param segment_zscore Logical. If \code{TRUE}, segment z-scores using changepoint detection to define windows instead of fixed SNP counts. Default \code{TRUE}.
@@ -105,8 +108,11 @@
 #'
 #' @export
 hmm_estimate_CN <- function(
-    qploidy_standarize_result,
+    qploidy_standarize_result = NULL,
     sample_id,
+    data = NULL,
+    geno.pos = NULL,
+    use_values = c("BAF", "zscore"),
     chr = NULL,
     reflect = TRUE,
     add_uniform = FALSE,
@@ -120,7 +126,7 @@ hmm_estimate_CN <- function(
     baf_weight = 0.5,
     z_range = NULL,
     transition_jump = 0.995, # decrease this value if you think there changes in CN is likely
-    initial_prob = 0.95, # Initial probability for the best CN state in the initial state distribution (pi0). Default 0.15. Sets the prior probability for the expected ploidy (or best CN from BAF model) at the first window; remaining probability is distributed uniformly across other states. If the best CN is not found, pi0 is uniform across all states.
+    initial_prob = 0.995, # Initial probability for the best CN state in the initial state distribution (pi0). Default 0.15. Sets the prior probability for the expected ploidy (or best CN from BAF model) at the first window; remaining probability is distributed uniformly across other states. If the best CN is not found, pi0 is uniform across all states.
     z_only = FALSE,
     verbose = TRUE,
     exp_ploidy = NA,
@@ -142,20 +148,48 @@ hmm_estimate_CN <- function(
   # --- input checks ---
   vmsg("Preparing inputs and applying initial filters", verbose = verbose, level = 0, type = ">>")
 
-  if (!is(qploidy_standarize_result, "qploidy_standardization")) {
-    stop("Input must be a qploidy_standardization object as returned by standardize().")
-  }
-
   if (!is.character(sample_id) || length(sample_id) != 1 || nchar(sample_id) == 0) {
     stop("sample_id must be a non-empty character scalar.")
   }
 
-  df <- as.data.frame(qploidy_standarize_result$data)
-  if (nrow(df) == 0) stop("Input data is empty. No SNPs found for any sample.")
-
-  # subset to one sample
-  d <- filter(df, SampleName == sample_id)
-  if (nrow(d) == 0) stop(sprintf("No data found for sample '%s'.", sample_id))
+  # Validate and resolve use_values
+  valid_uv_std <- list(c("BAF", "zscore"), c("BAF", "R"), c("ratio", "zscore"), c("ratio", "R"))
+  valid_uv_raw <- c("ratio", "R")
+  if (!is.null(qploidy_standarize_result)) {
+    if (!is(qploidy_standarize_result, "qploidy_standardization")) {
+      stop("Input must be a qploidy_standardization object as returned by standardize().")
+    }
+    if (!any(sapply(valid_uv_std, identical, use_values))) {
+      stop("When qploidy_standarize_result is provided, use_values must be one of: c(\"BAF\", \"zscore\"), c(\"BAF\", \"R\"), c(\"ratio\", \"zscore\"), c(\"ratio\", \"R\").")
+    }
+    baf_col <- if (use_values[1] == "BAF") "baf" else "ratio"
+    z_col   <- if (use_values[2] == "zscore") "z" else "R"
+    df <- as.data.frame(qploidy_standarize_result$data)
+    if (nrow(df) == 0) stop("Input data is empty. No SNPs found for any sample.")
+    d <- filter(df, SampleName == sample_id)
+    if (nrow(d) == 0) stop(sprintf("No data found for sample '%s'.", sample_id))
+  } else {
+    if (!identical(use_values, valid_uv_raw)) {
+      stop("When qploidy_standarize_result is NULL, use_values must be c(\"ratio\", \"R\").")
+    }
+    if (is.null(data) || is.null(geno.pos)) {
+      stop("When qploidy_standarize_result is NULL, both 'data' and 'geno.pos' must be provided.")
+    }
+    req_data <- c("MarkerName", "SampleName", "ratio", "R")
+    req_gp   <- c("MarkerName", "Chromosome", "Position")
+    miss_d  <- setdiff(req_data, names(data))
+    miss_gp <- setdiff(req_gp,   names(geno.pos))
+    if (length(miss_d))  stop(paste("'data' is missing columns:",   paste(miss_d,  collapse = ", ")))
+    if (length(miss_gp)) stop(paste("'geno.pos' is missing columns:", paste(miss_gp, collapse = ", ")))
+    baf_col <- "ratio"
+    z_col   <- "R"
+    d <- data[data$SampleName == sample_id, , drop = FALSE]
+    if (nrow(d) == 0) stop(sprintf("No data found for sample '%s'.", sample_id))
+    gp <- geno.pos[, req_gp]
+    colnames(gp)[colnames(gp) == "Chromosome"] <- "Chr"
+    d <- merge(d, gp, by = "MarkerName", all.x = FALSE)
+    if (nrow(d) == 0) stop("No markers remain after merging data with geno.pos.")
+  }
 
   # subset to chromosomes
   if (!is.null(chr)) {
@@ -164,16 +198,21 @@ hmm_estimate_CN <- function(
     if (nrow(d) == 0) stop("No data found for specified chromosomes after filtering.")
   }
 
-  # Remove outliers from z-scores
-  if(rm_outliers){
-    n_na <- sum(is.na(d$z))
-    d <- rm_outlier(d, z = TRUE, alpha= outlier_alpha)
-    vmsg("Outliers removed from z-scores: %s", verbose = verbose, level = 1, type = ">>", sum(is.na(d$z)) - n_na)
+  # Replace R == 0 with NA (zero depth is uninformative and distorts z/R distributions)
+  if ("R" %in% names(d)) d$R[d$R == 0] <- NA
+
+  # Remove outliers from depth/z scores
+  if (rm_outliers) {
+    n_na <- sum(is.na(d[[z_col]]))
+    if (z_col != "z") names(d)[names(d) == z_col] <- "z"
+    d <- rm_outlier(d, z = TRUE, alpha = outlier_alpha)
+    if (z_col != "z") names(d)[names(d) == "z"] <- z_col
+    vmsg("Outliers removed from %s scores: %s", verbose = verbose, level = 1, type = ">>", z_col, sum(is.na(d[[z_col]])) - n_na)
   }
 
-  # Remove markers with missing baf and z
-  rm <- which(is.na(d[["z"]]))
-  if(length(rm) > 0) d <- d[-rm, , drop = FALSE]
+  # Remove markers with missing BAF/ratio and z/R
+  rm <- which(is.na(d[[z_col]]))
+  if (length(rm) > 0) d <- d[-rm, , drop = FALSE]
 
   vmsg("Inputs good to go!", verbose = verbose, level = 1, type = ">>")
 
@@ -188,7 +227,7 @@ hmm_estimate_CN <- function(
     # Use user-provided selected_model
     vmsg("Using user-provided selected_model object", verbose = verbose, level = 1, type = ">>")
   } else {
-    selected_model <- select_best_baf_model(baf_vec = d$baf,
+    selected_model <- select_best_baf_model(baf_vec = d[[baf_col]],
                                             sample = sample_id,
                                             cn_grid= cn_grid,
                                             dists = dists,
@@ -214,12 +253,13 @@ hmm_estimate_CN <- function(
   vmsg("Parameters ready", verbose = verbose, level = 1, type = ">>")
   # --- build windows ---
   vmsg("Defining windows", verbose = verbose, level = 0, type = ">>")
+  d[["Position"]] <- as.numeric(d[["Position"]])
   d <- d[order(d[["Chr"]], d[["Position"]]), ]
 
   if(is.null(min_snps_per_window)){
     # If min_snp_per_window is not defined, the minimum will be set based on the smaller chromosome number
     floor <- 5 # hard default
-    frac <- 0.1 # hard default
+    frac <- 0.15 # hard default
     mk_by_chrom <- d %>% group_by(Chr) %>% summarize(n = n())
     x <- min(mk_by_chrom$n)
     m <- max(floor, floor(x * frac))
@@ -229,7 +269,9 @@ hmm_estimate_CN <- function(
   # Segmented z-score
   if (segment_zscore){
     vmsg("Using z-scores changepoint detection to define windows", verbose = verbose, level = 1, type = ">>")
+    if (z_col != "z") names(d)[names(d) == z_col] <- "z"
     d <- add_changepoint_windows(dat = d, minseglen = min_snps_per_window)
+    if (z_col != "z") names(d)[names(d) == "z"] <- z_col
 
   } else {
     # simple fixed-size windows
@@ -270,7 +312,7 @@ hmm_estimate_CN <- function(
       Start      = min(x[["Position"]]),
       End        = max(x[["Position"]]),
       n_snps     = nrow(x),
-      z_mean     = mean(x[["z"]], na.rm = TRUE)
+      z_mean     = mean(x[[z_col]], na.rm = TRUE)
     )
   }))
   rownames(win_df) <- NULL
@@ -371,7 +413,7 @@ hmm_estimate_CN <- function(
       d[[win_col]]  == win_df$WindowID[i] &
       d[["Position"]] >= win_df$Start[i] &
       d[["Position"]] <= win_df$End[i]
-    baf_list[[i]] <- d[wrows, "baf"]
+    baf_list[[i]] <- d[[baf_col]][wrows]
     if (length(baf_list[[i]]) == 0 || all(is.na(baf_list[[i]]))) {
       warning(sprintf("Window %d (Chr %s, WindowID %s) has no valid BAF values.",
                       i, win_df$Chr[i], win_df$WindowID[i]))
@@ -518,7 +560,7 @@ hmm_estimate_CN <- function(
 
 
   vmsg("Defining z-score distribution templates", verbose = verbose, level = 0, type = ">>")
-  mu <- define_z_limits(z = d$z, z_window = z, cn_grid = cn_grid,
+  mu <- define_z_limits(z = d[[z_col]], z_window = z, cn_grid = cn_grid,
                         exp_ploidy = exp_ploidy, z_range = z_range, verbose = verbose)
 
   # sig is the (shared) standard deviation of the z emission across states.
@@ -584,7 +626,7 @@ hmm_estimate_CN <- function(
     valid_idx <- c(lower_idx, exp_idx, higher_idx)
     valid_idx <- sort(valid_idx)
     cn_grid <- cn_grid[valid_idx]
-    mu <- define_z_limits(z = d$z, z_window = z, cn_grid = cn_grid,
+    mu <- define_z_limits(z = d[[z_col]], z_window = z, cn_grid = cn_grid,
                           exp_ploidy = exp_ploidy, z_range_out = FALSE, verbose = verbose) # redefine mu with the new cn_grid, but without z_range to avoid changing the limits too much and keep the same order of the ploidies, which is already checked in the previous steps
     K <- length(cn_grid)
     ll_baf_matrix <- ll_baf_matrix[,valid_idx]

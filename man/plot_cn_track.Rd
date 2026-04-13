@@ -7,6 +7,8 @@
 plot_cn_track(
   hmm_CN,
   qploidy_standarize_result = NULL,
+  data = NULL,
+  geno.pos = NULL,
   sample_id = NULL,
   cn_min = NULL,
   cn_max = NULL,
@@ -27,6 +29,10 @@ plot_cn_track(
 \item{hmm_CN}{An object of class \code{hmm_CN} (output from \code{hmm_estimate_CN}), containing a \code{result} data frame with one row per window and columns: \code{Sample}, \code{Chr}, \code{Start}, \code{End}, \code{CN_call}, \code{post_CN*}, etc. Optionally, may contain \code{updated_data} for marker-level fallback.}
 
 \item{qploidy_standarize_result}{An object of class \code{qploidy_standardization} (output from \code{standardize}), used to extract BAF values for the BAF panel. If NULL, marker-level data is taken from \code{hmm_CN$updated_data}.}
+
+\item{data}{Optional. A \code{data.frame} with columns \code{MarkerName}, \code{SampleName}, \code{X}, \code{Y}, \code{R}, and \code{ratio}. Required when \code{qploidy_standarize_result} is \code{NULL}.}
+
+\item{geno.pos}{Optional. A \code{data.frame} with columns \code{MarkerName}, \code{Chromosome}, and \code{Position}. Required when \code{qploidy_standarize_result} is \code{NULL}.}
 
 \item{sample_id}{Character scalar. Which sample from \code{hmm_CN$Sample} to display. Defaults to the first unique value in \code{hmm_CN$Sample}.}
 

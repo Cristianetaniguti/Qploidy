@@ -7,7 +7,7 @@
 vcf_sanity_check(
   vcf_path,
   n_data_lines = 100,
-  max_markers = 10000,
+  max_markers = NULL,
   depth_support_fields = c("AD", "RA", "AO", "RO", "NR", "NV", "SB", "F1R2", "F2R1"),
   verbose = FALSE
 )
@@ -17,7 +17,7 @@ vcf_sanity_check(
 
 \item{n_data_lines}{An integer specifying the number of data lines to sample for detailed checks. Default is 100.}
 
-\item{max_markers}{An integer specifying the maximum number of markers allowed in the VCF file. Default is 10,000.}
+\item{max_markers}{An integer specifying the maximum number of markers allowed in the VCF file. If NULL (default), no limit is applied.}
 
 \item{depth_support_fields}{(Optional) A character vector of fields that are expected to be present in the FORMAT column for allele counts. Default is `c("AD", "RA", "AO", "RO", "NR", "NV", "SB", "F1R2", "F2R1")`.}
 
@@ -48,5 +48,6 @@ The function performs the following checks:
 - **multiallelics**: Identifies multiallelic sites (ALT field with commas).
 - **phased_GT**: Checks for phased genotypes (presence of `|` in the `GT` field).
 - **duplicated_samples**: Checks for duplicated sample IDs.
-- **duplicated_markers**: Checks for duplicated marker IDs.
+- **duplicated_markers**: Checks for duplicated markers based on the CHROM and POS combination.
+- **marker_id**: Checks that all markers have a non-missing ID (column 3 is not `NA` or `"."`).
 }

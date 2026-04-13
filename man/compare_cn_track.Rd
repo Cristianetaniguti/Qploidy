@@ -9,7 +9,11 @@ compare_cn_track(
   samples_to_plot = NULL,
   chromosomes = NULL,
   facet_ncol = NULL,
-  facet_nrow = NULL
+  facet_nrow = NULL,
+  gray_CN = NULL,
+  add_het = TRUE,
+  hmm_dosage_calls = NULL,
+  interactive = FALSE
 )
 }
 \arguments{
@@ -22,9 +26,17 @@ compare_cn_track(
 \item{facet_ncol}{Number of columns for facet_wrap. If NULL, will be determined automatically unless facet_nrow is set.}
 
 \item{facet_nrow}{Number of rows for facet_wrap. If set, facet_ncol will be determined automatically unless both are set.}
+
+\item{gray_CN}{Integer or NULL. If provided, this copy-number value is colored gray (used as the baseline color). All CNs below it are colored blue and above red. If NULL (default), the baseline is auto-detected as the most frequent CN weighted by window length.}
+
+\item{add_het}{Logical. If TRUE, a heterozygosity column is added to the right side of the plot, with one square per sample colored from blue (low) to red (high). Requires \code{hmm_dosage_calls}. Default is TRUE.}
+
+\item{hmm_dosage_calls}{An object of class \code{hmm_dosage_calls} (inherits \code{data.frame}) with columns \code{SampleName}, \code{Chr}, \code{dosage}, and optionally others. Used to compute per-sample heterozygosity as the fraction of markers with dosage not equal to 0 or 1 (among non-NA dosage values). Required when \code{add_het = TRUE}.}
+
+\item{interactive}{Logical. If TRUE, returns an interactive \code{plotly} figure instead of a static ggplot. Hovering over segments shows: Sample, Chr, Start, End, CN, post_max, w_baf, and Heterozygosity (if \code{add_het = TRUE} and \code{hmm_dosage_calls} is provided). Requires the \pkg{plotly} package. Default is FALSE.}
 }
 \value{
-A ggplot object.
+A ggplot/ggarrange object (static), or a plotly figure when \code{interactive = TRUE}.
 }
 \description{
 Plots CNV windows as horizontal segments for multiple samples, faceted by chromosome.

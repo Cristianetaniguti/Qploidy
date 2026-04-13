@@ -11,7 +11,9 @@ pca_plot(
   group_column,
   sampleID_column,
   col2use = c("R", "z", "ratio"),
-  plot_title = NULL
+  plot_title = NULL,
+  palette = "auto",
+  samples = NULL
 )
 }
 \arguments{
@@ -36,6 +38,26 @@ the PCA. Defaults to c("R","z","ratio").}
 \item{plot_title}{Optional. A character string appended to the plot title after the PC pair label
 (e.g., "PC1 vs PC2 - My Title"). If NULL (default), the title will include the column used
 (e.g., "PCA: PC1 vs PC2 | R").}
+
+\item{palette}{Character string naming a built-in colour palette, or a
+character vector of colours to use directly. Built-in options:
+\describe{
+  \item{`"auto"` (default)}{ggplot2 default discrete colour scale.}
+  \item{`"alphabet"`}{26 highly-distinguishable colours (hand-tuned for
+    large group counts).}
+  \item{`"polychrome"`}{24 perceptually-distinct colours from the
+    Polychrome palette, suitable for 20+ groups.}
+  \item{`"okabe_ito"`}{8-colour Okabe-Ito palette — the recommended
+    colorblind-friendly choice. Colours are recycled if there are more
+    than 8 groups.}
+}
+When a named palette has fewer colours than the number of groups the
+colours are recycled with a warning.}
+
+\item{samples}{Optional character vector of sample IDs to include in the
+PCA. Values must match entries in the `SampleName` column of the input
+data. If `NULL` (default), all samples are used. Any requested sample not
+found in the data triggers a warning.}
 }
 \value{
 Prints three ggplot2 PCA plots: PC1 vs PC2, PC1 vs PC3, and PC2 vs PC3.

@@ -19,6 +19,24 @@
 #' @param plot_title Optional. A character string appended to the plot title after the PC pair label
 #'   (e.g., "PC1 vs PC2 - My Title"). If NULL (default), the title will include the column used
 #'   (e.g., "PCA: PC1 vs PC2 | R").
+#' @param samples Optional character vector of sample IDs to include in the
+#'   PCA. Values must match entries in the `SampleName` column of the input
+#'   data. If `NULL` (default), all samples are used. Any requested sample not
+#'   found in the data triggers a warning.
+#' @param palette Character string naming a built-in colour palette, or a
+#'   character vector of colours to use directly. Built-in options:
+#'   \describe{
+#'     \item{`"auto"` (default)}{ggplot2 default discrete colour scale.}
+#'     \item{`"alphabet"`}{26 highly-distinguishable colours (hand-tuned for
+#'       large group counts).}
+#'     \item{`"polychrome"`}{24 perceptually-distinct colours from the
+#'       Polychrome palette, suitable for 20+ groups.}
+#'     \item{`"okabe_ito"`}{8-colour Okabe-Ito palette — the recommended
+#'       colorblind-friendly choice. Colours are recycled if there are more
+#'       than 8 groups.}
+#'   }
+#'   When a named palette has fewer colours than the number of groups the
+#'   colours are recycled with a warning.
 #'
 #' @return Prints three ggplot2 PCA plots: PC1 vs PC2, PC1 vs PC3, and PC2 vs PC3.
 #'   Returns a list of these plots invisibly.
@@ -32,7 +50,7 @@
 #'   plot_title = "My Experiment"
 #' )
 #' @importFrom dplyr left_join select
-#' @importFrom ggplot2 ggplot aes geom_point theme_minimal labs
+#' @importFrom ggplot2 ggplot aes geom_point theme_minimal labs scale_color_hue scale_color_manual
 #' @importFrom stats prcomp
 #' @importFrom tidyr pivot_wider
 #' @importFrom tibble column_to_rownames
@@ -49,7 +67,9 @@ pca_plot <- function(
     group_column,
     sampleID_column,
     col2use = c("R", "z", "ratio"),
-    plot_title = NULL
+    plot_title = NULL,
+    palette = "auto",
+    samples = NULL
 ) {
   #### Validate col2use ####
   col2use <- match.arg(col2use)
@@ -107,6 +127,16 @@ pca_plot <- function(
   }
 
   #### Validate chosen column exists ####
+  if (!is.null(samples)) {
+    missing_samples <- setdiff(samples, unique(ttest_data$SampleName))
+    if (length(missing_samples) > 0)
+      warning("The following requested samples were not found and will be ignored: ",
+              paste(missing_samples, collapse = ", "))
+    ttest_data <- ttest_data[ttest_data$SampleName %in% samples, , drop = FALSE]
+    if (nrow(ttest_data) == 0)
+      stop("No data remaining after filtering to the requested samples.")
+  }
+
   if (col2use == "z" && !("z" %in% colnames(ttest_data))) {
     stop("Column 'z' not found in the data. Please choose 'R' or ensure 'z' is present.")
   }
@@ -128,6 +158,10 @@ pca_plot <- function(
       ) %>%
       column_to_rownames(var = "SampleName") %>%
       as.matrix()
+
+    if (!requireNamespace("AGHmatrix", quietly = TRUE))
+      stop("Package 'AGHmatrix' is required when col2use = 'ratio'. ",
+           "Install it with: install.packages('AGHmatrix')")
 
     ratio_matrix <- AGHmatrix::Gmatrix(
       test_matrix,
@@ -189,9 +223,59 @@ pca_plot <- function(
   merged_df <- left_join(pca_scores, passport, by = c("ID" = id))
   merged_df[[group_column]] <- as.factor(merged_df[[group_column]])
 
+  #### Resolve colour palette ####
+  .palettes <- list(
+    alphabet = c(
+      "#AA0DFE", "#3283FE", "#85660D", "#782AB6", "#565656", "#1C8356",
+      "#16FF32", "#F7E1A0", "#E2E2E2", "#1CBE4F", "#C4451C", "#DEA0FD",
+      "#FE00FA", "#325A9B", "#FEAF16", "#F8A19F", "#90AD1C", "#F6222E",
+      "#1CFFCE", "#2ED9FF", "#B10DA1", "#C075A6", "#FC1CBF", "#B00068",
+      "#FBE426", "#FA0087"
+    ),
+    polychrome = c(
+      "#5A5156", "#E4E1E3", "#F6222E", "#FE00FA", "#16FF32", "#3283FE",
+      "#FEAF16", "#B00068", "#1CFFCE", "#90AD1C", "#2ED9FF", "#DEA0FD",
+      "#AA0DFE", "#F8A19F", "#325A9B", "#C4451C", "#1C8356", "#85660D",
+      "#B10DA1", "#FBE426", "#1CBE4F", "#FA0087", "#FC1CBF", "#F7E1A0"
+    ),
+    okabe_ito = c(
+      "#E69F00", "#56B4E9", "#009E73", "#F0E442",
+      "#0072B2", "#D55E00", "#CC79A7", "#000000"
+    )
+  )
+
+  n_groups <- nlevels(merged_df[[group_column]])
+
+  if (identical(palette, "auto")) {
+    colour_scale <- scale_color_hue()
+  } else if (is.character(palette) && length(palette) == 1 && palette %in% names(.palettes)) {
+    pal_cols <- .palettes[[palette]]
+    if (n_groups > length(pal_cols)) {
+      warning(sprintf(
+        "Palette '%s' has %d colours but there are %d groups; colours will be recycled.",
+        palette, length(pal_cols), n_groups
+      ))
+      pal_cols <- rep_len(pal_cols, n_groups)
+    }
+    colour_scale <- scale_color_manual(values = pal_cols)
+  } else if (is.character(palette) && length(palette) > 1) {
+    # Custom vector supplied directly
+    if (n_groups > length(palette)) {
+      warning(sprintf(
+        "Supplied palette has %d colours but there are %d groups; colours will be recycled.",
+        length(palette), n_groups
+      ))
+      palette <- rep_len(palette, n_groups)
+    }
+    colour_scale <- scale_color_manual(values = palette)
+  } else {
+    stop("'palette' must be one of 'auto', 'alphabet', 'polychrome', 'okabe_ito', or a character vector of colours.")
+  }
+
   #### PCA Plots ####
   p1 <- ggplot(merged_df, aes(x = PC1, y = PC2, color = .data[[group_column]])) +
     geom_point(size = 3) +
+    colour_scale +
     theme_minimal() +
     labs(
       x     = paste0("PC1 (", round(pca_var[1] * 100, 2), "%)"),
@@ -202,6 +286,7 @@ pca_plot <- function(
 
   p2 <- ggplot(merged_df, aes(x = PC1, y = PC3, color = .data[[group_column]])) +
     geom_point(size = 3) +
+    colour_scale +
     theme_minimal() +
     labs(
       x     = paste0("PC1 (", round(pca_var[1] * 100, 2), "%)"),
@@ -212,6 +297,7 @@ pca_plot <- function(
 
   p3 <- ggplot(merged_df, aes(x = PC2, y = PC3, color = .data[[group_column]])) +
     geom_point(size = 3) +
+    colour_scale +
     theme_minimal() +
     labs(
       x     = paste0("PC2 (", round(pca_var[2] * 100, 2), "%)"),
@@ -223,152 +309,5 @@ pca_plot <- function(
   print(p1)
   print(p2)
   print(p3)
-  invisible(list(p1, p2, p3))
-}
-
-
-#' Heterozygosity Heatmap per Sample
-#'
-#' Computes the proportion of markers with BAF values within a heterozygosity
-#' range (\code{het_range}) for each sample and displays the result as a
-#' near-square heatmap. Hovering over a cell shows the sample name,
-#' heterozygosity rate, and number of markers used (requires the \pkg{plotly}
-#' package; a static \pkg{ggplot2} plot is returned if \pkg{plotly} is not
-#' installed).
-#'
-#' @param input Accepts one of:
-#'   1. A data.frame with at least columns \code{MarkerName}, \code{SampleName},
-#'      and the column specified by \code{col2use}.
-#'   2. An object of class \code{'qploidy_standardization'} (as returned by
-#'      \code{standardize()}).
-#'   3. A character string: path to a \code{.tsv[.gz]} file produced by
-#'      \code{write_qploidy_standardization()}.
-#' @param col2use Character. Column to use for computing heterozygosity.
-#'   Either \code{"baf"} (default) or \code{"ratio"}.
-#' @param het_range Numeric vector of length 2 giving the lower and upper
-#'   bounds of \code{col2use} that define a heterozygous marker.
-#'   Defaults to \code{c(0.2, 0.8)}.
-#'
-#' @return If \pkg{plotly} is available, a \code{plotly} htmlwidget with hover
-#'   tooltips; otherwise a \code{ggplot2} object. Values are returned
-#'   invisibly so the plot is still displayed when the function is called
-#'   interactively.
-#'
-#' @examples
-#' \dontrun{
-#' plot_heterozygosity(my_standardization_object)
-#' plot_heterozygosity("standardization.tsv.gz", het_range = c(0.3, 0.7))
-#' plot_heterozygosity(my_standardization_object, col2use = "ratio")
-#' }
-#'
-#' @importFrom dplyr group_by summarize
-#' @importFrom ggplot2 ggplot aes geom_tile scale_fill_gradientn scale_x_continuous
-#'   scale_y_continuous theme_minimal theme element_blank labs
-#' @importFrom scales percent_format
-#'
-#' @export
-plot_heterozygosity <- function(
-    input,
-    col2use = c("baf", "ratio"),
-    het_range = c(0.2, 0.8)
-) {
-  ## --- validate arguments --------------------------------------------------
-  col2use <- match.arg(col2use)
-
-  if (!is.numeric(het_range) || length(het_range) != 2 ||
-      het_range[1] >= het_range[2] ||
-      het_range[1] < 0 || het_range[2] > 1) {
-    stop("'het_range' must be a numeric vector of length 2 with 0 <= het_range[1] < het_range[2] <= 1.")
-  }
-
-  ## --- parse input (mirrors depth_pca_plot) --------------------------------
-  if (inherits(input, "qploidy_standardization")) {
-    tdata <- as.data.frame(input$data)
-  } else if (is.character(input) && length(input) == 1 && file.exists(input)) {
-    tdata <- as.data.frame(read_qploidy_standardization(input)$data)
-  } else if (is.data.frame(input)) {
-    tdata <- input
-  } else {
-    stop(paste(
-      "'input' must be a data.frame with columns MarkerName, SampleName, and", col2use,
-      "; a 'qploidy_standardization' object; or a valid file path."
-    ))
-  }
-
-  required_cols <- c("MarkerName", "SampleName", col2use)
-  missing_cols <- setdiff(required_cols, colnames(tdata))
-  if (length(missing_cols) > 0)
-    stop(sprintf(
-      "Input data is missing required columns: %s",
-      paste(missing_cols, collapse = ", ")
-    ))
-
-  ## --- compute per-sample heterozygosity -----------------------------------
-  het_df <- tdata %>%
-    group_by(SampleName) %>%
-    summarize(
-      het_ratio  = mean(.data[[col2use]] >= het_range[1] & .data[[col2use]] <= het_range[2], na.rm = TRUE),
-      n_markers  = sum(!is.na(.data[[col2use]])),
-      .groups    = "drop"
-    )
-
-  het_df <- het_df[order(het_df$het_ratio, decreasing = TRUE), ]
-
-  ## --- lay out samples in a near-square grid -------------------------------
-  n     <- nrow(het_df)
-  ncols <- ceiling(sqrt(n))
-  nrows <- ceiling(n / ncols)
-
-  het_df$col_idx <- ((seq_len(n) - 1L) %% ncols) + 1L
-  het_df$row_idx <- nrows - ((seq_len(n) - 1L) %/% ncols)  # row 1 = bottom (incomplete), highest row = top
-
-  ## --- build ggplot heatmap ------------------------------------------------
-  p <- ggplot(
-    het_df,
-    aes(
-      x    = col_idx,
-      y    = row_idx,
-      fill = het_ratio,
-      text = paste0(
-        "Sample: ",          SampleName,
-        "\nHeterozygosity: ", round(het_ratio * 100, 2), "%",
-        "\nMarkers used: ",   n_markers
-      )
-    )
-  ) +
-    geom_tile(color = "black", linewidth = 0.4) +
-    scale_fill_gradientn(
-      colours = c("#2166ac", "#fdae61", "#d7191c"),
-      limits  = c(0, 1),
-      name    = "Heterozygosity",
-      labels  = percent_format(accuracy = 1)
-    ) +
-    scale_x_continuous(breaks = NULL) +
-    scale_y_continuous(breaks = NULL) +
-    theme_minimal(base_size = 11) +
-    theme(
-      axis.title   = element_blank(),
-      axis.text    = element_blank(),
-      panel.grid   = element_blank()
-    ) +
-    labs(title = sprintf(
-      "Heterozygosity per Sample  [%s in (%.2f, %.2f)]  n = %d",
-      col2use, het_range[1], het_range[2], n
-    ))
-
-  ## --- add hover if plotly is available ------------------------------------
-  if (requireNamespace("plotly", quietly = TRUE)) {
-    out <- plotly::ggplotly(p, tooltip = "text")
-    # xgap/ygap are only valid on heatmap traces; apply selectively to avoid warnings
-    heatmap_idx <- which(vapply(out$x$data,
-                                function(tr) isTRUE(tr$type == "heatmap"),
-                                logical(1)))
-    if (length(heatmap_idx) > 0)
-      out <- plotly::style(out, xgap = 1.5, ygap = 1.5, traces = heatmap_idx)
-  } else {
-    message("Install the 'plotly' package for interactive hover tooltips.")
-    out <- p
-  }
-
-  invisible(out)
+  return(list(p1, p2, p3))
 }

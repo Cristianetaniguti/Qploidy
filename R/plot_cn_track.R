@@ -18,6 +18,8 @@ if (getRversion() >= "2.15.1") utils::globalVariables(
 ##'
 ##' @param hmm_CN An object of class \code{hmm_CN} (output from \code{hmm_estimate_CN}), containing a \code{result} data frame with one row per window and columns: \code{Sample}, \code{Chr}, \code{Start}, \code{End}, \code{CN_call}, \code{post_CN*}, etc. Optionally, may contain \code{updated_data} for marker-level fallback.
 ##' @param qploidy_standarize_result An object of class \code{qploidy_standardization} (output from \code{standardize}), used to extract BAF values for the BAF panel. If NULL, marker-level data is taken from \code{hmm_CN$updated_data}.
+##' @param data Optional. A \code{data.frame} with columns \code{MarkerName}, \code{SampleName}, \code{X}, \code{Y}, \code{R}, and \code{ratio}. Required when \code{qploidy_standarize_result} is \code{NULL}.
+##' @param geno.pos Optional. A \code{data.frame} with columns \code{MarkerName}, \code{Chromosome}, and \code{Position}. Required when \code{qploidy_standarize_result} is \code{NULL}.
 ##' @param sample_id Character scalar. Which sample from \code{hmm_CN$Sample} to display. Defaults to the first unique value in \code{hmm_CN$Sample}.
 ##' @param cn_min,cn_max Numeric scalars. Y-axis limits for CN. Defaults span the min/max of \code{CN_call}.
 ##' @param show_window_lines Logical. If TRUE, show dashed vertical lines at window boundaries.
@@ -71,6 +73,8 @@ if (getRversion() >= "2.15.1") utils::globalVariables(
 ##' @export
 plot_cn_track <- function(hmm_CN,
                           qploidy_standarize_result = NULL,
+                          data = NULL,
+                          geno.pos = NULL,
                           sample_id = NULL,
                           cn_min = NULL,
                           cn_max = NULL,
@@ -112,7 +116,7 @@ plot_cn_track <- function(hmm_CN,
   chr_order <- chr_order[order(as.numeric(gsub("[^0-9]+", "", chr_order)), chr_order)]
   x$Chr <- factor(x$Chr, levels = chr_order)
 
-  # Marker-level data: prefer by_marker, then qploidy_standarize_result
+  # Marker-level data: prefer by_marker, then qploidy_standarize_result, then data+geno.pos
   if (!is.null(hmm_CN$by_marker)) {
     data_sample2 <- hmm_CN$by_marker
     data_sample2 <- filter(data_sample2, SampleName == sample_id & Chr %in% unique(x$Chr))
@@ -123,9 +127,32 @@ plot_cn_track <- function(hmm_CN,
     data_sample2 <- filter(data_sample2, SampleName == sample_id & Chr %in% unique(x$Chr))
     data_sample2 <- data_sample2[!is.na(data_sample2$Chr), ]
     data_sample2$Chr <- factor(data_sample2$Chr, levels = chr_order)
+  } else if (!is.null(data) && !is.null(geno.pos)) {
+    req_data <- c("MarkerName", "SampleName")
+    req_gp   <- c("MarkerName", "Chromosome", "Position")
+    miss_d  <- setdiff(req_data, names(data))
+    miss_gp <- setdiff(req_gp,   names(geno.pos))
+    if (length(miss_d))  stop(paste("'data' is missing columns:",   paste(miss_d,  collapse = ", ")))
+    if (length(miss_gp)) stop(paste("'geno.pos' is missing columns:", paste(miss_gp, collapse = ", ")))
+    gp <- geno.pos[, req_gp]
+    colnames(gp)[colnames(gp) == "Chromosome"] <- "Chr"
+    data_sample2 <- merge(
+      data[data$SampleName == sample_id, , drop = FALSE],
+      gp, by = "MarkerName", all.x = FALSE
+    )
+    data_sample2 <- data_sample2[data_sample2$Chr %in% unique(x$Chr) & !is.na(data_sample2$Chr), , drop = FALSE]
+    data_sample2$Chr      <- factor(data_sample2$Chr, levels = chr_order)
+    data_sample2$Position <- as.numeric(data_sample2$Position)
+    # Alias ratio -> baf and R -> z so downstream plotting code works
+    if (!"baf" %in% names(data_sample2) && "ratio" %in% names(data_sample2))
+      data_sample2$baf <- data_sample2$ratio
+    if (!"z"   %in% names(data_sample2) && "R"     %in% names(data_sample2))
+      data_sample2$z   <- data_sample2$R
   } else {
-    stop("No marker-level data found in hmm_CN or qploidy_standarize_result.")
+    stop("No marker-level data found. Provide qploidy_standarize_result, hmm_CN$by_marker, or both 'data' and 'geno.pos'.")
   }
+
+  data_sample2$Position <- as.numeric(data_sample2$Position)
 
   if (is.null(cn_min)) cn_min <- min(x$CN_call, na.rm = TRUE)
   if (is.null(cn_max)) cn_max <- max(x$CN_call, na.rm = TRUE)
@@ -196,8 +223,8 @@ plot_cn_track <- function(hmm_CN,
           if (length(s) == 0 || all(is.na(s))) {
             rep(1L, n())
           } else {
-            brks <- c(-Inf, s, Inf)
-            cut(Position, breaks = brks, labels = FALSE, right = FALSE)
+            brks <- c(-Inf, as.numeric(s), Inf)
+            cut(as.numeric(Position), breaks = brks, labels = FALSE, right = FALSE)
           }
         }
       ) %>%
@@ -210,8 +237,12 @@ plot_cn_track <- function(hmm_CN,
     tag_markers_with_region(break_tbl) %>%
     left_join(win_tbl %>% select(Chr, region_id),
                      by = c("Chr", "region_id"))
-
-  # -------- top panel: z dots (color = w_baf, shape = outlier or R0) --------
+  # Ensure baf/z columns exist (needed when data+geno.pos path was used)
+  if (!"baf" %in% names(marker_df) && "ratio" %in% names(marker_df))
+    marker_df$baf <- as.numeric(marker_df$ratio)
+  if (!"z" %in% names(marker_df) && "R" %in% names(marker_df))
+    marker_df$z <- as.numeric(marker_df$R)
+  marker_df$Position <- as.numeric(marker_df$Position)
   # Add a column to marker_df to indicate R == 0
   marker_df$R0 <- ifelse(!is.null(marker_df$R) & marker_df$R == 0, TRUE, FALSE)
 
@@ -262,7 +293,9 @@ plot_cn_track <- function(hmm_CN,
       filter(Sample == sample_id & !is.na(Chr) & Chr %in% chr_order) %>%
       select(Chr, WindowID, Start, End, w_baf, z_mean = z) %>%
       arrange(factor(Chr, levels = chr_order), Start)
-    z_means$Chr <- factor(z_means$Chr, levels = chr_order)
+    z_means$Chr   <- factor(z_means$Chr, levels = chr_order)
+    z_means$Start <- as.numeric(z_means$Start)
+    z_means$End   <- as.numeric(z_means$End)
     p_z <- ggplot() +
       geom_segment(
         data = z_means,
@@ -291,7 +324,9 @@ plot_cn_track <- function(hmm_CN,
       filter(Sample == sample_id & !is.na(Chr) & Chr %in% chr_order) %>%
       select(Chr, WindowID, Start, End, w_baf, z_mean = z) %>%
       arrange(factor(Chr, levels = chr_order), Start)
-    z_means$Chr <- factor(z_means$Chr, levels = chr_order)
+    z_means$Chr   <- factor(z_means$Chr, levels = chr_order)
+    z_means$Start <- as.numeric(z_means$Start)
+    z_means$End   <- as.numeric(z_means$End)
     p_z <- ggplot(marker_df, aes(x = Position, y = z, color = w_baf)) +
       geom_point(size = 1.2, alpha = 0.8, mapping = shape_aes) +
       geom_segment(
@@ -418,8 +453,12 @@ plot_cn_track <- function(hmm_CN,
     tag_markers_with_region(break_tbl) %>%
     left_join(win_tbl %>% select(Chr, region_id),
                      by = c("Chr", "region_id"))
-
-  # Compute BAF density for y-axis background
+  # Ensure baf/z columns exist (needed when data+geno.pos path was used)
+  if (!"baf" %in% names(plot_df) && "ratio" %in% names(plot_df))
+    plot_df$baf <- as.numeric(plot_df$ratio)
+  if (!"z" %in% names(plot_df) && "R" %in% names(plot_df))
+    plot_df$z <- as.numeric(plot_df$R)
+  plot_df$Position <- as.numeric(plot_df$Position)
   dens_list <- lapply(split(plot_df, plot_df$Chr), function(df) {
     if (nrow(df) < 2) return(NULL)
     dens <- stats::density(df$baf, na.rm = TRUE)
@@ -541,18 +580,14 @@ plot_cn_track <- function(hmm_CN,
   }
   cn_grid <- if (!is.null(params$cn_grid)) paste(params$cn_grid, collapse = ", ") else "NA"
   dist <- if (!is.null(params$distribution)) as.character(params$distribution) else "NA"
-  sigma <- if (!is.null(params$sigma)) paste(round(params$sigma, 3), collapse = ", ") else "NA"
   sample_name <- if (!is.null(sample_id)) as.character(sample_id) else "NA"
-  loglik <- if (!is.null(params$loglik)) round(params$loglik, 3) else "NA"
   min_snps <- if (!is.null(params$min_snps_per_window)) round(params$min_snps_per_window, 3) else "NA"
   param_text <- paste0(
     "Sample Name: ", sample_name, "\n",
     "Est. overall ploidy: ", if (!is.null(params$exp_ploidy)) params$exp_ploidy else "NA", "\n",
-    "Log-likelihood: ", loglik, "\n",
     "CN grid: ", cn_grid, "\n",
     "Min SNPs p/window: ", min_snps, "\n",
-    "Distribution: ", dist, "\n",
-    "Sigma: ", sigma
+    "Distribution: ", dist, "\n"
   )
   param_panel <- ggplot() +
     theme_void() +
@@ -598,22 +633,31 @@ plot_cn_track <- function(hmm_CN,
 #' @param samples_to_plot Character vector of sample IDs to include. If NULL, the first sample in the data is plotted.
 #' @param chromosomes Optional character vector of chromosomes to include (matching result$Chr). If NULL, plots all chromosomes present after sample filtering.
 #' @param facet_ncol Number of columns for facet_wrap. If NULL, will be determined automatically unless facet_nrow is set.
-#' @param facet_nrow Number of rows for facet_wrap. If set, facet_ncol will be determined automatically unless both are set.
+##' @param facet_nrow Number of rows for facet_wrap. If set, facet_ncol will be determined automatically unless both are set.
+##' @param gray_CN Integer or NULL. If provided, this copy-number value is colored gray (used as the baseline color). All CNs below it are colored blue and above red. If NULL (default), the baseline is auto-detected as the most frequent CN weighted by window length.
+#' @param add_het Logical. If TRUE, a heterozygosity column is added to the right side of the plot, with one square per sample colored from blue (low) to red (high). Requires \code{hmm_dosage_calls}. Default is TRUE.
+#' @param hmm_dosage_calls An object of class \code{hmm_dosage_calls} (inherits \code{data.frame}) with columns \code{SampleName}, \code{Chr}, \code{dosage}, and optionally others. Used to compute per-sample heterozygosity as the fraction of markers with dosage not equal to 0 or 1 (among non-NA dosage values). Required when \code{add_het = TRUE}.
+#' @param interactive Logical. If TRUE, returns an interactive \code{plotly} figure instead of a static ggplot. Hovering over segments shows: Sample, Chr, Start, End, CN, post_max, w_baf, and Heterozygosity (if \code{add_het = TRUE} and \code{hmm_dosage_calls} is provided). Requires the \pkg{plotly} package. Default is FALSE.
 #'
-#' @return A ggplot object.
+#' @return A ggplot/ggarrange object (static), or a plotly figure when \code{interactive = TRUE}.
 #'
-#' @importFrom dplyr filter group_by summarise arrange desc
-#' @importFrom ggplot2 ggplot geom_segment facet_wrap
-#' @importFrom ggplot2 scale_x_continuous scale_color_manual scale_alpha
-#' @importFrom ggplot2 labs theme_bw theme
+#' @importFrom dplyr filter group_by summarise arrange desc mutate left_join
+#' @importFrom ggplot2 ggplot geom_segment geom_tile geom_point facet_wrap
+#' @importFrom ggplot2 scale_x_continuous scale_color_manual scale_alpha scale_fill_gradient
+#' @importFrom ggplot2 labs theme_bw theme aes
 #' @importFrom ggplot2 element_blank element_rect element_text
+#' @importFrom ggpubr ggarrange get_legend
 #'
 #' @export
 compare_cn_track <- function(hmm_CN,
                              samples_to_plot = NULL,
                              chromosomes = NULL,
                              facet_ncol = NULL,
-                             facet_nrow = NULL) {
+                             facet_nrow = NULL,
+                             gray_CN = NULL,
+                             add_het = TRUE,
+                             hmm_dosage_calls = NULL,
+                             interactive = FALSE) {
 
   stopifnot(inherits(hmm_CN, "hmm_CN"))
   cnv_df <- hmm_CN$by_window
@@ -692,14 +736,17 @@ compare_cn_track <- function(hmm_CN,
   # CN_call as integer -> ordered factor
   plot_df$CN_call <- as.integer(as.character(plot_df$CN_call))
 
-  # baseline CN = most frequent CN, weighted by window length (End-Start)
-  plot_df$w <- pmax(0, plot_df$End - plot_df$Start)
-  cn_totals <- plot_df |>
-    group_by(.data$CN_call) |>
-    summarise(total_bp = sum(.data$w, na.rm = TRUE), .groups = "drop") |>
-    arrange(desc(.data$total_bp))
-
-  baseline_cn <- cn_totals$CN_call[1]
+  # baseline CN = user-supplied gray_CN, or most frequent CN weighted by window length
+  if (!is.null(gray_CN)) {
+    baseline_cn <- as.integer(gray_CN)
+  } else {
+    plot_df$w <- pmax(0, plot_df$End - plot_df$Start)
+    cn_totals <- plot_df |>
+      group_by(.data$CN_call) |>
+      summarise(total_bp = sum(.data$w, na.rm = TRUE), .groups = "drop") |>
+      arrange(desc(.data$total_bp))
+    baseline_cn <- cn_totals$CN_call[1]
+  }
 
   cn_levels <- sort(unique(plot_df$CN_call))
   plot_df$CN_call <- factor(plot_df$CN_call, levels = cn_levels)
@@ -723,7 +770,7 @@ compare_cn_track <- function(hmm_CN,
   if (!is.null(facet_ncol) && is.null(facet_nrow)) {
     nrow_final <- NULL
   }
-  ggplot(plot_df) +
+  p_main <- ggplot(plot_df) +
     geom_segment(
       aes(
         x = .data$Start, xend = .data$End,
@@ -751,6 +798,206 @@ compare_cn_track <- function(hmm_CN,
       panel.grid.minor = element_blank(),
       strip.background = element_rect(fill = NA),
       strip.text = element_text(face = "bold"),
-      axis.text.y = element_text(size = 9)
+      axis.text.y = element_text(size = 9),
+      axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)
     )
+
+  # ---- compute het_df (shared by both interactive and static paths) ----
+  het_df <- NULL
+  if (add_het && !is.null(hmm_dosage_calls)) {
+    if (!inherits(hmm_dosage_calls, "hmm_dosage_calls")) {
+      stop("hmm_dosage_calls must be an object of class 'hmm_dosage_calls'")
+    }
+    het_raw <- hmm_dosage_calls |>
+      filter(.data$SampleName %in% samples_present)
+    if (!is.null(chromosomes)) {
+      het_raw <- het_raw |> filter(.data$Chr %in% chromosomes)
+    }
+    het_df <- het_raw |>
+      group_by(.data$SampleName) |>
+      summarise(
+        het = sum(!is.na(.data$dosage) & .data$dosage != 0 & .data$dosage != 1,
+                  na.rm = TRUE) / max(sum(!is.na(.data$dosage)), 1L),
+        .groups = "drop"
+      )
+    het_df$SampleName <- factor(het_df$SampleName, levels = levels(plot_df$Sample))
+    het_df$label <- "Het."
+  }
+
+  # ---- interactive (plotly) output ----
+  if (interactive) {
+    if (!requireNamespace("plotly", quietly = TRUE)) {
+      stop("Package 'plotly' is required for interactive = TRUE. Install with: install.packages('plotly')")
+    }
+
+    # Build per-segment tooltip lookup for het
+    het_lookup <- if (!is.null(het_df)) {
+      setNames(round(het_df$het, 3), as.character(het_df$SampleName))
+    } else NULL
+
+    plot_df$Mid <- (as.numeric(plot_df$Start) + as.numeric(plot_df$End)) / 2
+    plot_df$tooltip_text <- paste0(
+      "Sample: ", plot_df$Sample,
+      "<br>Chr: ", plot_df$Chr,
+      "<br>Start: ", format(as.numeric(plot_df$Start), big.mark = ",", scientific = FALSE),
+      "<br>End: ", format(as.numeric(plot_df$End), big.mark = ",", scientific = FALSE),
+      "<br>CN: ", plot_df$CN_call,
+      "<br>post_max: ", round(plot_df$post_max, 3),
+      "<br>w_baf: ", if ("w_baf" %in% names(plot_df)) round(plot_df$w_baf, 3) else "NA",
+      "<br>w_het: ", round(plot_df$n_het/plot_df$n_snps, 3)
+    )
+
+    # map CN colors to hex per row
+    plot_df$seg_color <- cn_pal[as.character(plot_df$CN_call)]
+
+    chrs <- levels(plot_df$Chr)[levels(plot_df$Chr) %in% unique(as.character(plot_df$Chr))]
+    n_chr <- length(chrs)
+
+    # one subplot column per chromosome.
+    # Draw one add_segments trace per CN level per chromosome so every CN level
+    # gets a proper legend entry (shown only on the first chr where that CN appears).
+    # Use only observed CN levels to avoid NA in showlegend.
+    cn_levels_all <- as.character(sort(unique(plot_df$CN_call)))
+
+    # For each CN level, find the first chromosome where it has data
+    first_chr_for_cn <- vapply(cn_levels_all, function(cn) {
+      found <- Filter(function(ch) {
+        any(as.character(plot_df$CN_call[plot_df$Chr == ch]) == cn)
+      }, chrs)
+      if (length(found) == 0L) chrs[1] else found[1]
+    }, character(1))
+
+    chr_figs <- lapply(seq_along(chrs), function(i) {
+      ch <- chrs[i]
+      d <- plot_df[plot_df$Chr == ch, ]
+      fig <- plotly::plot_ly()
+
+      # One trace per CN level — guarantees a legend swatch for every level
+      for (cn in cn_levels_all) {
+        dsub <- d[as.character(d$CN_call) == as.character(cn), ]
+        if (nrow(dsub) == 0) next
+        fig <- fig |>
+          plotly::add_segments(
+            x    = as.numeric(dsub$Start),
+            xend = as.numeric(dsub$End),
+            y    = as.character(dsub$Sample),
+            yend = as.character(dsub$Sample),
+            line = list(color = cn_pal[[as.character(cn)]], width = 10),
+            name = as.character(cn),
+            legendgroup = as.character(cn),
+            showlegend = (ch == first_chr_for_cn[[as.character(cn)]]),
+            opacity = 1,
+            hoverinfo = "none"
+          )
+      }
+
+      # Invisible tooltip anchors at segment midpoints
+      sample_order <- rev(levels(plot_df$Sample))
+      fig <- fig |>
+        plotly::add_markers(
+          x    = d$Mid,
+          y    = as.character(d$Sample),
+          text = d$tooltip_text,
+          hoverinfo = "text",
+          marker = list(color = "rgba(0,0,0,0)", size = 6, line = list(width = 0)),
+          showlegend = FALSE
+        ) |>
+        plotly::layout(
+          xaxis = list(title = ch, tickformat = ".2s", tickangle = 270),
+          yaxis = list(
+            title = "",
+            categoryarray = sample_order,
+            categoryorder = "array",
+            showticklabels = (i == 1)
+          )
+        )
+      fig
+    })
+
+    fig_main <- plotly::subplot(chr_figs,
+                                nrows = 1,
+                                shareY = TRUE,
+                                margin = 0.002)
+
+    if (!is.null(het_df)) {
+      het_df$tooltip_text <- paste0(
+        "Sample: ", het_df$SampleName,
+        "<br>Heterozygosity: ", round(het_df$het, 3)
+      )
+
+      sample_order <- rev(levels(plot_df$Sample))
+      fig_het <- plotly::plot_ly() |>
+        plotly::add_markers(
+          x    = het_df$label,
+          y    = as.character(het_df$SampleName),
+          text = het_df$tooltip_text,
+          hoverinfo = "text",
+          marker = list(
+            symbol    = "square",
+            size      = 20,
+            color     = het_df$het,
+            colorscale = list(list(0, "#2166ac"), list(1, "#d6604d")),
+            cmin      = 0,
+            cmax      = 1,
+            showscale = TRUE,
+            colorbar  = list(title = "Het.", len = 0.4, y = 0.5),
+            line      = list(width = 0)
+          ),
+          showlegend = FALSE
+        ) |>
+        plotly::layout(
+          xaxis = list(title = ""),
+          yaxis = list(
+            title = "",
+            categoryarray = sample_order,
+            categoryorder = "array",
+            showticklabels = FALSE
+          )
+        )
+      return(plotly::subplot(fig_main, fig_het,
+                             nrows = 1, widths = c(0.92, 0.08),
+                             shareY = FALSE, margin = 0.0001))
+    }
+    return(fig_main)
+  }
+
+  # ---- static (ggplot) output ----
+  if (!is.null(het_df)) {
+    het_df$facet_dummy <- " "  # blank strip to match p_main chromosome strip height
+
+    p_het <- ggplot(het_df, aes(x = .data$label, y = .data$SampleName, fill = .data$het)) +
+      geom_tile(color = "white") +
+      scale_fill_gradient(
+        low = "#2166ac", high = "#d6604d",
+        name = "Heterozygosity",
+        limits = c(0, 1)
+      ) +
+      facet_wrap(~ facet_dummy) +
+      theme_bw() +
+      labs(x = "", y = NULL) +
+      theme(
+        axis.text.y      = element_blank(),
+        axis.ticks.y     = element_blank(),
+        panel.grid       = element_blank(),
+        legend.position  = "top",
+        axis.text.x      = element_text(angle = 90, vjust = 0.5, hjust = 1),
+        strip.background = element_rect(fill = "grey95"),
+        strip.text       = element_text(colour = "grey95")  # invisible text, keeps height
+      )
+
+    p_main <- p_main + theme(legend.position = "top")
+
+    leg_main <- get_legend(p_main)
+    leg_het  <- get_legend(p_het)
+
+    plots_row <- ggarrange(
+      p_main + theme(legend.position = "none"),
+      p_het  + theme(legend.position = "none"),
+      ncol = 2, widths = c(15, 1), align = "hv"
+    )
+    legends_row <- ggarrange(leg_main, leg_het, ncol = 2, widths = c(7, 4))
+    return(ggarrange(legends_row, plots_row, nrow = 2, heights = c(2, 20)))
+  }
+
+  return(p_main)
 }

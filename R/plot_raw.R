@@ -91,7 +91,8 @@ plot_raw <- function(data,
                      font_size = 12,
                      window_size = 2000000,
                      het_interval = 0.1,
-                     bins = 100,
+                     bins = 50,
+                     bar_colour = NA,
                      ploidy = 4,
                      area_single = 0.75,
                      add_expected_peaks = FALSE) {
@@ -248,7 +249,8 @@ plot_raw <- function(data,
       BAF_hist_overall  = FALSE,
       ratio             = TRUE,
       font_size         = font_size,
-      bins              = bins
+      bins              = bins,
+      bar_colour        = bar_colour
     )
   }
 
@@ -263,7 +265,8 @@ plot_raw <- function(data,
       BAF_hist_overall  = TRUE,
       ratio             = TRUE,
       font_size         = font_size,
-      bins              = bins
+      bins              = bins,
+      bar_colour        = bar_colour
     )
   }
 

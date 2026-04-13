@@ -192,7 +192,7 @@ test_that("plot_qploidy_standardization accepts type aliases", {
   for (alias_list in aliases) {
     for (alias in alias_list) {
       p <- plot_qploidy_standardization(std, sample = "S1", type = alias, ploidy = 2)
-      expect_s3_class(p, "gg", info = paste("alias =", alias))
+      expect_s3_class(p, "gg")
     }
   }
 })

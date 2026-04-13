@@ -324,6 +324,8 @@ get_zscore <- function(data = NULL,
 
   stopifnot(all(c("MarkerName", "SampleName", "R") %in% colnames(data)))
 
+  data$R[data$R == 0] <- NA
+
   zscore <- data %>% group_by(MarkerName) %>%
     mutate(z = (R - mean(R, na.rm = TRUE))/sd(R, na.rm = TRUE)) %>% select(MarkerName, SampleName, z)
 

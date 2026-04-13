@@ -14,7 +14,9 @@ plot_baf_hist(
   BAF_hist_overall = FALSE,
   ratio = FALSE,
   rm_homozygous = FALSE,
-  font_size = 12
+  font_size = 12,
+  bins = 100,
+  bar_colour = NA
 )
 }
 \arguments{
@@ -47,6 +49,12 @@ histogram. Default is FALSE.}
 
 \item{font_size}{Numeric value for the font size of plot labels. Default is
 12.}
+
+\item{bins}{Integer specifying the number of histogram bins. Default is 100.}
+
+\item{bar_colour}{Colour for the bar border in histograms. Use `NA` (default)
+for no border, giving solid opaque bars. Use `"white"` for thin separators
+between bars.}
 }
 \value{
 A ggplot object representing the BAF histogram.

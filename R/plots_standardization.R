@@ -167,6 +167,9 @@ plot_baf <- function(data_sample,
 #' @param font_size Numeric value for the font size of plot labels. Default is
 #' 12.
 #' @param bins Integer specifying the number of histogram bins. Default is 100.
+#' @param bar_colour Colour for the bar border in histograms. Use `NA` (default)
+#'   for no border, giving solid opaque bars. Use `"white"` for thin separators
+#'   between bars.
 #' @return A ggplot object representing the BAF histogram.
 #'
 #' @import ggplot2
@@ -184,7 +187,8 @@ plot_baf_hist <- function(data_sample,
                           ratio = FALSE,
                           rm_homozygous = FALSE,
                           font_size = 12,
-                          bins = 100) {
+                          bins = 100,
+                          bar_colour = NA) {
   if ((add_estimated_peaks || add_expected_peaks || colors) &&
     !all(is.na(ploidy))) {
     if (length(ploidy) == 1) {
@@ -270,11 +274,11 @@ plot_baf_hist <- function(data_sample,
         if (colors) {
           geom_histogram(
             aes(fill = color), bins = bins,
-            colour = "white", linewidth = 0.15
+            colour = bar_colour, linewidth = 0.15
           )
         } else {
           geom_histogram(
-            fill = col_bar, colour = "white",
+            fill = col_bar, colour = bar_colour,
             linewidth = 0.15, bins = bins
           )
         }
@@ -345,11 +349,11 @@ plot_baf_hist <- function(data_sample,
         if (colors) {
           geom_histogram(
             aes(fill = color), bins = bins,
-            colour = "white", linewidth = 0.15
+            colour = bar_colour, linewidth = 0.15
           )
         } else {
           geom_histogram(
-            fill = col_bar, colour = "white",
+            fill = col_bar, colour = bar_colour,
             linewidth = 0.15, bins = bins
           )
         }
@@ -465,6 +469,8 @@ plot_baf_hist <- function(data_sample,
 #' histogram plots. Default is FALSE.
 #' @param bins Integer specifying the number of bins in histogram plots.
 #' Default is 100.
+#' @param bar_colour Colour for the bar border in histogram plots. Use `NA`
+#'   (default) for no border. Passed to all internal `plot_baf_hist` calls.
 #' @param ... Additional plot parameters.
 #' @return A ggarrange object containing the requested plots.
 #'
@@ -518,7 +524,8 @@ plot_qploidy_standardization <- function(x,
                                          window_size = 2000000,
                                          het_interval = 0.1,
                                          rm_homozygous = FALSE,
-                                         bins = 100, ...) {
+                                         bins = 100,
+                                         bar_colour = NA, ...) {
   if (!inherits(x, "qploidy_standardization")) {
     stop("Object is not of class qploidy_standardization")
   }
@@ -640,7 +647,8 @@ plot_qploidy_standardization <- function(x,
       BAF_hist_overall = FALSE,
       rm_homozygous = rm_homozygous,
       font_size = font_size,
-      bins = bins
+      bins = bins,
+      bar_colour = bar_colour
     )
   }
 
@@ -655,7 +663,8 @@ plot_qploidy_standardization <- function(x,
       BAF_hist_overall = TRUE,
       rm_homozygous = rm_homozygous,
       font_size = font_size,
-      bins = bins
+      bins = bins,
+      bar_colour = bar_colour
     )
   }
 
@@ -671,7 +680,8 @@ plot_qploidy_standardization <- function(x,
       ratio = TRUE,
       rm_homozygous = rm_homozygous,
       font_size = font_size,
-      bins = bins
+      bins = bins,
+      bar_colour = bar_colour
     )
   }
 
@@ -687,7 +697,8 @@ plot_qploidy_standardization <- function(x,
       ratio = TRUE,
       rm_homozygous = rm_homozygous,
       font_size = font_size,
-      bins = bins
+      bins = bins,
+      bar_colour = bar_colour
     )
   }
 

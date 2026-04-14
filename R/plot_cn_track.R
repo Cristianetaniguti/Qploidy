@@ -154,6 +154,10 @@ plot_cn_track <- function(hmm_CN,
 
   data_sample2$Position <- as.numeric(data_sample2$Position)
 
+  # Detect y-axis labels based on original column names in data_sample2
+  baf_label <- if ("baf" %in% names(data_sample2)) "BAF" else if ("ratio" %in% names(data_sample2)) "Ratio" else "BAF"
+  z_label   <- if ("z"   %in% names(data_sample2)) "z"   else if ("R"     %in% names(data_sample2)) "R"     else "z"
+
   if (is.null(cn_min)) cn_min <- min(x$CN_call, na.rm = TRUE)
   if (is.null(cn_max)) cn_max <- max(x$CN_call, na.rm = TRUE)
 
@@ -308,7 +312,7 @@ plot_cn_track <- function(hmm_CN,
         aes(x = Position, y = min(z_means$z_mean, na.rm = TRUE))
       ) +
       facet_wrap(~ Chr, scales = "free_x", nrow = 1) +
-      labs(x = NULL, y = "z") +
+      labs(x = NULL, y = z_label) +
       theme_bw(base_size = 12) +
       theme(
         panel.grid.major.x = element_blank(),
@@ -354,7 +358,7 @@ plot_cn_track <- function(hmm_CN,
                             limits = c(0, 1),
                             oob = squish,
                             name = "BAF weight") +
-      labs(x = NULL, y = "z") +
+      labs(x = NULL, y = z_label) +
       theme_bw(base_size = 12) +
       theme(
         panel.grid.major.x = element_blank(),
@@ -389,7 +393,7 @@ plot_cn_track <- function(hmm_CN,
                             limits = c(0, 1),
                             oob = squish,
                             name = "BAF weight") +
-      labs(x = NULL, y = "z") +
+      labs(x = NULL, y = z_label) +
       theme_bw(base_size = 12) +
       theme(
         panel.grid.major.x = element_blank(),
@@ -470,12 +474,15 @@ plot_cn_track <- function(hmm_CN,
   })
   dens_df <- do.call(rbind, dens_list)
 
-  # Add per-chromosome Position range to dens_df
+  # Add per-chromosome Position range and per-chromosome density max to dens_df
   chrom_pos_range <- plot_df %>%
     group_by(Chr) %>%
     summarise(pos_min = min(Position, na.rm = TRUE), pos_max = max(Position, na.rm = TRUE), .groups = "drop")
   dens_df <- dens_df %>%
-    left_join(chrom_pos_range, by = "Chr")
+    left_join(chrom_pos_range, by = "Chr") %>%
+    group_by(Chr) %>%
+    mutate(max_dens = max(density, na.rm = TRUE)) %>%
+    ungroup()
 
   if (summarized) {
     # Only plot the BAF polygon (no points)
@@ -487,10 +494,9 @@ plot_cn_track <- function(hmm_CN,
       ) +
       geom_polygon(
         data = dens_df,
-        aes(x = min(plot_df$Position, na.rm = TRUE) +
-                  (max(plot_df$Position, na.rm = TRUE) - min(plot_df$Position, na.rm = TRUE)) * density / max(density, na.rm = TRUE),
+        aes(x = pos_min + (pos_max - pos_min) * density / max_dens,
             y = y, group = Chr),
-        fill = "#848d98", alpha = 0.3, color = NA,
+        fill = "black", alpha = 0.6, color = NA,
         inherit.aes = FALSE
       )
     if (show_window_lines) {
@@ -501,7 +507,7 @@ plot_cn_track <- function(hmm_CN,
     p_baf <- p_baf +
       facet_wrap(~Chr, scales = "free_x", nrow = 1) +
       theme_bw() +
-      ylab("BAF") +
+      ylab(baf_label) +
       theme(
         axis.text.x        = element_text(angle = 30, vjust = 1, hjust = 1, size = 8),
         legend.position    = "top",
@@ -519,7 +525,7 @@ plot_cn_track <- function(hmm_CN,
       # Add density polygon on y-axis (background)
       geom_polygon(
         data = dens_df,
-        aes(x = pos_min + (pos_max - pos_min) * density / max(density, na.rm = TRUE),
+        aes(x = pos_min + (pos_max - pos_min) * density / max_dens,
             y = y, group = Chr),
         fill = "#848d98", alpha = 0.3, color = NA,
         inherit.aes = FALSE
@@ -533,7 +539,7 @@ plot_cn_track <- function(hmm_CN,
     p_baf <- p_baf +
       facet_wrap(~Chr, scales = "free_x", nrow = 1) +
       theme_bw() +
-      ylab("BAF") +
+      ylab(baf_label) +
       scale_color_viridis_c(option = "plasma", direction = -1,
                             limits = c(0, 1),
                             oob = squish,
@@ -552,8 +558,8 @@ plot_cn_track <- function(hmm_CN,
   p_baf_dist <- ggplot(plot_df, aes(x = baf)) +
     geom_density(fill = "#848d98", alpha = 0.5, color = NA) +
     theme_bw() +
-    labs(title = "BAF distribution", x = "BAF", y = "Density") +
-    scale_x_continuous(limits = c(0, 1)) +
+    labs(title = paste(baf_label, "distribution"), x = baf_label, y = "Density") +
+    scale_x_continuous(limits = range(plot_df$baf, na.rm = TRUE)) +
     scale_y_continuous(expand = expansion(mult = c(0, 0.05))) +
     theme(
       plot.title = element_text(size = 10, hjust = 0.5),

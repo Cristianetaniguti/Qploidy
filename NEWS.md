@@ -1,8 +1,22 @@
+# Qploidy 1.8.3
+
+* `hmm_estimate_CN()` gains a `use_values` argument supporting all combinations of BAF/ratio and z/R as input signals.
+* `plot_cn_track()` now accepts raw `data` + `geno.pos` as an alternative to a `qploidy_standardization` object, enabling visualization of non-standardized ratio/R data directly.
+* Y-axis labels in `plot_cn_track()` now adapt to the input type: "BAF" or "Ratio" for the BAF panel, and "z" or "R" for the z-score panel.
+* BAF density polygon in `plot_cn_track()` is now normalized per chromosome, ensuring consistent visibility across chromosomes with varying marker densities.
+* `plot_cn_track()` with `summarized = TRUE` now renders the BAF density polygon in black for improved contrast, and correctly scales the polygon per chromosome.
+* The distribution summary panel in `plot_cn_track()` now uses the correct x-axis limits and label based on the input data type (BAF or Ratio).
+* `compare_cn_track()` gains an `add_het` argument (with `hmm_dosage_calls`) to display a per-sample heterozygosity sidebar alongside the CN track.
+* `compare_cn_track()` gains an `interactive` argument to produce a plotly figure with per-segment tooltips.
+* `compare_cn_track()` gains a `gray_CN` argument to manually specify the baseline copy-number value for color scaling.
+* `compare_cn_track()` gains a `facet_nrow` argument for controlling facet layout.
+* New function `plot_heterozygosity()` for visualizing per-sample heterozygosity as a heatmap grid, with optional plotly interactivity.
+* `pca_plot()` gains `samples` and `palette` arguments for subsetting samples and customizing colors.
+
 # Qploidy 1.8.2
 
 * BUGfix on read vcf functions when there are duplicated markers and lack of marker ID
 * Adjustments in the plot_standardization
-
 
 # Qploidy 1.8.1
 

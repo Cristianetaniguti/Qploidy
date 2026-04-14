@@ -23,7 +23,7 @@ hmm_estimate_CN(
   baf_weight = 0.5,
   z_range = NULL,
   transition_jump = 0.995,
-  initial_prob = 0.995,
+  initial_prob = 0.95,
   z_only = FALSE,
   verbose = TRUE,
   exp_ploidy = NA,

@@ -126,7 +126,7 @@ hmm_estimate_CN <- function(
     baf_weight = 0.5,
     z_range = NULL,
     transition_jump = 0.995, # decrease this value if you think there changes in CN is likely
-    initial_prob = 0.995, # Initial probability for the best CN state in the initial state distribution (pi0). Default 0.15. Sets the prior probability for the expected ploidy (or best CN from BAF model) at the first window; remaining probability is distributed uniformly across other states. If the best CN is not found, pi0 is uniform across all states.
+    initial_prob = 0.95, # Initial probability for the best CN state in the initial state distribution (pi0). Default 0.15. Sets the prior probability for the expected ploidy (or best CN from BAF model) at the first window; remaining probability is distributed uniformly across other states. If the best CN is not found, pi0 is uniform across all states.
     z_only = FALSE,
     verbose = TRUE,
     exp_ploidy = NA,

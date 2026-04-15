@@ -1,3 +1,8 @@
+# Qploidy 1.8.4
+
+* Bugfix in `pca_plot()`: markers that become zero-variance after mean-imputation of missing values are now removed before PCA, preventing the `prcomp()` error "cannot rescale a constant/zero column to unit variance".
+
+
 # Qploidy 1.8.3
 
 * `hmm_estimate_CN()` gains a `use_values` argument supporting all combinations of BAF/ratio and z/R as input signals.

@@ -199,6 +199,14 @@ pca_plot <- function(
       }
     }
 
+    # Re-filter after imputation: columns that were all-NA except one value
+    # become constant after mean-imputation and would cause prcomp to fail.
+    marker_sd2 <- apply(gt_dp_num_filtered, 2, sd)
+    n_removed <- sum(!is.na(marker_sd2) & marker_sd2 == 0)
+    if (n_removed > 0)
+      message(n_removed, " marker(s) removed after imputation due to zero variance.")
+    gt_dp_num_filtered <- gt_dp_num_filtered[, !is.na(marker_sd2) & marker_sd2 > 0, drop = FALSE]
+
     pca_res <- prcomp(gt_dp_num_filtered, center = TRUE, scale. = TRUE)
   }
 

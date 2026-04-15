@@ -1,6 +1,7 @@
 # Qploidy 1.8.4
 
-* Bugfix in `pca_plot()`: markers that become zero-variance after mean-imputation of missing values are now removed before PCA, preventing the `prcomp()` error "cannot rescale a constant/zero column to unit variance".
+* Bugfix in `pca_plot()`: markers where `sd(na.rm = TRUE)` returns `NA` (e.g. only one non-NA sample) were silently retained as all-NA columns due to R's `NA > 0 = NA` subsetting behaviour; these are now correctly excluded before PCA.
+* Bugfix in `pca_plot()`: `NaN`/`Inf` values introduced when imputing columns that are entirely `NA` are now replaced and removed, preventing the `prcomp()` error "cannot rescale a constant/zero column to unit variance".
 
 
 # Qploidy 1.8.3

@@ -190,7 +190,8 @@ pca_plot <- function(
     ))
 
     marker_sd <- apply(gt_dp_num, 2, sd, na.rm = TRUE)
-    gt_dp_num_filtered <- gt_dp_num[, marker_sd > 0, drop = FALSE]
+    # Use explicit TRUE/FALSE (not NA) to avoid NA columns being silently included
+    gt_dp_num_filtered <- gt_dp_num[, !is.na(marker_sd) & marker_sd > 0, drop = FALSE]
 
     for (j in seq_len(ncol(gt_dp_num_filtered))) {
       nas <- is.na(gt_dp_num_filtered[, j])
@@ -199,13 +200,17 @@ pca_plot <- function(
       }
     }
 
-    # Re-filter after imputation: columns that were all-NA except one value
-    # become constant after mean-imputation and would cause prcomp to fail.
-    marker_sd2 <- apply(gt_dp_num_filtered, 2, sd)
-    n_removed <- sum(!is.na(marker_sd2) & marker_sd2 == 0)
+    # Replace any non-finite values (NaN, Inf, -Inf) introduced by imputation
+    gt_dp_num_filtered[!is.finite(gt_dp_num_filtered)] <- NA
+
+    # Final comprehensive filter: remove columns with any NA or zero/non-finite sd
+    keep <- apply(gt_dp_num_filtered, 2, function(col) {
+      !anyNA(col) && is.finite(sd(col)) && sd(col) > 0
+    })
+    n_removed <- sum(!keep)
     if (n_removed > 0)
-      message(n_removed, " marker(s) removed after imputation due to zero variance.")
-    gt_dp_num_filtered <- gt_dp_num_filtered[, !is.na(marker_sd2) & marker_sd2 > 0, drop = FALSE]
+      message(n_removed, " marker(s) removed after imputation due to zero variance or non-finite values.")
+    gt_dp_num_filtered <- gt_dp_num_filtered[, keep, drop = FALSE]
 
     pca_res <- prcomp(gt_dp_num_filtered, center = TRUE, scale. = TRUE)
   }

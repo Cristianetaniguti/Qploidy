@@ -473,8 +473,8 @@ hmm_estimate_CN <- function(
     }, integer(1))
 
     n_het_window <- vapply(seq_along(dosages), function(i) {
-      sum(dosages[[i]]$data$dosage != 0 & 
-      dosages[[i]]$data$dosage != ploidies_temp[i] & 
+      sum(dosages[[i]]$data$dosage != 0 &
+      dosages[[i]]$data$dosage != ploidies_temp[i] &
       dosages[[i]]$data$max_prob > dosage_threshold, na.rm = TRUE)
     }, integer(1))
 
@@ -850,12 +850,14 @@ print.hmm_CN <- function(x, ...) {
 #' The user must provide a file prefix; files will be named <prefix>_by_window.csv, <prefix>_by_marker.csv, <prefix>_params.csv.
 #' @param hmm_CN An object of class 'hmm_CN'.
 #' @param prefix File prefix for output files (character scalar).
+#'
+#' @importFrom data.table fwrite
 #' @export
 write_hmm_CN <- function(hmm_CN, prefix) {
   stopifnot(inherits(hmm_CN, "hmm_CN"))
   stopifnot(is.character(prefix) && length(prefix) == 1)
-  write.csv(hmm_CN$by_window, paste0(prefix, "_by_window.csv"), row.names = FALSE)
-  write.csv(hmm_CN$by_marker, paste0(prefix, "_by_marker.csv"), row.names = FALSE)
+  fwrite(hmm_CN$by_window, paste0(prefix, "_by_window.csv.gz"), row.names = FALSE, compress = "gzip")
+  fwrite(hmm_CN$by_marker, paste0(prefix, "_by_marker.csv.gz"), row.names = FALSE, compress = "gzip")
   # Save params or params_samples as RDS, depending on which is present
   if (!is.null(hmm_CN$params_samples)) {
     saveRDS(list(params_samples = hmm_CN$params_samples), file = paste0(prefix, "_params.rds"))
@@ -873,12 +875,19 @@ write_hmm_CN <- function(hmm_CN, prefix) {
 #' @param by_window_file Path to the by_window CSV file.
 #' @param by_marker_file Path to the by_marker CSV file.
 #' @param params_file Path to the params RDS file.
+#' @importFrom data.table fread
+#'
 #' @return An object of class 'hmm_CN'.
 #' @export
 read_hmm_CN <- function(by_window_file, by_marker_file, params_file) {
-  by_window <- read.csv(by_window_file, stringsAsFactors = FALSE)
-  by_marker <- read.csv(by_marker_file, stringsAsFactors = FALSE)
-  params_obj <- readRDS(params_file)
+  by_window <- fread(by_window_file, data.table = FALSE)
+  by_marker <- fread(by_marker_file, data.table = FALSE)
+  # Or make it flexible to handle both local files and URLs
+  if (grepl("^http", params_file)) {
+    params_obj <- readRDS(gzcon(url(params_file)))
+  } else {
+    params_obj <- readRDS(params_file)
+  }
   # Multi-sample: params_obj is a list with params_samples, or just the params_samples list itself
   if (is.list(params_obj) && (!is.null(params_obj$params_samples) || (is.null(names(params_obj)) && all(sapply(params_obj, function(x) is.list(x) && all(c("cn_grid", "mu", "sigma") %in% names(x))))))) {
     params_samples <- if (!is.null(params_obj$params_samples)) params_obj$params_samples else params_obj

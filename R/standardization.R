@@ -2,512 +2,91 @@ globalVariables(c("theta", "R", "geno", "Var1", "array.id",
                   "ids", "sd", "median", "z", "lm", "sd",
                   "snp", "centers_theta", "pnorm"))
 
-#' Estimate Centers for Standardization Using Updog Bias
-#'
-#' This function calculates the centers for standardization based on the estimated
-#' bias from the `updog` package. It identifies genotype dosage clusters and determines
-#' whether markers should be retained or removed based on the number of clusters.
-#'
-#' @param multidog_obj An object of class `multidog` (from the `updog` package),
-#' containing information about SNPs, ploidy, sequencing error rates, and bias.
-#' @param threshold.n.clusters An integer specifying the minimum number of dosage
-#' clusters (heterozygous classes) required for a marker to be retained for
-#' standardization. Default is `2`.
-#' @param rm.mks A logical vector indicating which markers should be removed.
-#' The names of the vector correspond to the marker names.
-#'
-#' @return A named list where each element corresponds to a marker and contains:
-#'   - `rm`: An integer flag indicating whether the marker is retained (`0`) or removed (`1`).
-#'   - `centers_theta`: A numeric vector of cluster centers (sorted in descending order).
-#'   - `MarkerName`: The name of the marker.
-#'   - `n.clusters`: The number of clusters identified for the marker.
-#'
-#' @details The function uses the `xi_fun` to calculate the cluster centers for each marker
-#' based on the ploidy, sequencing error rate, and bias. Markers with fewer clusters than
-#' the specified threshold are flagged for removal.
-#'
-#' @import tidyr
-#' @import dplyr
-#' @importFrom magrittr "%>%"
-#'
-#' @export
-updog_centers <- function(multidog_obj, threshold.n.clusters=2, rm.mks){
 
-  n.clusters.df <- multidog_obj$inddf %>%
-    filter(!(snp %in% rm.mks)) %>%
-    group_by(snp) %>%
-    summarize(n.clusters = length(table(geno)))
-
-  if(length(rm.mks) >0) snpdf <- multidog_obj$snpdf[-which(multidog_obj$snpdf$snp %in% rm.mks),] else snpdf <- multidog_obj$snpdf
-  ploidy <- snpdf$ploidy
-  seq <- snpdf$seq
-  bias <- snpdf$bias
-
-  result <- list()
-  for(i in seq_along(bias)){
-    centers_theta <- xi_fun(p = (0:ploidy[i])/ploidy[i], eps = seq[i], h = bias[i])
-
-    result[[i]] <- list(rm = if(n.clusters.df[i,]$n.clusters >= threshold.n.clusters) 0 else 1,
-                        centers_theta = sort(1 - centers_theta),
-                        MarkerName = n.clusters.df[i,]$snp,
-                        n.clusters = n.clusters.df[i,]$n.clusters)
-  }
-
-  names(result) <- snpdf$snp
-  return(result)
-}
-
-#' Calculate B-Allele Frequency (BAF) from Theta Values
-#'
-#' This function calculates the B-allele frequency (BAF) from normalized theta values,
-#' using cluster centers that represent genotype classes. BAF is computed by linearly
-#' interpolating the theta values between adjacent genotype cluster centroids.
-#'
-#' The approach is based on the methodology described by Wang et al. (2007), and is
-#' commonly used in SNP genotyping to infer allele-specific signal intensities.
-#'
-#' @param theta_subject A numeric vector of theta values to be standardized. These typically
-#' represent allelic ratios or normalized intensity values for a set of samples.
-#'
-#' @param centers_theta A numeric vector of length `ploidy + 1`, representing the estimated
-#' cluster centers (centroids) for each genotype class. These values should be sorted in
-#' increasing order from homozygous reference to homozygous alternative.
-#'
-#' @param ploidy An integer indicating the ploidy level of the organism (e.g., `2` for diploid).
-#'
-#' @return A numeric vector of BAF values ranging from 0 to 1
-#'
-#' @note The `centers_theta` vector must contain exactly `ploidy + 1` values, and must be
-#' sorted in ascending order. If `theta_subject` values fall outside the range, BAFs are
-#' capped at 0 or 1 accordingly.
-#'
-#' @references Wang, K., Li, M., Hadley, D., Liu, R., Glessner, J., Grant, S. F. A., Hakonarson, H., & Bucan, M. (2007). PennCNV: An integrated hidden Markov model designed for high-resolution copy number variation detection in whole-genome SNP genotyping data. \emph{Genome Research, 17}(11), 1665–1674. \doi{10.1101/gr.6861907}
-#'
-#' @examples
-#' theta <- c(0.1, 0.35, 0.6, 0.95)
-#' centers <- c(0.1, 0.5, 0.9)
-#' get_baf(theta, centers, ploidy = 2)
-#'
-#' @export
-get_baf <- function(theta_subject, centers_theta, ploidy){
-
-  if (length(centers_theta) != (ploidy + 1)) {
-    stop("centers_theta must contain exactly ploidy + 1 values.")
-  }
-
-  baf <- rep(NA, length(theta_subject))
-  ploidy_freq <- seq(0,1,1/(ploidy))
-  ploidy_freq_multi <- 1/ploidy
-  centers_theta <- sort(centers_theta, decreasing = F)
-  idx <- which(theta_subject <= centers_theta[1])
-  if(length(idx) > 0) baf[idx] <- 0
-  for(i in 2:(ploidy+1)){
-    idx <- which(theta_subject > centers_theta[i-1] & theta_subject <= centers_theta[i])
-    D2 <- centers_theta[i] - centers_theta[i-1]
-    D1 <- as.numeric(theta_subject[idx]) - centers_theta[i-1]
-    baf[idx] <- ploidy_freq[i-1] + (D1/D2)*ploidy_freq_multi
-  }
-  idx <- which(theta_subject >= centers_theta[ploidy+1])
-  if(length(idx) > 0) baf[idx] <- 1
-
-  return(baf)
-}
-
-#' To create baf in parallel
-#'
-#' @param par_all_item list containing R and theta matrices, and clusters models
-#' @param ploidy integer defining ploidy
-#'
-#' @return A list of numeric vectors, where each vector contains the BAF values
-#'         for a corresponding row in the input `par_all_item` matrices. Each BAF
-#'         vector has values ranging from 0 to 1, representing the standardized
-#'         allelic ratios for the respective samples or markers.
-#'
-#' @export
-get_baf_par <- function(par_all_item, ploidy=2){
-  baf <- list()
-  i <- 1
-  for(i in seq_len(nrow(par_all_item[[1]]))){
-    baf[[i]] <- get_baf(theta_subject = as.numeric(par_all_item[[1]][i,-1]),
-                        centers_theta = as.numeric(par_all_item[[2]][i,-1]),
-                        ploidy = ploidy)
-  }
-
-  return(baf)
-}
-
-#' Estimate Cluster Centers for Genotype Dosage Classes
-#'
-#' This function estimates the cluster centers for each genotype dosage class
-#' based on the `theta` values (e.g., allelic ratios or normalized signal intensities).
-#' It supports imputing missing clusters and optionally removing outliers.
-#'
-#' @param ratio_geno A data.frame containing the following columns:
-#'   - `MarkerName`: Identifier for each marker.
-#'   - `SampleName`: Identifier for each sample.
-#'   - `theta`: Numeric variable representing allelic ratio or signal intensity.
-#'   - `geno`: Integer dosage (e.g., 0, 1, 2 for diploids).
-#'
-#' @param ploidy Integer specifying the organism ploidy (e.g., 2 for diploid).
-#'
-#' @param n.clusters.thr Integer specifying the minimum number of genotype clusters
-#'   required for a marker to be retained. If fewer clusters are found, missing ones
-#'   can be imputed depending on the `type`.
-#'   Defaults to `ploidy + 1` if `NULL`.
-#'
-#' @param type Character string indicating the data source type:
-#'   - `"intensities"`: For array-based allele intensities.
-#'   - `"counts"`: For sequencing read counts.
-#'   Default is `"intensities"`.
-#'
-#' @param rm_outlier Logical; if `TRUE`, outlier samples within genotype clusters
-#'   will be identified and removed prior to center calculation (default: `TRUE`).
-#'
-#' @param cluster_median Logical; if `TRUE`, cluster centers are calculated using
-#'   the median of `theta` values. If `FALSE`, the mean is used (default: `TRUE`).
-#'
-#' @return A named list with the following elements:
-#'   - `rm`: Integer flag: `0` (retained), `1` (no clusters found), or `2` (too few clusters).
-#'   - `centers_theta`: A numeric vector of cluster center positions on the theta scale.
-#'   - `MarkerName`: Marker identifier.
-#'   - `n.clusters`: Number of clusters (including imputed ones if applicable).
-#'
-#' @import dplyr
-#' @import tidyr
-#' @importFrom magrittr "%>%"
-#'
-#' @export
-get_centers <- function(ratio_geno,
-                        ploidy,
-                        n.clusters.thr = NULL,
-                        type = c("intensities", "counts"),
-                        rm_outlier = TRUE,
-                        cluster_median = TRUE){
-
-  if(all(is.na(ratio_geno$theta))) centers <- which(!is.na(ratio_geno$theta)) else {
-    if(is.null(n.clusters.thr)) n.clusters.thr <- ploidy + 1
-
-    # Adjust codification
-    ad <- ratio_geno %>% filter(!is.na(theta) & !is.na(geno)) %>% group_by(geno) %>% summarise(mean = mean(theta))
-    if(ad$mean[1] > ad$mean[nrow(ad)]) {
-      genos = data.frame(geno = 0:ploidy, geno.new = ploidy:0)
-      ratio_geno$geno <- genos$geno.new[match(ratio_geno$geno,genos$geno)]
-    }
-
-    plot_data_split <- split(ratio_geno, ratio_geno$geno)
-
-    if(rm_outlier) plot_data_split <- lapply(plot_data_split, function(x) rm_outlier(x))
-
-    if(cluster_median){
-      centers <- lapply(plot_data_split, function(x) apply(x[,3:4], 2, function(y) median(y, na.rm = TRUE)))
-    } else centers <- lapply(plot_data_split, function(x) apply(x[,3:4], 2, function(y) mean(y, na.rm = TRUE)))
-  }
-
-  if(length(centers) == 0 || length(centers) < n.clusters.thr) {
-    return(list(rm= {if(length(centers) == 0) 1 else if(length(centers) < n.clusters.thr) 2},
-                centers_theta = centers,
-                MarkerName = unique(ratio_geno$MarkerName),
-                n.clusters = length(centers)))
-  } else {
-    centers_df <- data.frame(dose = names(centers), do.call(rbind, centers))
-
-    # If one or more cluster is missing, this code will input using the mean distance between the other clusters
-    if(length(centers) < ploidy + 1){
-      doses <- 0:ploidy
-      new_centers_df <- data.frame(dose = doses)
-      new_centers_df$theta <- NA
-      new_centers_df$theta[match(names(centers), doses)] <- centers_df$theta
-      mis <- which(is.na(new_centers_df$theta))
-      wi <- which(!is.na(new_centers_df$theta))
-
-      if(length(type == 2)) select_type <- match.arg(type)
-      if(select_type == "counts"){
-        loop <- sort(mis, decreasing = T)
-        if(any(loop == 1)) loop <- c(1,loop[-which(loop==1)]) # 1 and ploidy + 1 first in the loop
-        for(miss_i in loop){
-          if(miss_i == 1) { # Avoid numbers < 0 and > 1 as theta
-            new_centers_df[1,2] <- 0
-          } else if(miss_i == nrow(new_centers_df)) {
-            new_centers_df[nrow(new_centers_df),2] <- 1
-          } else {
-            # find the interval
-            before <- after <- miss_i
-            before <- before - 1
-            after <- after + 1
-            while(is.na(new_centers_df$theta[before])) {
-              before <- before - 1
-            }
-            while(is.na(new_centers_df$theta[after])) {
-              after <- after + 1
-            }
-            new_centers_df$theta[miss_i] <- new_centers_df$theta[before] + (miss_i-before)*((new_centers_df$theta[after] - new_centers_df$theta[before])/(after-before))
-          }
-        }
-      } else if(select_type == "intensities"){
-        input <- mean(diff(centers_df$theta)/diff(as.numeric(names(centers))))
-        for (i in seq_along(mis)) {
-          if (mis[i] < wi[1]) {
-            new_centers_df$theta[mis[i]] <- new_centers_df$theta[wi[1]] -
-              (wi[1] - mis[i]) * input
-          }
-          if (mis[i] > wi[1]) {
-            new_centers_df$theta[mis[i]] <- new_centers_df$theta[wi[length(wi)]] +
-              diff(c(wi[length(wi)], mis[i])) * input
-          }
-        }
-      }
-      centers_df <- new_centers_df
-    }
-
-    centers_df <- cbind(centers_df, cluster = seq_len(nrow(centers_df)))
-
-    return(list(rm = 0,
-                centers_theta = centers_df$theta,
-                MarkerName = unique(ratio_geno$MarkerName),
-                n.clusters = length(centers)))
-
-  }
-}
-
-#' Calculate Z-Scores for Allele Intensities or Counts
-#'
-#' This function computes per-marker Z-scores based on the total signal intensity (R),
-#' which typically represents the sum of reference (X) and alternative (Y) allele signals.
-#' The Z-score measures how much each sample deviates from the mean intensity of that marker.
-#'
-#' The function also merges positional metadata from the `geno.pos` input, adding chromosome
-#' and physical position for each marker.
-#'
-#' @param data A data.frame containing signal intensity and ratio values with the following columns:
-#' \describe{
-#'   \item{MarkerName}{Marker identifiers.}
-#'   \item{SampleName}{Sample identifiers.}
-#'   \item{X}{Reference allele intensity or count.}
-#'   \item{Y}{Alternative allele intensity or count.}
-#'   \item{R}{Total signal or depth (i.e., \code{X + Y}).}
-#'   \item{ratio}{Allelic ratio, typically \code{Y / (X + Y)}.}
-#' }
-#'
-#' @param geno.pos A data.frame with marker genomic positions, containing the following columns:
-#' \describe{
-#'   \item{MarkerName}{Marker identifiers.}
-#'   \item{Chromosome}{Chromosome identifier where the marker is located.}
-#'   \item{Position}{Genomic position (base-pair coordinate) of the marker.}
-#' }
-#'
-#' @return A data.frame containing the following columns:
-#' \describe{
-#'   \item{MarkerName}{Marker ID.}
-#'   \item{Chr}{Chromosome corresponding to the marker.}
-#'   \item{Position}{Genomic position (bp).}
-#'   \item{SampleName}{Sample ID.}
-#'   \item{z}{Z-score computed per marker across all samples.}
-#' }
-#' Markers with missing chromosome or position information are excluded from the final output.
-#'
-#' @import dplyr
-#' @import tidyr
-#' @importFrom magrittr "%>%"
-#'
-#' @examples
-#' data <- data.frame(
-#'   MarkerName = rep("m1", 5),
-#'   SampleName = paste0("S", 1:5),
-#'   X = c(100, 110, 90, 95, 85),
-#'   Y = c(200, 190, 210, 205, 215),
-#'   R = c(300, 300, 300, 300, 300),
-#'   ratio = c(0.67, 0.63, 0.70, 0.68, 0.72)
-#' )
-#' geno.pos <- data.frame(MarkerName = "m1", Chromosome = "1", Position = 123456)
-#' get_zscore(data, geno.pos)
-#'
-#' @export
-get_zscore <- function(data = NULL,
-                       geno.pos = NULL){
-
-  stopifnot(all(c("MarkerName", "SampleName", "R") %in% colnames(data)))
-
-  zscore <- data %>% group_by(MarkerName) %>%
-    mutate(z = (R - mean(R, na.rm = TRUE))/sd(R, na.rm = TRUE)) %>% select(MarkerName, SampleName, z)
-
-  colnames(geno.pos)[1] <- c("MarkerName")
-
-  chr <- geno.pos$Chromosome[match(zscore$MarkerName,geno.pos$MarkerName)]
-  pos <- geno.pos$Position[match(zscore$MarkerName,geno.pos$MarkerName)]
-
-  zscore <- cbind(MarkerName=zscore$MarkerName, Chr = chr, Position = pos, zscore[,-1])
-
-  if(length(which(is.na(zscore$Chr)))> 0)
-    zscore <- zscore[-which(is.na(zscore$Chr)),]
-
-  return(zscore)
-}
-
-
-#' Identify and Remove Outliers Based on Bonferroni-Holm Adjusted P-values
-#'
-#' This function detects and removes outlier observations from a vector of `theta` values
-#' using externally studentized residuals and the Bonferroni-Holm adjustment for multiple testing.
-#' It is typically used during genotype cluster center estimation to clean noisy values.
-#'
-#' The method fits a constant model (`theta ~ 1`) and computes standardized residuals.
-#' Observations with significant deviation are flagged using the Bonferroni-Holm procedure
-#' and removed if their adjusted p-value is below the defined `alpha` threshold.
-#'
-#' This function was originally developed by **Kaio Olympio** and incorporated into the Qploidy workflow.
-#'
-#' @param data A data.frame containing a `theta` column.
-#'   This is usually a subset of the full dataset, representing samples within a single genotype class.
-#'
-#' @param alpha Significance level for identifying outliers (default is `0.05`).
-#'   Observations with adjusted p-values below this threshold will be removed.
-#'
-#' @return A data.frame containing only the non-outlier observations from the input.
-#'   If fewer than two non-NA `theta` values are present or if all values are identical,
-#'   the input is returned unmodified.
-#'
-#' @author Kaio Olympio
-#'
-#' @importFrom stats lm pnorm sd
-#' @import multtest
-#'
-#' @export
-rm_outlier <- function(data, alpha=0.05){
-  # Produce externally standardized residuals
-  theta <- data$theta
-  rm.na <- which(is.na(theta))
-  if(length(rm.na) > 0) theta <- theta[-rm.na]
-  if(length(theta) < 2 || length(unique(theta)) == 1) {
-    return(data)
-  } else {
-    lm.object <- lm(theta ~ 1)
-    resid <- lm.object$residuals
-    studresid <- resid/sd(resid, na.rm=TRUE)
-    # Calculate adjusted p-values
-    rawp.BHStud = 2 * (1 - pnorm(abs(studresid)))
-    #Produce a Bonferroni-Holm tests for the adjusted p-values
-    #The output is a list
-    test.BHStud <- multtest::mt.rawp2adjp(rawp.BHStud,proc=c("Holm"),alpha = alpha)
-    #Create vectors/matrices out of the list of the BH tests
-    adjp = cbind(test.BHStud[[1]][,1])
-    bholm = cbind(test.BHStud[[1]][,2])
-    index = test.BHStud$index
-    # Condition to flag outliers according to the BH test
-    out_flag = ifelse(bholm<alpha, "OUTLIER ", ".")
-    #Create a matrix with all the output of the BH test
-    BHStud_test = cbind(adjp,bholm,index,out_flag)
-    #Order the file by index
-    BHStud_test2 = BHStud_test[order(index),]
-    #Label colums
-    names = c("rawp","bholm","index","out_flag")
-    colnames(BHStud_test2) <- names
-    #Create a final file, with the data and the test and the labels for the outliers
-
-    # Take a look at the outliers
-    outliers_BH <- as.numeric(BHStud_test2[which(BHStud_test2[,"out_flag"]!="."),"index"])
-    if(length(outliers_BH) >0) new.theta <- data[-outliers_BH,] else new.theta <- data
-
-    return(new.theta)
-  }
-}
-
-#' Standardize Allelic Ratio Data and Compute BAF and Z-Scores
-#'
-#' This function performs signal standardization of genotype data by aligning `theta` values
-#' (allelic ratios or normalized intensities) to expected genotype clusters. It outputs
-#' standardized BAF (B-allele frequency) and Z-scores per sample and marker.
-#'
-#' Reference genotypes are used to estimate cluster centers either from dosage data
-#' (e.g., via `fitpoly` or `updog`) or using an `updog` `multidog` object directly.
-#' This function supports both array-based (intensity) and sequencing-based (count) data.
-#'
-#' It applies marker and genotype-level quality filters, uses parallel computing
-#' to estimate BAF, and generates a final annotated output suitable for CNV or
-#' dosage variation analyses.
-#'
-#' Filtering steps:
-#'   1. Genotype probability filter: Genotypes with probability below `threshold.geno.prob` are set to missing.
-#'   2. Marker missingness filter: Markers with fraction of missing genotypes above `threshold.missing.geno` are removed.
-#'   3. Cluster number filter: Markers with fewer than `threshold.n.clusters` clusters are removed.
-#'   4. Genomic info filter: Markers lacking chromosome or position info are removed.
-#'
-#' Merging logic:
-#'   - The function merges filtered genotype and signal data, estimates cluster centers, computes BAFs in parallel,
-#'     and calculates Z-scores. Results are merged into a single output data.frame containing BAF, Z-score, and genotype info.
-#'
-#' @param data A `data.frame` containing the full dataset with the following columns:
-#'   - MarkerName: Marker identifiers.
-#'   - SampleName: Sample identifiers.
-#'   - X: Reference allele intensity or count.
-#'   - Y: Alternative allele intensity or count.
-#'   - R: Total signal intensity or read depth (X + Y).
-#'   - ratio: Allelic ratio, typically Y / (X + Y).
-#'
-#' @param genos A `data.frame` containing genotype dosage information for the reference panel.
-#'   - MarkerName: Marker identifiers.
-#'   - SampleName: Sample identifiers.
-#'   - geno: Estimated dosage (0, 1, 2, ...).
-#'   - prob: Genotype call probability (used for filtering low-confidence genotypes).
-#'
-#' @param geno.pos A `data.frame` with marker position metadata.
-#'   - MarkerName: Marker identifiers.
-#'   - Chromosome: Chromosome names.
-#'   - Position: Base-pair positions on the genome.
-#'
-#' @param threshold.missing.geno Numeric (0–1). Maximum fraction of missing genotype data allowed per marker.
-#'   Markers with a higher fraction will be removed.
-#'
-#' @param threshold.geno.prob Numeric (0–1). Minimum genotype call probability threshold.
-#'   Genotypes with lower probability will be treated as missing.
-#'
-#' @param ploidy.standardization Integer. The ploidy level of the reference panel used for standardization.
-#'
-#' @param threshold.n.clusters Integer. Minimum number of expected dosage clusters per marker.
-#'   For diploid data, this is typically 3 (corresponding to genotypes 0, 1, and 2).
-#'
-#' @param n.cores Integer. Number of cores to use in parallel computations (e.g., for cluster center estimation and BAF generation).
-#'
-#' @param out_filename Optional. Path to save the final standardized dataset to disk as a CSV file (suitable for Qploidy).
-#'
-#' @param type Character. Type of data used for clustering:
-#'   - "intensities": For array-based allele intensity data.
-#'   - "counts": For sequencing data.
-#'   - "updog": Automatically set when `multidog_obj` is provided.
-#'
-#' @param multidog_obj Optional. An object of class `multidog` from the `updog` package, containing model fits and estimated biases.
-#'   If provided, this will override the `type` parameter and use `updog`'s expected cluster positions.
-#'
-#' @param parallel.type Character. Parallel backend to use ("FORK" or "PSOCK"). "FORK" is faster but only works on Unix-like systems.
-#'
-#' @param rm_outlier Logical. If TRUE, uses Bonferroni-Holm corrected residuals to remove outliers before estimating cluster centers.
-#'
-#' @param cluster_median Logical. If TRUE, uses the median of theta values to estimate cluster centers. If FALSE, uses the mean.
-#'
-#' @param verbose Logical. If TRUE, prints progress and filtering information to the console.
-#'
-#' @return An object of class "qploidy_standardization" (list) with the following components:
-#'   - info: Named vector of standardization parameters.
-#'   - filters: Named vector summarizing how many markers were removed at each filtering step.
-#'   - data: A data.frame containing merged BAF, Z-score, and genotype information by marker and sample.
-#'
-#' @importFrom dplyr group_by summarize filter mutate inner_join full_join
-#' @importFrom tidyr pivot_wider pivot_longer
-#' @importFrom vroom vroom_write
-#' @importFrom parallel makeCluster stopCluster clusterExport parLapply clusterEvalQ
-#' @importFrom stats sd
-#'
-#' @examples
-#' # Example usage:
-#' # data <- ... # see vignette for example data
-#' # genos <- ...
-#' # geno.pos <- ...
-#' # result <- standardize(data, genos, geno.pos, ploidy.standardization=2, threshold.n.clusters=3, n.cores=2)
-#'
-#' @export
+##' Standardize allelic ratio data and compute BAF and Z-scores
+##'
+##' Performs signal standardization of genotype data by aligning `theta` values (allelic ratios or normalized intensities)
+##' to expected genotype clusters. Outputs standardized BAF (B-allele frequency) and Z-scores per sample and marker.
+##'
+##' Reference genotypes are used to estimate cluster centers either from dosage data (e.g., via `fitpoly` or `updog`)
+##' or using an `updog` `multidog` object directly. Supports both array-based (intensity) and sequencing-based (count) data.
+##'
+##' The function applies marker and genotype-level quality filters, uses parallel computing to estimate BAF, and generates
+##' a final annotated output suitable for CNV or dosage variation analyses.
+##'
+##' Filtering steps include:
+##'   1. Genotype probability filter: datapoints with probability below `threshold.geno.prob` are set to missing.
+##'   2. Marker missingness filter: Markers with fraction of missing datapoints above `threshold.missing.geno` are removed.
+##'   3. Cluster number filter: Markers with fewer than `threshold.n.clusters` clusters are removed.
+##'   4. Genomic info filter: Markers lacking chromosome or position info are removed.
+##'
+##' Merging logic:
+##'   - The function merges filtered genotype and signal data, estimates cluster centers, computes BAFs in parallel,
+##'     and calculates Z-scores. Results are merged into a single output data.frame containing BAF, Z-score, and genotype info.
+##'
+##' @param data A `data.frame` containing the full dataset with columns:
+##'   - MarkerName: Marker identifiers
+##'   - SampleName: Sample identifiers
+##'   - X: Reference allele intensity or count
+##'   - Y: Alternative allele intensity or count
+##'   - R: Total signal intensity or read depth (X + Y)
+##'   - ratio: Allelic ratio, typically Y / (X + Y)
+##'
+##' @param genos A `data.frame` containing genotype dosage information for the reference panel, with columns:
+##'   - MarkerName: Marker identifiers
+##'   - SampleName: Sample identifiers
+##'   - geno: Estimated dosage (0, 1, 2, ...)
+##'   - prob: Genotype call probability (used for filtering low-confidence datapoints)
+##'
+##' @param geno.pos A `data.frame` with marker position metadata, with columns:
+##'   - MarkerName: Marker identifiers
+##'   - Chromosome: Chromosome names
+##'   - Position: Base-pair positions on the genome
+##'
+##' @param threshold.missing.geno Numeric (0–1). Maximum fraction of missing datapoints allowed per marker. Markers with a higher fraction will be removed.
+##' @param threshold.geno.prob Numeric (0–1). Minimum genotype call probability threshold. Datapoints with lower probability will be treated as missing.
+##' @param ploidy.standardization Integer. The ploidy level of the reference panel used for standardization.
+##' @param threshold.n.clusters Integer. Minimum number of expected dosage clusters per marker. For diploid data, this is typically 3 (corresponding to dosages 0, 1, and 2). Cannot exceed `ploidy.standardization + 1`.
+##' @param n.cores Integer. Number of cores to use in parallel computations (e.g., for cluster center estimation and BAF generation).
+##' @param out_filename Optional. Path to save the final standardized dataset to disk as a CSV file (suitable for Qploidy).
+##' @param type Character. Type of data used for clustering: "intensities" (array-based), "counts" (sequencing), or "updog" (set automatically if `multidog_obj` is provided).
+##' @param multidog_obj Optional. An object of class `multidog` from the `updog` package, containing model fits and estimated biases. If provided, this will override the `type` parameter and use `updog`'s expected cluster positions.
+##' @param parallel.type Character. Parallel backend to use ("FORK" or "PSOCK"). "FORK" is faster but only works on Unix-like systems.
+##' @param verbose Logical. If TRUE, prints progress and filtering information to the console.
+##' @param rm_outlier Logical. If TRUE, uses Bonferroni-Holm corrected residuals to remove outliers before estimating cluster centers.
+##' @param cluster_median Logical. If TRUE, uses the median of theta values to estimate cluster centers. If FALSE, uses the mean.
+##' @param filter_R Logical. If TRUE, calculates Z-scores only for markers that passed missing data filter (default: FALSE).
+##'
+##' @return An object of class `qploidy_standardization` (list) with the following components:
+##'   - info: Named vector of standardization parameters
+##'   - filters: Named vector summarizing how many markers were removed at each filtering step
+##'   - data: A data.frame containing merged BAF, Z-score, and genotype information by marker and sample
+##'
+##' @importFrom dplyr group_by summarize filter mutate inner_join full_join
+##' @importFrom tidyr pivot_wider pivot_longer
+##' @importFrom vroom vroom_write
+##' @importFrom parallel makeCluster stopCluster clusterExport parLapply clusterEvalQ
+##' @importFrom stats sd
+##'
+##' @examples
+##' # Example usage:
+##' # data <- ... # see vignette for example data
+##' # genos <- ...
+##' # geno.pos <- ...
+##' # result <- standardize(
+##' #   data = data,
+##' #   genos = genos,
+##' #   geno.pos = geno.pos,
+##' #   ploidy.standardization = 2,
+##' #   threshold.n.clusters = 3,
+##' #   n.cores = 2
+##' # )
+##'
+##' @export
 standardize <- function(data = NULL,
                         genos = NULL,
                         geno.pos = NULL,
-                        threshold.missing.geno=0.90,
+                        threshold.missing.geno=0.9,
                         threshold.geno.prob=0.8,
                         ploidy.standardization = NULL,
                         threshold.n.clusters = NULL,
@@ -518,38 +97,122 @@ standardize <- function(data = NULL,
                         parallel.type = "PSOCK",
                         verbose = TRUE,
                         rm_outlier = TRUE,
-                        cluster_median = TRUE){
+                        cluster_median = TRUE,
+                        filter_R = FALSE){
 
   if(is.null(data) || is.null(genos) || is.null(geno.pos) ||
      is.null(ploidy.standardization) || is.null(threshold.n.clusters)) {
     stop("Not all required inputs were defined.")
   }
 
-  if(!all(colnames(data) %in% c("MarkerName", "SampleName", "X", "Y", "R", "ratio"))) stop("Column names of the provided data object does not match the required.")
-  if(!all(colnames(genos) %in% c("MarkerName", "SampleName", "geno", "prob"))) stop("Column names of the provided genos object does not match the required.")
-  if(!all(colnames(geno.pos) %in% c("MarkerName", "SampleName", "Chromosome", "Position"))) stop("Column names of the provided geno.pos object does not match the required.")
+  # Scalar type checks
+  if (!is.data.frame(data))     stop("'data' must be a data.frame.")
+  if (!is.data.frame(genos))    stop("'genos' must be a data.frame.")
+  if (!is.data.frame(geno.pos)) stop("'geno.pos' must be a data.frame.")
+  if (nrow(data) == 0)     stop("'data' has no rows.")
+  if (nrow(genos) == 0)    stop("'genos' has no rows.")
+  if (nrow(geno.pos) == 0) stop("'geno.pos' has no rows.")
+
+  if (!is.numeric(threshold.missing.geno) || length(threshold.missing.geno) != 1 ||
+      threshold.missing.geno < 0 || threshold.missing.geno > 1)
+    stop("'threshold.missing.geno' must be a single numeric value in [0, 1].")
+
+  if (!is.numeric(threshold.geno.prob) || length(threshold.geno.prob) != 1 ||
+      threshold.geno.prob < 0 || threshold.geno.prob > 1)
+    stop("'threshold.geno.prob' must be a single numeric value in [0, 1].")
+
+  if (!is.numeric(ploidy.standardization) || length(ploidy.standardization) != 1 ||
+      ploidy.standardization < 1 || ploidy.standardization != as.integer(ploidy.standardization))
+    stop("'ploidy.standardization' must be a single positive integer.")
+
+  if (!is.null(threshold.n.clusters) &&
+      (!is.numeric(threshold.n.clusters) || length(threshold.n.clusters) != 1 ||
+       threshold.n.clusters < 1 || threshold.n.clusters != as.integer(threshold.n.clusters)))
+    stop("'threshold.n.clusters' must be a single positive integer.")
+
+  if (!is.null(threshold.n.clusters) && threshold.n.clusters > ploidy.standardization + 1)
+    stop(sprintf("'threshold.n.clusters' cannot be higher than ploidy.standardization + 1 (%d).",
+                 ploidy.standardization + 1L))
+
+  if (!is.numeric(n.cores) || length(n.cores) != 1 || n.cores < 1 || n.cores != as.integer(n.cores))
+    stop("'n.cores' must be a single positive integer.")
+
+  if (!is.null(out_filename) && (!is.character(out_filename) || length(out_filename) != 1))
+    stop("'out_filename' must be a single character string or NULL.")
+
+  allowed_types <- c("intensities", "counts", "updog")
+  if (!is.character(type) || length(type) != 1 || !type %in% allowed_types)
+    stop(sprintf("'type' must be one of: %s.", paste(allowed_types, collapse = ", ")))
+
+  allowed_parallel <- c("FORK", "PSOCK")
+  if (!is.character(parallel.type) || length(parallel.type) != 1 || !parallel.type %in% allowed_parallel)
+    stop(sprintf("'parallel.type' must be one of: %s.", paste(allowed_parallel, collapse = ", ")))
+
+  if (!is.logical(verbose)       || length(verbose) != 1)       stop("'verbose' must be a single logical value.")
+  if (!is.logical(rm_outlier)    || length(rm_outlier) != 1)    stop("'rm_outlier' must be a single logical value.")
+  if (!is.logical(cluster_median)|| length(cluster_median) != 1) stop("'cluster_median' must be a single logical value.")
+  if (!is.logical(filter_R)      || length(filter_R) != 1)      stop("'filter_R' must be a single logical value.")
+
+  if (!is.null(multidog_obj) && !inherits(multidog_obj, "multidog"))
+    stop("'multidog_obj' must be an object of class 'multidog' (from the updog package) or NULL.")
+
+  # Check column names and order for data
+  required_data_cols <- c("MarkerName", "SampleName", "X", "Y", "R", "ratio")
+  if (!identical(colnames(data), required_data_cols)) {
+    stop(sprintf(
+      "Column names of the provided data object must be exactly: %s (in this order).",
+      paste(required_data_cols, collapse = ", ")
+    ))
+  }
+  # Check column names and order for genos
+  allowed_genos_cols <- list(
+    c("MarkerName", "SampleName", "geno"),
+    c("MarkerName", "SampleName", "geno", "prob")
+  )
+  genos_colnames <- colnames(genos)
+  if (!any(sapply(allowed_genos_cols, function(cols) identical(genos_colnames, cols)))) {
+    stop(sprintf(
+      "Column names of the provided genos object must be exactly: %s (in this order), or: %s (in this order).",
+      paste(allowed_genos_cols[[1]], collapse = ", "),
+      paste(allowed_genos_cols[[2]], collapse = ", ")
+    ))
+  }
+  has_prob_col <- identical(genos_colnames, allowed_genos_cols[[2]])
+
+  # Check column names and order for geno.pos
+  required_genopos_cols <- c("MarkerName", "Chromosome", "Position")
+  if (!identical(colnames(geno.pos), required_genopos_cols)) {
+    stop(sprintf(
+      "Column names of the provided geno.pos object must be exactly: %s (in this order).",
+      paste(required_genopos_cols, collapse = ", ")
+    ))
+  }
 
   dose <- max(genos$geno, na.rm = T)
   if(dose != ploidy.standardization) stop("Ploidy of the provided reference samples do not match with the one defined in the ploidy.standardization parameter.")
 
-  if(verbose) cat("Generating standardized BAFs...\n")
+  vmsg("Generating standardized BAFs", verbose = verbose, level = 0, type = ">>")
   if(is.null(threshold.n.clusters)) threshold.n.clusters <- ploidy.standardization + 1
 
-  ## Filter by prob
-  idx <- genos$prob < threshold.geno.prob
-  prob.rm <- table(idx)
-  if(!is.na(prob.rm["TRUE"])) prob.rm <- round(as.numeric(prob.rm["TRUE"]/sum(prob.rm)*100),2) else prob.rm <- 0
-  idx <- which(idx)
-  if(length(idx) > 0) genos$geno[idx] <- NA
-
-  if(verbose) print(paste0("Percentage of genotypes turned into missing data because of low genotype probability:", prob.rm))
+  ## Filter by prob (only if prob column is present)
+  if (has_prob_col) {
+    idx <- genos$prob < threshold.geno.prob
+    prob.rm <- table(idx)
+    if(!is.na(prob.rm["TRUE"])) prob.rm <- round(as.numeric(prob.rm["TRUE"]/sum(prob.rm)*100),2) else prob.rm <- 0
+    idx <- which(idx)
+    if(length(idx) > 0) genos$geno[idx] <- NA
+    vmsg("Percentage of datapoints turned into missing data because of low genotype probability: %s", verbose = verbose, level = 2, type = ">>", prob.rm)
+  } else {
+    prob.rm <- 0
+    vmsg("No 'prob' column in genos: skipping genotype probability filtering.", verbose = verbose, level = 1, type = ">>")
+  }
 
   ## Filter by missing data
   n.na <- genos %>% group_by(MarkerName) %>% summarize(n.na = (sum(is.na(geno))/length(geno)))
   rm.mks <- n.na$MarkerName[which(n.na$n.na > threshold.missing.geno)]
   mis.rm <- length(rm.mks)
 
-  if(verbose) print(paste0("Markers removed because of excess of missing data:", mis.rm))
+  vmsg("Markers removed because of excess of missing data: %s", verbose = verbose, level = 2, type = ">>", mis.rm)
 
   if(length(rm.mks) > 0){
     genos_filt <- genos[which(!(genos$MarkerName %in% rm.mks)),]
@@ -574,7 +237,7 @@ standardize <- function(data = NULL,
   if(is.null(multidog_obj)){
     lst_standardization <- split(data_standardization, data_standardization$MarkerName)
 
-    if(verbose) cat("Going to parallel mode...\n")
+    vmsg("Going to parallel mode", verbose = verbose, level = 1, type = ">>")
     clust <- makeCluster(n.cores, type = parallel.type)
     clusterExport(clust, c("get_centers", "rm_outlier"), envir = .GlobalEnv)
     clusterEvalQ(clust, { library(magrittr); library(dplyr)}) # load required packages and Qploidy on workers
@@ -587,7 +250,7 @@ standardize <- function(data = NULL,
 
     stopCluster(clust)
 
-    if(verbose) cat("Back to single core usage\n")
+    vmsg("Back to single core usage", verbose = verbose, level = 1, type = ">>")
 
     gc(verbose = FALSE)
 
@@ -599,7 +262,7 @@ standardize <- function(data = NULL,
   rm.mks <- sapply(clusters, function(x) x$rm != 0)
   clusters.rm <- sum(rm.mks)
 
-  if(verbose) print(paste0("Markers removed because of smaller number of clusters than set threshold:",clusters.rm))
+  vmsg("Markers removed because of smaller number of clusters than set threshold: %s", verbose = verbose, level = 2, type = ">>", clusters.rm)
 
   if(length(which(rm.mks)) > 0)  clusters_filt <- clusters[-which(rm.mks)] else clusters_filt <- clusters
 
@@ -628,7 +291,7 @@ standardize <- function(data = NULL,
   }
 
   # Get BAF
-  if(verbose) cat("Going to parallel mode...\n")
+  vmsg("Going to parallel mode", verbose = verbose, level = 1, type = ">>")
 
   clust <- makeCluster(n.cores, type = parallel.type)
   clusterExport(clust, c("get_baf_par", "get_baf"))
@@ -636,7 +299,7 @@ standardize <- function(data = NULL,
 
   stopCluster(clust)
 
-  if(verbose) cat("Back to single core usage\n")
+  vmsg("Back to single core usage", verbose = verbose, level = 1, type = ">>")
 
   gc()
 
@@ -658,19 +321,27 @@ standardize <- function(data = NULL,
     bafs_join <- bafs_join[-which(is.na(bafs_join$Chr)),]
 
   baf_melt <- pivot_longer(bafs_join, cols = 4:ncol(bafs_join), names_to = "SampleName", values_to = "baf")
-  if(verbose) cat("BAFs ready!\n")
+  vmsg("BAFs ready!", verbose = verbose, level = 1, type = ">>")
 
   # Z score
-  if(verbose) cat("Generating z scores...\n")
-  zscore <- get_zscore(data_filt, geno.pos) # z score is calculated only for markers that passed missing data filter
-  if(verbose) cat("Z scores ready!\n")
+  vmsg("Generating z scores", verbose = verbose, level = 0, type = ">>")
+  if(filter_R)
+    zscore <- get_zscore(data_filt, geno.pos) # z score is calculated only for markers that passed missing data filter
+  else zscore <- get_zscore(data, geno.pos)
 
-  if(verbose) cat("Merging results into qploidy_standardization object...\n")
+  vmsg("Z scores ready!", verbose = verbose, level = 1, type = ">>")
+
+  vmsg("Preparing outputs", verbose = verbose, level = 0, type = ">>")
+
+  vmsg("Merging results into qploidy_standardization object", verbose = verbose, level = 1, type = ">>")
   qploidy_data <- full_join(data, data_standardization[,-3], c("MarkerName", "SampleName"))
-  qploidy_data <- full_join(qploidy_data,baf_melt, c("MarkerName", "SampleName"))
-  qploidy_data <- full_join(qploidy_data[,-c(8,9)], zscore, c("MarkerName", "SampleName"))
+  qploidy_data <- full_join(qploidy_data,baf_melt[,-c(2,3)], c("MarkerName", "SampleName"))
+  qploidy_data <- full_join(qploidy_data, zscore[,-c(2,3)], c("MarkerName", "SampleName"))
 
-  qploidy_data$Position <- as.numeric(qploidy_data$Position)
+  # Fill Chr and Position columns in qploidy_data using geno.pos
+  marker_idx <- match(qploidy_data$MarkerName, geno.pos$MarkerName)
+  qploidy_data$Chr <- geno.pos$Chromosome[marker_idx]
+  qploidy_data$Position <- as.numeric(geno.pos$Position[marker_idx])
 
   result <- structure(list(info = c(threshold.missing.geno = threshold.missing.geno,
                                     threshold.geno.prob = threshold.geno.prob,
@@ -687,11 +358,11 @@ standardize <- function(data = NULL,
                            data = qploidy_data), class = "qploidy_standardization")
 
   if(!is.null(out_filename)) {
-    if(verbose) cat(paste0("Writting Qploidy app input file:", out_filename))
+    vmsg("Writting QploidyApp input file: %s", verbose = verbose, level = 1, type = ">>", out_filename)
     write_qploidy_standardization(result, out_filename)
   }
 
-  if(verbose) cat("Done!\n")
+  vmsg("Done!", verbose = verbose, level = 1, type = ">>")
   return(result)
 }
 
@@ -708,21 +379,21 @@ standardize <- function(data = NULL,
 #' @export
 print.qploidy_standardization <- function(x, ...){
 
-  info <- data.frame(c1 = c("standardization type:", "Ploidy:",
-                            "Minimum number of heterozygous classes (clusters) present:",
-                            "Maximum number of missing genotype by marker:",
-                            "Minimum genotype probability:"),
+  info <- data.frame(c1 = c("Standardization type:", "Ploidy:",
+                            "Min # of heterozygous classes (clusters) present:",
+                            "Max proportion of missing genotype by marker:",
+                            "Min genotype probability:"),
                      c2 = c(x$info["type"], x$info["ploidy.standardization"],
                             x$info["threshold.n.clusters"],
-                            1 - as.numeric(x$info["threshold.missing.geno"]),
+                            as.numeric(x$info["threshold.missing.geno"]),
                             x$info["threshold.geno.prob"]))
 
-  format.df <- data.frame(c1 = c("Number of markers at raw data:",
-                                 "Percentage of filtered genotypes by probability threshold:",
-                                 "Number of markers filtered by missing data:",
-                                 "Number of markers filtered for not having the minimum number of clusters:",
-                                 "Number of markers filtered for not having genomic information:",
-                                 "Number of markers with estimated BAF:"),
+  format.df <- data.frame(c1 = c("# markers at raw data:",
+                                 "% datapoints filtered by low probability:",
+                                 "# markers filtered by missing data:",
+                                 "# markers filtered by min number of clusters:",
+                                 "# markers filtered by lack of genomic information:",
+                                 "# markers remaining with estimated BAF:"),
                           c2 = c(x$filters["n.markers.start"],
                                  "-",
                                  x$filters["miss.rm"],
@@ -738,7 +409,7 @@ print.qploidy_standardization <- function(x, ...){
 
   colnames(info) <- rownames(info) <- colnames(format.df) <- rownames(format.df) <- NULL
 
-  cat("This is on object of class 'ploidy_standardization'\n")
+  cat("This is an object of class 'qploidy_standardization'\n")
   cat("--------------------------------------------------------------------\n")
   cat("Parameters\n")
   print(format(info, justify="left", digit = 2))
@@ -868,4 +539,137 @@ write_qploidy_standardization <- function(qploidy_standardization_object, out_fi
   vroom_write(info, file = out_filename, col_names = T)
   vroom_write(filters, file = out_filename, append = TRUE, col_names = T)
   vroom_write(qploidy_standardization_object$data, file = out_filename, append = TRUE, col_names = T)
+}
+
+
+##' Re-standardize a Qploidy HMM object
+##'
+##' Re-runs the Qploidy standardization pipeline on a HMM object (from `hmm_estimate_CN_multi`),
+##' generating a new `qploidy_standardization` object for downstream analysis or Shiny app input.
+##' This is useful for re-standardizing after model selection or parameter tuning.
+##'
+##' The function extracts marker-level data and genotype dosages for a selected model, applies quality filters,
+##' estimates cluster centers, computes BAF (B-allele frequency) and Z-scores, and merges results into a standardized data frame.
+##'
+##' @param data A `data.frame` containing the full dataset with columns:
+##'   - MarkerName: Marker identifiers
+##'   - SampleName: Sample identifiers
+##'   - X: Reference allele intensity or count
+##'   - Y: Alternative allele intensity or count
+##'   - R: Total signal intensity or read depth (X + Y)
+##'   - ratio: Allelic ratio, typically Y / (X + Y)
+##'
+##' @param geno.pos A `data.frame` with marker genomic positions, with columns:
+##'   - MarkerName: Marker identifiers
+##'   - Chromosome: Chromosome identifier
+##'   - Position: Genomic position (base-pair coordinate)
+##'
+##' @param hmm_CN_multi An object of class `hmm_CN` as returned by `hmm_estimate_CN_multi`.
+##' @param selected_model Character. The name of the model to use from `hmm_CN_multi$params_samples` (required).
+##' @param ploidy.standardization Integer. Ploidy level to use for standardization. If NULL, uses the mode of CN_call in dosages.
+##' @param threshold.n.clusters Integer. Minimum number of expected dosage clusters per marker. Defaults to ploidy + 1.
+##' @param n.cores Integer. Number of cores for parallel computation. Default is 1.
+##' @param threshold.geno.prob Numeric (0–1). Minimum genotype call probability. Default is 0.5.
+##' @param threshold.missing.geno Numeric (0–1). Maximum fraction of missing datapoints per marker. Default is 0.90.
+##' @param out_filename Optional. Path to save the standardized dataset (CSV/TSV).
+##' @param type Character. Data type for clustering: "intensities" (default), "counts", or "updog".
+##' @param multidog_obj Optional. updog multidog object for cluster center estimation.
+##' @param parallel.type Character. Parallel backend: "FORK" or "PSOCK". Default is "PSOCK".
+##' @param rm_outlier Logical. Remove outliers before estimating cluster centers. Default is TRUE.
+##' @param cluster_median Logical. Use median (TRUE) or mean (FALSE) for cluster centers. Default is TRUE.
+##' @param verbose Logical. Print progress messages. Default is TRUE.
+##'
+##' @return An object of class `qploidy_standardization` (list) with elements:
+##'   - info: Named vector of standardization parameters
+##'   - filters: Named vector summarizing filtering steps
+##'   - data: Data frame with merged BAF, Z-score, and genotype info by marker and sample
+##'
+##' @details
+##' This function is intended for re-standardizing a Qploidy HMM object after model selection or parameter changes.
+##' It extracts the relevant marker-level and dosage data, applies quality filters, estimates cluster centers,
+##' computes BAF and Z-scores, and merges all results into a standardized data frame suitable for downstream analysis or Shiny app input.
+##'
+##' Filtering steps include:
+##'   1. Genotype probability filter: datapoints with probability below `threshold.geno.prob` are set to missing.
+##'   2. Marker missingness filter: Markers with fraction of missing datapoints above `threshold.missing.geno` are removed.
+##'   3. Cluster number filter: Markers with fewer than `threshold.n.clusters` clusters are removed.
+##'   4. Genomic info filter: Markers lacking chromosome or position info are removed.
+##'
+##' @examples
+##' # Example usage:
+##' # hmm_CN_multi <- hmm_estimate_CN_multi(...)
+##' # std <- re_standardize(
+##' #   data = my_data,
+##' #   geno.pos = my_geno_pos,
+##' #   hmm_CN_multi = hmm_CN_multi,
+##' #   selected_model = "model1",
+##' #   ploidy.standardization = 4
+##' # )
+##'
+##' @export
+re_standardize <- function(data = NULL,
+                           geno.pos = NULL,
+                           hmm_CN_multi,
+                           selected_model = NULL,
+                           ploidy.standardization = NULL,
+                           threshold.n.clusters = NULL,
+                           n.cores = 1,
+                           threshold.geno.prob = 0.5,
+                           threshold.missing.geno = 0.90,
+                           out_filename = NULL,
+                           type = "intensities",
+                           multidog_obj = NULL,
+                           parallel.type = "PSOCK",
+                           rm_outlier = TRUE,
+                           cluster_median = TRUE,
+                           verbose = TRUE) {
+
+  # Check input object
+  # check if hmm_CN_multi is hmm_CN class
+  if (!inherits(hmm_CN_multi, "hmm_CN")) stop("Input object must be of class 'hmm_CN'")
+  # check if hmm_CN_multi has params_samples element
+  if (!any(names(hmm_CN_multi) == "params_samples")) stop("Input object must come from hmm_estimate_CN_multi function")
+
+  # make selected_model required
+  if (is.null(selected_model)) stop("selected_model must be provided")
+
+  # Call dosages for the selected model
+  dosages <- call_hmm_dosages(hmm_CN = hmm_CN_multi, selected_model)
+
+  # Set ploidy.standardization if not provided
+  if(is.null(ploidy.standardization)) {
+    ploidy.standardization <- mode( hmm_CN_multi$by_marker$CN_call)
+    if (verbose) cat("ploidy.standardization not provided, using:", ploidy.standardization, "\n")
+  }
+
+  dosages[which(dosages$CN_call != ploidy.standardization), "dosage"] <- NA
+
+  genos <- dosages[, c("MarkerName", "SampleName", "dosage", "post_max_dosage")]
+  colnames(genos)[3:4] <- c("geno", "prob")
+  genos <- genos[order(genos$MarkerName, genos$SampleName),]
+
+  if (is.null(threshold.n.clusters)) {
+    threshold.n.clusters <- ploidy.standardization + 1
+    if (verbose) cat("threshold.n.clusters not provided, using:", threshold.n.clusters, "\n")
+  }
+
+  re_qploidy_standardization <- standardize(
+    data = data,
+    genos = genos,
+    geno.pos = geno.pos,
+    ploidy.standardization = ploidy.standardization,
+    threshold.n.clusters = threshold.n.clusters,
+    n.cores = n.cores,
+    threshold.geno.prob = threshold.geno.prob,
+    threshold.missing.geno = threshold.missing.geno,
+    out_filename = out_filename,
+    type = type,
+    multidog_obj = multidog_obj,
+    parallel.type = parallel.type,
+    rm_outlier = rm_outlier,
+    cluster_median = cluster_median,
+    verbose = verbose
+  )
+
+  return(re_qploidy_standardization)
 }

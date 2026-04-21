@@ -2,7 +2,7 @@
 % Please edit documentation in R/standardization.R
 \name{standardize}
 \alias{standardize}
-\title{Standardize Allelic Ratio Data and Compute BAF and Z-Scores}
+\title{Standardize allelic ratio data and compute BAF and Z-scores}
 \usage{
 standardize(
   data = NULL,
@@ -19,51 +19,45 @@ standardize(
   parallel.type = "PSOCK",
   verbose = TRUE,
   rm_outlier = TRUE,
-  cluster_median = TRUE
+  cluster_median = TRUE,
+  filter_R = FALSE
 )
 }
 \arguments{
-\item{data}{A `data.frame` containing the full dataset with the following columns:
-- MarkerName: Marker identifiers.
-- SampleName: Sample identifiers.
-- X: Reference allele intensity or count.
-- Y: Alternative allele intensity or count.
-- R: Total signal intensity or read depth (X + Y).
-- ratio: Allelic ratio, typically Y / (X + Y).}
+\item{data}{A `data.frame` containing the full dataset with columns:
+- MarkerName: Marker identifiers
+- SampleName: Sample identifiers
+- X: Reference allele intensity or count
+- Y: Alternative allele intensity or count
+- R: Total signal intensity or read depth (X + Y)
+- ratio: Allelic ratio, typically Y / (X + Y)}
 
-\item{genos}{A `data.frame` containing genotype dosage information for the reference panel.
-- MarkerName: Marker identifiers.
-- SampleName: Sample identifiers.
-- geno: Estimated dosage (0, 1, 2, ...).
-- prob: Genotype call probability (used for filtering low-confidence genotypes).}
+\item{genos}{A `data.frame` containing genotype dosage information for the reference panel, with columns:
+- MarkerName: Marker identifiers
+- SampleName: Sample identifiers
+- geno: Estimated dosage (0, 1, 2, ...)
+- prob: Genotype call probability (used for filtering low-confidence datapoints)}
 
-\item{geno.pos}{A `data.frame` with marker position metadata.
-- MarkerName: Marker identifiers.
-- Chromosome: Chromosome names.
-- Position: Base-pair positions on the genome.}
+\item{geno.pos}{A `data.frame` with marker position metadata, with columns:
+- MarkerName: Marker identifiers
+- Chromosome: Chromosome names
+- Position: Base-pair positions on the genome}
 
-\item{threshold.missing.geno}{Numeric (0–1). Maximum fraction of missing genotype data allowed per marker.
-Markers with a higher fraction will be removed.}
+\item{threshold.missing.geno}{Numeric (0–1). Maximum fraction of missing datapoints allowed per marker. Markers with a higher fraction will be removed.}
 
-\item{threshold.geno.prob}{Numeric (0–1). Minimum genotype call probability threshold.
-Genotypes with lower probability will be treated as missing.}
+\item{threshold.geno.prob}{Numeric (0–1). Minimum genotype call probability threshold. Datapoints with lower probability will be treated as missing.}
 
 \item{ploidy.standardization}{Integer. The ploidy level of the reference panel used for standardization.}
 
-\item{threshold.n.clusters}{Integer. Minimum number of expected dosage clusters per marker.
-For diploid data, this is typically 3 (corresponding to genotypes 0, 1, and 2).}
+\item{threshold.n.clusters}{Integer. Minimum number of expected dosage clusters per marker. For diploid data, this is typically 3 (corresponding to dosages 0, 1, and 2). Cannot exceed `ploidy.standardization + 1`.}
 
 \item{n.cores}{Integer. Number of cores to use in parallel computations (e.g., for cluster center estimation and BAF generation).}
 
 \item{out_filename}{Optional. Path to save the final standardized dataset to disk as a CSV file (suitable for Qploidy).}
 
-\item{type}{Character. Type of data used for clustering:
-- "intensities": For array-based allele intensity data.
-- "counts": For sequencing data.
-- "updog": Automatically set when `multidog_obj` is provided.}
+\item{type}{Character. Type of data used for clustering: "intensities" (array-based), "counts" (sequencing), or "updog" (set automatically if `multidog_obj` is provided).}
 
-\item{multidog_obj}{Optional. An object of class `multidog` from the `updog` package, containing model fits and estimated biases.
-If provided, this will override the `type` parameter and use `updog`'s expected cluster positions.}
+\item{multidog_obj}{Optional. An object of class `multidog` from the `updog` package, containing model fits and estimated biases. If provided, this will override the `type` parameter and use `updog`'s expected cluster positions.}
 
 \item{parallel.type}{Character. Parallel backend to use ("FORK" or "PSOCK"). "FORK" is faster but only works on Unix-like systems.}
 
@@ -72,30 +66,29 @@ If provided, this will override the `type` parameter and use `updog`'s expected 
 \item{rm_outlier}{Logical. If TRUE, uses Bonferroni-Holm corrected residuals to remove outliers before estimating cluster centers.}
 
 \item{cluster_median}{Logical. If TRUE, uses the median of theta values to estimate cluster centers. If FALSE, uses the mean.}
+
+\item{filter_R}{Logical. If TRUE, calculates Z-scores only for markers that passed missing data filter (default: FALSE).}
 }
 \value{
-An object of class "qploidy_standardization" (list) with the following components:
-  - info: Named vector of standardization parameters.
-  - filters: Named vector summarizing how many markers were removed at each filtering step.
-  - data: A data.frame containing merged BAF, Z-score, and genotype information by marker and sample.
+An object of class `qploidy_standardization` (list) with the following components:
+  - info: Named vector of standardization parameters
+  - filters: Named vector summarizing how many markers were removed at each filtering step
+  - data: A data.frame containing merged BAF, Z-score, and genotype information by marker and sample
 }
 \description{
-This function performs signal standardization of genotype data by aligning `theta` values
-(allelic ratios or normalized intensities) to expected genotype clusters. It outputs
-standardized BAF (B-allele frequency) and Z-scores per sample and marker.
+Performs signal standardization of genotype data by aligning `theta` values (allelic ratios or normalized intensities)
+to expected genotype clusters. Outputs standardized BAF (B-allele frequency) and Z-scores per sample and marker.
 }
 \details{
-Reference genotypes are used to estimate cluster centers either from dosage data
-(e.g., via `fitpoly` or `updog`) or using an `updog` `multidog` object directly.
-This function supports both array-based (intensity) and sequencing-based (count) data.
+Reference genotypes are used to estimate cluster centers either from dosage data (e.g., via `fitpoly` or `updog`)
+or using an `updog` `multidog` object directly. Supports both array-based (intensity) and sequencing-based (count) data.
 
-It applies marker and genotype-level quality filters, uses parallel computing
-to estimate BAF, and generates a final annotated output suitable for CNV or
-dosage variation analyses.
+The function applies marker and genotype-level quality filters, uses parallel computing to estimate BAF, and generates
+a final annotated output suitable for CNV or dosage variation analyses.
 
-Filtering steps:
-  1. Genotype probability filter: Genotypes with probability below `threshold.geno.prob` are set to missing.
-  2. Marker missingness filter: Markers with fraction of missing genotypes above `threshold.missing.geno` are removed.
+Filtering steps include:
+  1. Genotype probability filter: datapoints with probability below `threshold.geno.prob` are set to missing.
+  2. Marker missingness filter: Markers with fraction of missing datapoints above `threshold.missing.geno` are removed.
   3. Cluster number filter: Markers with fewer than `threshold.n.clusters` clusters are removed.
   4. Genomic info filter: Markers lacking chromosome or position info are removed.
 
@@ -108,6 +101,13 @@ Merging logic:
 # data <- ... # see vignette for example data
 # genos <- ...
 # geno.pos <- ...
-# result <- standardize(data, genos, geno.pos, ploidy.standardization=2, threshold.n.clusters=3, n.cores=2)
+# result <- standardize(
+#   data = data,
+#   genos = genos,
+#   geno.pos = geno.pos,
+#   ploidy.standardization = 2,
+#   threshold.n.clusters = 3,
+#   n.cores = 2
+# )
 
 }

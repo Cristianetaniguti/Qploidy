@@ -1,6 +1,8 @@
+##' @keywords internal
 # Suppress global variable warnings for non-standard evaluation in dplyr/ggplot2
 globalVariables(c(
-  "Sample", "Chr", "Start", "End", "CN_call", "prob_call", "w_baf", "Mid"
+  "Sample", "Chr", "Start", "End", "CN_call", "prob_call", "w_baf", "Mid",
+  "n_vlines", "n_regions", "region_id"
 ))
 
 #' Numerically stable log-sum-exp
@@ -20,62 +22,6 @@ logsumexp <- function(x) {
   m <- max(x); m + log(sum(exp(x - m)))
 }
 
-#' Build a polyploid BAF comb template for a given copy number
-#'
-#' Constructs a discrete BAF density template on [0,1] for a given copy number \code{c}, by placing Gaussian kernels at genotype fractions \eqn{d/c} for \eqn{d=0,...,c}. Reflection kernels keep mass within [0,1]. Binomial weights are used for relative peak heights.
-#'
-#' @param c Integer. Copy number (e.g., 2 for diploid, 4 for tetraploid).
-#' @param M Integer. Number of histogram bins over [0,1]. Default is 101.
-#' @param bw Numeric. Kernel bandwidth (standard deviation) for the Gaussians. Default is 0.03.
-#' @param floor_eps Numeric. Small positive value added to the template before renormalization to ensure strictly positive probabilities. Default is 1e-8.
-#'
-#' @return Numeric vector of length \code{M} summing to 1. The BAF template for copy number \code{c}.
-#'
-#' @details
-#' Peaks are centered at \eqn{d/c}. Binomial weights \code{dbinom(0:c, c, 0.5)} provide relative mass across clusters. Boundary reflections (\eqn{\mu,-\mu,2-\mu}) prevent leakage outside [0,1].
-#'
-#' @examples
-#' t4 <- baf_template(4, M = 121, bw = 0.03)
-#' sum(t4)            # 1
-#' which.max(t4)      # near BAF = 0.5 for c = 4
-#'
-#' @export
-baf_template <- function(c, M=101, bw=0.03, floor_eps=1e-8) {
-  x <- seq(0, 1, length.out=M)
-  centers <- 0:c / c
-  wd <- dbinom(0:c, size=c, prob=0.5)
-  # Gaussian kernels with reflection to keep mass in [0,1]
-  kfun <- function(mu) dnorm(x, mu, bw) + dnorm(x, -mu, bw) + dnorm(x, 2 - mu, bw)
-  dens <- Reduce(`+`, Map(function(mu,w) w * kfun(mu), centers, wd))
-  dens <- dens + floor_eps              # strictly positive
-  dens <- dens / sum(dens)              # renormalize
-  dens
-}
-
-#' BAF histogram log-likelihood under a template
-#'
-#' Computes the multinomial-style log-likelihood of observed BAF histogram counts against a template (probabilities over the same bins). Only bins with nonzero counts contribute. If all counts are zero, returns 0.
-#'
-#' @param counts Integer vector of length \code{M}. BAF bin counts (e.g., from \code{hist(..., plot = FALSE)$counts}).
-#' @param templ Numeric vector of length \code{M}. Strictly positive probabilities summing to 1 (e.g., output of \code{baf_template}).
-#' @param eps Numeric. Small positive value added inside \code{log()} for extra numerical safety. Default is 1e-8.
-#'
-#' @return Numeric scalar. The log-likelihood \eqn{\sum_i n_i \log p_i}.
-#'
-#' @details
-#' Only bins with \code{counts > 0} are used. If all counts are zero, returns 0. Ensure \code{templ} has no zeros (use \code{floor_eps} in \code{baf_template}).
-#'
-#' @examples
-#' templ <- baf_template(4, M = 21)
-#' counts <- rmultinom(1, size = 200, prob = templ)[,1]
-#' baf_ll(counts, templ)
-#'
-#' @export
-baf_ll <- function(counts, templ, eps=1e-8) {
-  idx <- counts > 0L
-  if (!any(idx)) return(0)  # empty histogram contributes nothing
-  sum(counts[idx] * log(templ[idx] + eps))
-}
 
 #' Viterbi decoding for a first-order HMM in log-space
 #'
@@ -119,239 +65,6 @@ viterbi <- function(ll_em, logA, logpi0) {
   path
 }
 
-#' Plot copy-number segments per window with posterior shading and BAF
-#'
-#' Plots a genome track for each window, showing the called copy number (CN) as a horizontal segment and coloring by the posterior probability of that call. Facets are split by chromosome. The top panel shows z-scores per window, colored by BAF weight; the bottom panel shows CN segments colored by posterior probability. The new top panel shows BAF values per SNP, colored by BAF weight, for the selected sample and chromosomes.
-#'
-#' @param hmm_CN An object of class \code{hmm_CN} (output from \code{hmm_estimate_CN}), containing a \code{result} data frame with one row per window and columns: \code{Sample}, \code{Chr}, \code{Start}, \code{End}, \code{CN_call}, \code{post_CN*}, etc.
-#' @param qploidy_standarize_result An object of class \code{qploidy_standardization} (output from \code{standardize}), used to extract BAF values for the BAF panel.
-#' @param sample_id Character scalar. Which sample from \code{hmm_CN$Sample} to display. Defaults to the first unique value in \code{hmm_CN$Sample}.
-#' @param cn_min,cn_max Numeric scalars. Y-axis limits for CN. Defaults span the min/max of \code{CN_call}.
-#' @param show_window_lines Logical. If TRUE, show dashed vertical lines at window boundaries.
-#' @param include_first_in_chr Logical. If TRUE, include the first window line in each chromosome.
-#' @param line_color,line_alpha,line_width,line_linetype Appearance settings for window boundary lines.
-#' @param heights Numeric vector of length 2 or 3. Relative heights of the BAF, z, and CN panels.
-#'
-#' @return A \code{ggplot} object (from ggpubr::ggarrange). Print to render, or add layers/scales as needed.
-#'
-#' @details
-#' Posterior columns are detected by the prefix "post_CN" and matched to \code{CN_call} values, so the function is agnostic to the specific CN grid. The BAF panel shows per-SNP BAF values for the selected sample and chromosomes, colored by the BAF weight for the corresponding region. The z panel shows window z-scores, colored by BAF weight. The CN panel shows copy number segments colored by posterior probability.
-#'
-#' @section Expected columns:
-#' The function assumes posterior columns named exactly \code{post_CN<k>} for each copy-number state \code{k}. If your column naming differs, rename them before calling this function.
-#'
-#' @examples
-#' \dontrun{
-#' library(dplyr)
-#' library(ggplot2)
-#' toy <- data.frame(
-#'   Sample   = "S1",
-#'   Chr      = c("chr1","chr1","chr1"),
-#'   Start    = c(1, 1e6, 2e6),
-#'   End      = c(1e6-1, 2e6-1, 3e6-1),
-#'   CN_call  = c(2,3,2),
-#'   post_CN2 = c(0.95, 0.05, 0.9),
-#'   post_CN3 = c(0.05, 0.94, 0.1)
-#' )
-#' # qploidy_standarize_result should be a
-#' # qploidy_standardization object with $data containing BAF values
-#' plot_cn_track(toy, qploidy_standarize_result, sample_id = "S1")
-#' }
-#'
-#' @import ggplot2
-#' @import dplyr
-#' @import tidyr
-#' @importFrom magrittr %>%
-#' @importFrom ggpubr ggarrange
-#'
-#' @export
-plot_cn_track <- function(hmm_CN,
-                          qploidy_standarize_result,  # for BAF plot
-                          sample_id = NULL,
-                          cn_min = NULL,
-                          cn_max = NULL,
-                          show_window_lines = FALSE,
-                          include_first_in_chr = FALSE,
-                          line_color = "grey60",
-                          line_alpha = 0.6,
-                          line_width = 0.3,
-                          line_linetype = "dashed",
-                          heights = c(2, 2.5)) {
-
-  stopifnot(inherits(hmm_CN, "hmm_CN"))
-  stopifnot(inherits(qploidy_standarize_result, "qploidy_standardization"))
-
-  df <- hmm_CN$result
-
-  # defaults BEFORE filtering
-  if (is.null(sample_id)) sample_id <- unique(df$Sample)[1]
-  x <- filter(df, Sample == sample_id)
-  if (nrow(x) == 0) stop("No rows for sample_id = ", sample_id)
-
-  if (is.null(cn_min)) cn_min <- min(x$CN_call, na.rm = TRUE)
-  if (is.null(cn_max)) cn_max <- max(x$CN_call, na.rm = TRUE)
-
-  # compute P(CN_call) per window
-  cn_states <- as.integer(gsub("^post_CN", "", grep("^post_CN", names(x), value = TRUE)))
-  post_mat  <- as.matrix(x[, paste0("post_CN", cn_states), drop = FALSE])
-  idx       <- match(x$CN_call, cn_states)
-  x$prob_call <- post_mat[cbind(seq_len(nrow(x)), idx)]
-
-  # coordinates
-  x$Start <- as.numeric(x$Start)
-  x$End   <- as.numeric(x$End)
-  x$Mid   <- (x$Start + x$End)/2
-
-  # dashed verticals (one per unique Start, per Chr)
-  vlines <- NULL
-  if (show_window_lines) {
-    vlines <- x |>
-      distinct(Chr, Start) |>
-      arrange(Chr, Start)
-    if (!include_first_in_chr) {
-      vlines <- vlines |>
-        group_by(Chr) |>
-        filter(Start != min(Start)) |>
-        ungroup()
-    }
-  }
-
-  data_sample2 <- qploidy_standarize_result$data %>% filter(SampleName == sample_id & Chr %in% unique(x$Chr))
-
-  # Per-chromosome genomic range (based on BAF; you can also combine with Start/End if you prefer)
-  chrom_ghost <- data_sample2 %>%
-    group_by(Chr) %>%
-    summarise(Position = range(Position, na.rm = TRUE), .groups = "drop")
-  # This gives 2 rows per Chr: min and max Position
-
-  # -------- top panel: z dots (fill = w_baf) --------
-  p_z <- ggplot(x, aes(Mid, z)) +
-    # force x scale to span full chromosome range
-    geom_blank(
-      data = chrom_ghost,
-      inherit.aes = FALSE,
-      aes(x = Position, y = 0)
-    ) +
-    # connect points within each chromosome
-    geom_line(aes(group = Chr, alpha = w_baf), color = "grey50", linewidth = 0.6) +
-    scale_alpha(range = c(0.2, 0.9), guide = "none") +
-    # points colored by w_baf
-    geom_point(aes(color = w_baf), size = 1.8, alpha = 0.9) +
-    { if (show_window_lines)
-      geom_vline(data = vlines, aes(xintercept = Start),
-                 color = line_color, alpha = line_alpha,
-                 linewidth = line_width, linetype = line_linetype)
-      else NULL } +
-    facet_wrap(~ Chr, scales = "free_x", nrow = 1) +
-    scale_color_distiller(palette = "RdBu", direction = -1, limits = c(0, 1), name = "BAF weight")+
-    labs(x = NULL, y = "z", title = sample_id) +
-    theme_bw(base_size = 12) +
-    theme(
-      panel.grid.major.x = element_blank(),
-      panel.grid.minor   = element_blank(),
-      strip.background   = element_rect(fill = "grey95"),
-      legend.position    = "none",
-      axis.title.x       = element_blank(),
-      axis.text.x = element_text(angle = 30, vjust = 1, hjust = 1)
-    )
-
-  # -------- bottom panel: CN segments (color = P(CN call)) --------
-  p_cn <- ggplot(x) +
-    geom_blank(
-      data = chrom_ghost,
-      inherit.aes = FALSE,
-      aes(x = Position, y = 0)
-    ) +
-    geom_segment(aes(x = Start, xend = End, y = CN_call, yend = CN_call, color = prob_call),
-                 linewidth = 2, lineend = "butt") +
-    { if (show_window_lines)
-      geom_vline(data = vlines, aes(xintercept = Start),
-                 color = line_color, alpha = line_alpha,
-                 linewidth = line_width, linetype = line_linetype) else NULL } +
-    facet_wrap(~ Chr, scales = "free_x", nrow = 1) +
-    scale_y_continuous(breaks = seq(cn_min, cn_max, by = 1), minor_breaks = NULL) +
-    scale_color_viridis_c(name = "P(CN call)", limits = c(0, 1)) +
-    labs(x = "Genomic position (bp)", y = "Copy number") +
-    theme_bw(base_size = 12) +
-    theme(
-      panel.grid.major.x = element_blank(),
-      panel.grid.minor   = element_blank(),
-      strip.background   = element_rect(fill = "grey95"),
-      legend.position    = "bottom",
-      axis.text.x = element_text(angle = 30, vjust = 1, hjust = 1)
-    )
-
-  # -------- BAF -----
-
-  data_tagged <- data_sample2 %>%
-    group_by(Chr) %>%
-    group_modify(function(df, key) {
-      chr_starts <- vlines %>%
-        filter(Chr == key$Chr[1]) %>%
-        arrange(Start) %>%
-        pull(Start)
-      # regions: [-Inf, s1), [s1, s2), ..., [sN, +Inf)
-      brks <- c(-Inf, chr_starts, Inf)
-      df$region_id <- cut(df$Position, breaks = brks, labels = FALSE, right = FALSE)
-      df
-    }) %>%
-    ungroup()
-
-  ## 2) Build a region-to-w_baf table
-  regions_tbl <- vlines %>%
-    arrange(Chr, Start) %>%
-    count(Chr, name = "n_vlines") %>%
-    mutate(n_regions = n_vlines + 1L) %>%
-    select(Chr, n_regions) %>%
-    rowwise() %>%
-    mutate(region_id = list(seq_len(n_regions))) %>%
-    unnest(region_id) %>%
-    ungroup()
-
-  # If your x$w_baf is for a single chromosome (like chr1) and matches the
-  # region order, attach it like this:
-  # (If you have per-Chr w_baf values already in a data.frame, join that instead.)
-  w_baf_tbl <- regions_tbl %>%
-    group_by(Chr) %>%
-    mutate(w_baf = x$w_baf[region_id]) %>%  # ensure the vector aligns: length == n_regions
-    ungroup()
-
-  ## 3) Join w_baf onto points and plot
-  plot_df <- data_tagged %>%
-    left_join(w_baf_tbl, by = c("Chr", "region_id"))
-
-  p_baf <- ggplot(plot_df, aes(x = Position, y = baf, color = w_baf)) +
-    geom_blank(
-      data = chrom_ghost,
-      inherit.aes = FALSE,
-      aes(x = Position, y = 0)
-    ) +
-    geom_point(alpha = 0.7, size = 1) +
-    { if (show_window_lines)
-      geom_vline(data = vlines, aes(xintercept = Start),
-                 color = line_color, alpha = line_alpha,
-                 linewidth = line_width, linetype = line_linetype) else NULL } +
-    facet_wrap(~Chr, scales = "free_x", nrow=1) +
-    theme_bw() +
-    ylab("BAF") +
-    scale_color_distiller(palette = "RdBu", direction = -1, limits = c(0, 1), name = "BAF weight")+
-    theme(
-      axis.text.x = element_text(angle = 30, vjust = 1, hjust = 1),
-      legend.position = "top",
-      text = element_text(size = 12),
-      axis.title.x       = element_blank()
-    )
-
-  # -------- stack with ggpubr (no patchwork needed) --------
-  # align = "v" keeps x-axes aligned; widths are matched automatically
-  ggarrange(
-    p_baf, p_z, p_cn,
-    ncol = 1, nrow = 3,
-    heights = heights,
-    align = "v"
-  )
-}
-
 #' Internal worker for parallel HMM CN estimation
 #'
 #' Runs hmm_estimate_CN for a single sample within a parallel loop, forwarding arguments.
@@ -366,14 +79,27 @@ plot_cn_track <- function(hmm_CN,
 #' @keywords internal
 #' @noRd
 worker <- function(sid, obj, dots) {
-  tryCatch({
-    res <- do.call(hmm_estimate_CN,
-                   c(list(obj, sample_id = sid), dots))
-    res
-  }, error = function(e) {
-    warning(sprintf("Sample '%s' failed: %s", sid, conditionMessage(e)))
-    NULL
-  })
+  collected_warnings <- character(0)
+  result <- withCallingHandlers(
+    tryCatch({
+      do.call(hmm_estimate_CN,
+              c(list(obj, sample_id = sid), dots))
+    }, error = function(e) {
+      collected_warnings <<- c(
+        collected_warnings,
+        sprintf("Sample '%s' failed: %s", sid, conditionMessage(e))
+      )
+      NULL
+    }),
+    warning = function(w) {
+      collected_warnings <<- c(
+        collected_warnings,
+        sprintf("[Sample '%s'] %s", sid, conditionMessage(w))
+      )
+      invokeRestart("muffleWarning")
+    }
+  )
+  list(result = result, warnings = collected_warnings)
 }
 
 #' Summarize copy number mode and posterior probability
@@ -398,9 +124,9 @@ summarize_cn_mode <- function(df,
                               post_col = "post_max") {
   level <- match.arg(level)
 
-  # unwrap if hmm_CN-like object with $result
-  dat <- if (is.data.frame(df)) df else if (!is.null(df$result) && is.data.frame(df$result)) df$result else
-    stop("Input must be a data.frame or an hmm_CN-like object with a data.frame at `$result`.")
+  # unwrap if hmm_CN-like object with $by_window
+  dat <- if (is.data.frame(df)) df else if (!is.null(df$by_window) && is.data.frame(df$by_window)) df$by_window else
+    stop("Input must be a data.frame or an hmm_CN-like object with a data.frame at `$by_window`.")
 
   # required columns
   req_cols <- c("Sample", "Chr", "Start", "End", cn_col, post_col)
@@ -580,4 +306,51 @@ merge_cn_summary_with_estimates <- function(hmm_summarized,
 
   rownames(out) <- NULL
   out
+}
+
+##' Initialize monotonic z-score means for HMM ploidy states
+##'
+##' Computes a monotonic ramp of z-score means (mu) for each ploidy state, centered on the expected ploidy, with padding to avoid boundary collapse.
+##' Used for initializing HMM emission parameters in ploidy estimation.
+##'
+##' @param z Numeric vector. Window-level z-scores.
+##' @param cn_grid Integer vector. Copy-number states to consider.
+##' @param exp_ploidy Numeric. Expected ploidy value (center of ramp).
+##' @param z_range Numeric. Padding added to min/max z for ramp initialization. If NULL, estimated from z interquartile range.
+##' @param verbose Logical. If TRUE, prints estimated z_range. Default FALSE.
+##' @param z_range_out Logical. If TRUE, expand range (min - z_range, max + z_range). If FALSE, reduce range (min + z_range, max - z_range).
+##'
+##' @return Named numeric vector of z-score means (mu) for each ploidy state in cn_grid.
+##'
+##' @details
+##' The ramp is constructed as: mu_c = z_mean + step * (c - exp_ploidy), where step is chosen so the lowest and highest ploidy states fit within the padded z range.
+##' Ensures monotonic initialization for EM fitting.
+##' @keywords internal
+##' @export
+define_z_limits <- function(z, z_window, cn_grid, exp_ploidy, z_range = NULL, verbose = FALSE, z_range_out = TRUE) {
+  state_ids <- as.character(cn_grid)
+
+  if (is.null(z_range) || (length(z_range) == 1 && is.na(z_range))) {
+    z_range <- (1/length(cn_grid)) * (as.numeric(quantile(z, probs = 0.75)) - as.numeric(quantile(z, probs = 0.25)))
+    vmsg("Estimated z_range from data: %f", verbose = verbose, level = 2, type = ">>", z_range)
+  }
+  z_mean <- mean(z_window, na.rm = TRUE)
+  if (z_range_out) {
+    z_lo <- min(z_window, na.rm = TRUE) - z_range
+    z_hi <- max(z_window, na.rm = TRUE) + z_range
+  } else {
+    z_lo <- min(z_window, na.rm = TRUE) + z_range
+    z_hi <- max(z_window, na.rm = TRUE) - z_range
+  }
+  cmin <- min(cn_grid)
+  cmax <- max(cn_grid)
+
+  step_lo <- if (exp_ploidy > cmin) (z_mean - z_lo) / (exp_ploidy - cmin) else 0
+  step_hi <- if (exp_ploidy < cmax) (z_hi  - z_mean) / (cmax - exp_ploidy) else 0
+  step    <- max(step_lo, step_hi, 1e-6)
+
+  mu_vec <- z_mean + step * (as.numeric(cn_grid) - exp_ploidy)
+  mu     <- setNames(mu_vec, as.character(cn_grid))
+  mu <- mu[state_ids]
+  return(mu)
 }

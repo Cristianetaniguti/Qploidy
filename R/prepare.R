@@ -34,10 +34,17 @@ qploidy_read_vcf <- function(vcf_file, geno = FALSE, geno.pos = FALSE) {
   }
 
   # Check if the required checks are FALSE
-  required_not <- c("multiallelics", "phased_GT")
+  required_not <- c("multiallelics", "phased_GT", "duplicated_markers")
   if(any(checks$checks[required_not])) {
     stop(paste(checks$message[2,required_not][which(checks$checks[required_not])],
                collapse = "\n"))
+  }
+
+  # warning
+  warnings <- c("marker_id")
+  if(!all(checks$checks[warnings])) {
+    warning(paste(checks$message[1,warnings][which(!checks$checks[warnings])],
+                  collapse = "\n"))
   }
 
   vcf <- read.vcfR(vcf_file,  verbose = FALSE)
@@ -45,7 +52,7 @@ qploidy_read_vcf <- function(vcf_file, geno = FALSE, geno.pos = FALSE) {
   if(!(geno || geno.pos)){
     DP <- extract.gt(vcf, "AD")
 
-    mknames <- pivot_longer(data.frame(mks = rownames(DP), DP),
+    mknames <- pivot_longer(cbind(mks = rownames(DP), as.data.frame(DP)),
                             cols = 2:(ncol(DP)+1))
 
     dp_split <- strsplit(mknames$value, ",")
@@ -66,7 +73,7 @@ qploidy_read_vcf <- function(vcf_file, geno = FALSE, geno.pos = FALSE) {
                                ratio = alt/(ref+alt))
   } else if(geno){
     GT_m <- extract.gt(vcf, "GT")
-    GT <- pivot_longer(data.frame(mks = rownames(GT_m), GT_m),
+    GT <- pivot_longer(cbind(mks = rownames(GT_m), as.data.frame(GT_m)),
                        cols = 2:(ncol(GT_m)+1))
     GT$value <- stringr::str_count(GT$value, "1")
     colnames(GT) <- c("MarkerName","SampleName","geno")
@@ -89,7 +96,7 @@ qploidy_read_vcf <- function(vcf_file, geno = FALSE, geno.pos = FALSE) {
       }
     }
 
-    prob <- pivot_longer(data.frame(mks = rownames(prob), prob),
+    prob <- pivot_longer(cbind(mks = rownames(prob), as.data.frame(prob)),
                          cols = 2:(ncol(prob)+1))
     colnames(prob) <- c("MarkerName","SampleName","prob")
 
@@ -98,7 +105,9 @@ qploidy_read_vcf <- function(vcf_file, geno = FALSE, geno.pos = FALSE) {
     data_qploidy$prob <- as.numeric(data_qploidy$prob)
 
   } else if(geno.pos){
-    data_qploidy <- data.frame("MarkerName" = vcf@fix[,3],
+    if(all(is.na(vcf@fix[,3]))) mkname <- paste0(vcf@fix[,1], "_", vcf@fix[,2]) else mkname <- vcf@fix[,3]
+
+    data_qploidy <- data.frame("MarkerName" = mkname,
                                "Chromosome" = vcf@fix[,1],
                                "Position" = vcf@fix[,2])
 

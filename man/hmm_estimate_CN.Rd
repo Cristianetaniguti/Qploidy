@@ -5,45 +5,73 @@
 \title{Polyploid copy-number HMM (z + BAF) per sample and window}
 \usage{
 hmm_estimate_CN(
-  qploidy_standarize_result,
+  qploidy_standarize_result = NULL,
   sample_id,
+  data = NULL,
+  geno.pos = NULL,
+  use_values = c("BAF", "zscore"),
   chr = NULL,
-  snps_per_window = 500,
-  min_snps_per_window = 20,
-  cn_grid = 2:8,
+  reflect = TRUE,
+  add_uniform = FALSE,
+  segment_zscore = TRUE,
+  snps_per_window = 50,
+  min_snps_per_window = NULL,
+  cn_grid = 1:4,
   M = 100,
-  bw = 0.03,
   max_iter = 60,
-  het_lims = c(0, 1),
   het_quantile = 0.8,
-  baf_weight = 1,
-  z_range = 0.2,
+  baf_weight = 0.5,
+  z_range = NULL,
   transition_jump = 0.995,
-  exp_ploidy = NULL,
+  initial_prob = 0.95,
   z_only = FALSE,
-  verbose = TRUE
+  verbose = TRUE,
+  exp_ploidy = NA,
+  rm_outliers = TRUE,
+  outlier_alpha = 0.05,
+  selected_model = NULL,
+  dists = c("gaussian", "beta", "beta_binomial", "negative_binomial"),
+  bw_grid = c(0.02, 0.03, 0.04),
+  add_uniform_grid = c(FALSE, TRUE),
+  uniform_weight_grid = c(0.01, 0.03, 0.05, 0.1, 0.15),
+  param_count = NULL,
+  count_grid_as_params = TRUE,
+  correct_scale = TRUE,
+  min_het_frac = 0.05,
+  het_range = c(0.2, 0.8),
+  dosage_threshold = 0.6
 )
 }
 \arguments{
-\item{qploidy_standarize_result}{An object of class \code{qploidy_standardization} as returned by \code{standardize()}. Contains standardized SNP-level data for all samples and chromosomes.}
+\item{qploidy_standarize_result}{An object of class \code{qploidy_standardization} as returned by \code{standardize()}, or \code{NULL}. When \code{NULL}, raw data must be supplied via \code{data} and \code{geno.pos}.}
 
 \item{sample_id}{Character scalar. Sample identifier to analyze; rows are filtered as \code{SampleName == sample_id}.}
 
+\item{data}{Optional. A \code{data.frame} with columns \code{MarkerName}, \code{SampleName}, \code{X}, \code{Y}, \code{R}, and \code{ratio}. Required when \code{qploidy_standarize_result} is \code{NULL}.}
+
+\item{geno.pos}{Optional. A \code{data.frame} with columns \code{MarkerName}, \code{Chromosome}, and \code{Position}. Required when \code{qploidy_standarize_result} is \code{NULL}.}
+
+\item{use_values}{Character vector of length 2 specifying which columns to use as the BAF-like and depth-like signals. When \code{qploidy_standarize_result} is provided, the first element can be \code{"BAF"} (uses column \code{baf}) or \code{"ratio"} (uses column \code{ratio}), and the second element can be \code{"zscore"} (uses column \code{z}) or \code{"R"} (uses column \code{R}). All four combinations are accepted: \code{c("BAF", "zscore")} (default), \code{c("BAF", "R")}, \code{c("ratio", "zscore")}, \code{c("ratio", "R")}. When \code{qploidy_standarize_result} is \code{NULL}, the only accepted value is \code{c("ratio", "R")}.}
+
 \item{chr}{Optional. Character or integer vector specifying chromosomes to include. If \code{NULL}, all chromosomes are used.}
+
+\item{reflect}{Logical. If TRUE (default), apply reflection for continuous
+kernels to keep mass within [0,1] (useful for gaussian).}
+
+\item{add_uniform}{Logical. If TRUE, add a uniform noise component to the
+mixture before renormalization. Default FALSE.}
+
+\item{segment_zscore}{Logical. If \code{TRUE}, segment z-scores using changepoint detection to define windows instead of fixed SNP counts. Default \code{TRUE}.}
 
 \item{snps_per_window}{Integer. Number of SNPs per window when windows are created. Default \code{500}.}
 
-\item{min_snps_per_window}{Integer. Minimum SNPs required to keep a window (windows with fewer SNPs are dropped). Default \code{100}.}
+\item{min_snps_per_window}{Integer. Minimum SNPs required to keep a window. If NULL, a dynamic value is chosen based on chromosome size (see code for details). Windows with fewer SNPs are dropped. Default: NULL (dynamic), or user-specified value.}
 
-\item{cn_grid}{Integer vector of copy-number states to consider (e.g., \code{2:8}).}
+\item{cn_grid}{Integer vector of copy-number states to consider (e.g., \code{1:4}). Unlikely values will be discarded during estimation if their z means are not monotonic with ploidy.}
 
 \item{M}{Integer. Number of BAF histogram bins on [0,1]. Default \code{121}.}
 
-\item{bw}{Numeric. Bandwidth (SD) of the Gaussian kernels used to generate the BAF comb templates. Default \code{0.03}.}
-
 \item{max_iter}{Integer. Maximum EM iterations. Default \code{60}.}
-
-\item{het_lims}{Numeric vector of length 2. BAF limits to consider a SNP heterozygous. Default \code{c(0,1)}.}
 
 \item{het_quantile}{Numeric. Quantile used to scale BAF emission weight based on heterozygote count. Default \code{0.8}.}
 
@@ -53,11 +81,41 @@ hmm_estimate_CN(
 
 \item{transition_jump}{Numeric. Diagonal value for transition matrix (probability to stay in same CN state). Default \code{0.995}.}
 
-\item{exp_ploidy}{Integer. Expected ploidy for initialization. If \code{NULL}, median of \code{cn_grid} is used.}
+\item{initial_prob}{Numeric. Initial probability for the best CN state in the initial state distribution (pi0). Default \code{0.15}. Sets the prior probability for the expected ploidy (or best CN from BAF model) at the first window; remaining probability is distributed uniformly across other states. If the best CN is not found, pi0 is uniform across all states.}
 
 \item{z_only}{Logical. If \code{TRUE}, fit the HMM using the z-emission only (ignores BAF). Default \code{FALSE}.}
 
 \item{verbose}{Logical. If \code{TRUE}, print progress messages. Default \code{TRUE}.}
+
+\item{exp_ploidy}{Numeric. Expected ploidy value. If \code{NA} or \code{NULL}, it is set to the best CN from the BAF model. Default \code{NA}.}
+
+\item{rm_outliers}{Logical. If \code{TRUE}, remove outliers from z-scores before HMM fitting. Default \code{TRUE}.}
+
+\item{outlier_alpha}{Numeric. Alpha threshold for outlier removal in z-scores. Default 0.05.}
+
+\item{selected_model}{Optional. An object of class \code{selected_BAF_model}. If provided, it is used instead of running \code{select_best_baf_model}.}
+
+\item{dists}{Character vector. Distribution families to test in BAF model selection (e.g., c("gaussian", "beta", ...)).}
+
+\item{bw_grid}{Numeric vector. Bandwidth (SD or concentration) values to try for kernel smoothing in BAF model selection. Default: c(0.02, 0.03, 0.04).}
+
+\item{add_uniform_grid}{Logical vector. Whether to include a uniform noise component in the BAF template. Default: c(FALSE, TRUE).}
+
+\item{uniform_weight_grid}{Numeric vector. Mixture weights for the uniform component (when enabled). Default: c(0.01, 0.03, 0.05, 0.10, 0.15).}
+
+\item{param_count}{Optional named integer vector. Number of free parameters per distribution (for BIC penalty in BAF model selection). If NULL, defaults to 0 for all.}
+
+\item{count_grid_as_params}{Logical. If TRUE (default), adds +1 to BIC penalty for each hyperparameter tuned by grid search (bw, and uniform_weight if used).}
+
+\item{correct_scale}{Logical. If TRUE (default), the BAF log-likelihood is corrected by the number of markers with valid BAF values in each window, so that windows with different numbers of markers contribute equally to the combined emission. Prevents windows with many markers from dominating the HMM via the BAF term alone.}
+
+\item{min_het_frac}{Numeric in [0,1]. Threshold for the fraction of BAF values in \code{het_range} considered heterozygous. If the observed heterozygous fraction exceeds this value, CN=1 is excluded from \code{cn_grid} during BAF model selection and per-window likelihood computation, as a meaningful proportion of heterozygous loci makes haploid (CN=1) implausible. Default \code{0.05}.}
+
+\item{het_range}{Numeric vector of length 2. BAF interval used to define heterozygous loci (default \code{c(0.2, 0.8)}). Used by the \code{min_het_frac} filter and by \code{plot_heterozygosity}.}
+
+\item{dosage_threshold}{Numeric in [0,1]. Minimum posterior probability required for a dosage call to be counted as a heterozygote when computing the BAF emission weight (\code{w_baf}) per window. Markers whose maximum dosage posterior falls below this threshold are excluded from the heterozygote count. Default \code{0.6}.}
+
+\item{plot}{Logical. If TRUE, returns a ggplot object for the best BAF model only (default FALSE).}
 }
 \value{
 An object of class \code{hmm_CN}, a list with two elements:
@@ -105,7 +163,7 @@ chromosomes/batches.
 }
 \section{Required helpers}{
 
-This function calls \code{\link{baf_template}}, \code{\link{baf_ll}}, \code{\link{logsumexp}}, and \code{\link{viterbi}} which must be available in your package/namespace.
+This function calls \code{\link{generate_baf_template}}, \code{\link{baf_log_likelihood}}, \code{\link{logsumexp}}, and \code{\link{viterbi}} which must be available in your package/namespace.
 }
 
 \examples{
@@ -119,12 +177,12 @@ res <- hmm_estimate_CN(
   snps_per_window = 500,
   cn_grid = 2:6
 )
-head(res$result)
+head(res$by_window)
 res$params
 }
 
 }
 \seealso{
-\code{\link{baf_template}}, \code{\link{baf_ll}},
+\code{\link{generate_baf_template}}, \code{\link{baf_log_likelihood}},
   \code{\link{viterbi}}, \code{\link{plot_cn_track}}
 }

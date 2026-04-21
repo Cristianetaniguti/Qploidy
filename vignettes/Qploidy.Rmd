@@ -44,6 +44,7 @@ The methodology will not be effective under the following circumstances:
 - You **do not have a subset of samples with known ploidy** or **lack a
   predominant ploidy** in your dataset.  
 - Your samples consist of **inbred lines** (homozygous individuals).  
+- Your samples consist of first-generation, colchicine-treated individuals in which genome duplication was directly induced.
 
 # Installation
 

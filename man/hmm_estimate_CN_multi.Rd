@@ -8,6 +8,7 @@ hmm_estimate_CN_multi(
   qploidy_standarize_result,
   sample_ids = "all",
   n_cores = 2,
+  parallel_type = "auto",
   ...
 )
 }
@@ -18,10 +19,12 @@ hmm_estimate_CN_multi(
 
 \item{n_cores}{Number of cores to use (default: 2).}
 
+\item{parallel_type}{Character. Parallel backend to use: \code{"FORK"}, \code{"PSOCK"}, or \code{"auto"} (default). \code{"auto"} selects \code{"FORK"} on Unix/macOS (faster; workers inherit the parent environment automatically) and \code{"PSOCK"} on Windows (the only option available there). Use \code{"PSOCK"} explicitly if you need cross-platform reproducibility or are debugging worker crashes.}
+
 \item{...}{Additional arguments passed to hmm_estimate_CN (e.g., chr, snps_per_window, etc).}
 }
 \value{
-A data.frame with results for all samples, as returned by hmm_estimate_CN$result, combined.
+A data.frame with results for all samples, as returned by hmm_estimate_CN$by_window, combined.
 }
 \description{
 Runs copy-number HMM for each sample in a user-defined vector (or all samples if "all" is specified).

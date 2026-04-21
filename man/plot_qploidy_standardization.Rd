@@ -8,8 +8,8 @@ plot_qploidy_standardization(
   x,
   sample = NULL,
   chr = NULL,
-  type = c("all", "het", "BAF", "zscore", "BAF_hist", "ratio", "BAF_hist_overall",
-    "Ratio_hist_overall"),
+  type = c("all", "het", "BAF", "zscore", "BAF_hist", "Ratio_hist", "ratio", "R",
+    "BAF_hist_overall", "Ratio_hist_overall"),
   area_single = 0.75,
   ploidy = 4,
   dot.size = 1,
@@ -22,6 +22,8 @@ plot_qploidy_standardization(
   window_size = 2e+06,
   het_interval = 0.1,
   rm_homozygous = FALSE,
+  bins = 100,
+  bar_colour = NA,
   ...
 )
 }
@@ -34,16 +36,22 @@ plot_qploidy_standardization(
 Default is NULL (plots all chromosomes).}
 
 \item{type}{Character vector defining the plot types. Options include:
-- "all": Generates all available plot types.
-- "het": Plots heterozygous locus counts across genomic windows.
-- "BAF": Plots B-allele frequency (BAF) for each chromosome.
-- "zscore": Plots z-scores for each chromosome.
-- "BAF_hist": Plots BAF histograms for each chromosome.
-- "BAF_hist_overall": Plots a BAF histogram for the entire genome.
-- "Ratio_hist_overall": Plots a histogram of raw ratios for the entire
-genome.
-- "ratio": Plots raw ratios for each chromosome.
-Default is "all".}
+- `"all"`: Generates all available plot types.
+- `"het"` / `"heterozygosity"` / `"heterozygous"`: Plots heterozygous
+locus counts across genomic windows.
+- `"BAF"` / `"baf"`: Plots B-allele frequency (BAF) for each chromosome.
+- `"zscore"` / `"z"` / `"z-score"`: Plots z-scores for each chromosome.
+- `"BAF_hist"` / `"baf_hist"` / `"baf_histogram"`: Plots BAF histograms
+for each chromosome.
+- `"Ratio_hist"` / `"ratio_hist"` / `"ratio_histogram"` /
+`"Ratio_histogram"`: Plots ratio histograms for each chromosome.
+- `"BAF_hist_overall"` / `"baf_hist_overall"` / `"baf_hist_sample"` /
+`"baf_histogram_overall"`: Plots a BAF histogram for the entire genome.
+- `"Ratio_hist_overall"` / `"ratio_hist_overall"` /
+`"ratio_histogram_overall"`: Plots a histogram of raw ratios for the
+entire genome.
+- `"ratio"`: Plots raw ratios for each chromosome.
+Default is `"all"`.}
 
 \item{area_single}{Numeric value defining the area around the expected peak
 to be considered. Default is 0.75.}
@@ -80,6 +88,12 @@ heterozygous. Default is 0.1.}
 \item{rm_homozygous}{Logical. If TRUE, removes homozygous calls from BAF
 histogram plots. Default is FALSE.}
 
+\item{bins}{Integer specifying the number of bins in histogram plots.
+Default is 100.}
+
+\item{bar_colour}{Colour for the bar border in histogram plots. Use `NA`
+(default) for no border. Passed to all internal `plot_baf_hist` calls.}
+
 \item{...}{Additional plot parameters.}
 }
 \value{
@@ -100,10 +114,14 @@ useful for identifying regions with high or low heterozygosity.
 the distribution of allele frequencies.
 - **zscore**: Plots z-scores for each chromosome, which can help identify
 outliers or regions with unusual data distributions.
+- **R**: Plots the R column (e.g., read depth) for each chromosome, using the 
+same style as the z-score plot (smoothed line, per chromosome, with median line).
 - **BAF_hist**: Plots histograms of BAF values for each chromosome,
 providing a summary of allele frequency distributions.
 - **BAF_hist_overall**: Plots a single histogram of BAF values for the
 entire genome, summarizing allele frequency distributions genome-wide.
+- **Ratio_hist**: Plots histograms of raw ratio values per chromosome,
+analogous to `BAF_hist` but using the `ratio` column.
 - **Ratio_hist_overall**: Plots a histogram of raw ratios for the entire
 genome, useful for visualizing overall ratio distributions.
 - **ratio**: Plots raw ratios for each chromosome, showing the distribution

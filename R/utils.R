@@ -93,3 +93,109 @@ is_compressed_file <- function(file_path) {
     return(FALSE)  # Not a known compressed format
   }
 }
+
+
+#' print qploidy_area_ploidy_estimation object
+#'
+#' @param x qploidy_area_ploidy_estimation object
+#' @param ... print parameters
+#'
+#' @method print qploidy_area_ploidy_estimation
+#'
+#' @return No return value, called for side effects.
+#'
+#' @export
+print.qploidy_area_ploidy_estimation <- function(x, ...){
+
+  count_aneu <- get_aneuploids(x$ploidy)
+
+  df <- data.frame(c1 = c("Number of samples:",
+                          "Chromosomes:",
+                          "Tested ploidies:",
+                          "Number of euploid samples:",
+                          "Number of potential aneuploid samples:",
+                          "Number of highly inbred samples:"),
+                   c2 = c(dim(x$ploidy)[1],
+                          {if(!is.null(colnames(x$ploidy)))
+                            paste0(colnames(x$ploidy), collapse = ",") else
+                              paste0(x$chr, collapse = ",")},
+                          paste0(x$tested, collapse = ","),
+                          sum(!count_aneu, na.rm = TRUE),
+                          sum(count_aneu, na.rm = TRUE),
+                          x$n.inbred
+                   ))
+
+  colnames(df) <- rownames(df) <- NULL
+
+  cat("Object of class qploidy_area_ploidy_estimation")
+  print(format(df, justify = "left", digits = 2))
+}
+
+
+#' indexes for aneuploids
+#'
+#' @param ploidy_df ploidy table (chromosome in columns and individuals in rows)
+#'
+#' @return A logical vector where each element corresponds to an individual in the
+#'         input ploidy table. The value is `TRUE` if the individual is identified
+#'         as potentially aneuploid, and `FALSE` otherwise.
+#'
+#' @export
+get_aneuploids  <- function(ploidy_df){
+
+  if(any(grepl("/NA", ploidy_df) | grepl("NA/",ploidy_df))){
+    ploidy_df <- gsub("/NA", "", ploidy_df)
+    ploidy_df <- gsub("NA/", "", ploidy_df)
+  }
+
+  count_aneu <- !apply(ploidy_df, 1, function(y) {
+    if(any(is.na(y))) {
+      temp <- length(unique(y[-which(is.na(y))]))
+      if(temp == 1) TRUE else if(temp == 0) NA else FALSE
+    } else length(unique(y)) == 1
+  })
+  return(count_aneu)
+}
+
+##' Verbose Message Utility
+##'
+##' Prints a formatted verbose message with timestamp, indentation, and type label, if verbose is TRUE.
+##'
+##' @param text Character string, the message to print (supports sprintf formatting).
+##' @param verbose Logical. If TRUE, prints the message; if FALSE, suppresses output.
+##' @param level Integer, indentation level (0=header, 1=main step, 2=detail, 3=sub-detail).
+##' @param type Character string, message type (e.g., "INFO", "WARN", "ERROR"). Only shown for level 0.
+##' @param ... Additional arguments passed to sprintf for formatting.
+##'
+##' @details Use the verbose argument to control message output. Typically, pass the function's verbose parameter to vmsg.
+##'
+##' @return No return value, called for side effects.
+##' @export
+vmsg <- function(text, verbose = FALSE, level = 1, type = ">>", ...) {
+  if (!verbose) return(invisible())
+  # Format timestamp
+  timestamp <- format(Sys.time(), "[%H:%M:%S]")
+
+  # Create indentation based on level
+  indent <- switch(as.character(level),
+    "0" = "",           # Section headers
+    "1" = "  ∙ ",       # Main steps (medium bullet)
+    "2" = "    - ",     # Details
+    "3" = "      > ",   # Sub-details
+    paste0(paste(rep("  ", level), collapse = ""), "• ")  # Fallback for level > 3
+  )
+
+  # Format type label (only show for level 0)
+  type_label <- if (level == 0) sprintf("%-1s ", type) else ""
+
+  # Format message text
+  dots <- list(...)
+  if(length(dots) == 0) {
+    msg_text <- text
+  } else {
+    msg_text <- sprintf(text, ...)
+  }
+  # Combine everything
+  formatted_msg <- sprintf("%s %s%s%s", timestamp, type_label, indent, msg_text)
+  message(formatted_msg)
+}

@@ -1,17 +1,27 @@
 Package: Qploidy
 Title: Estimation of Ploidy and Detection of Aneuploidy Using Genotyping Data
-Version: 1.5.2
+Version: 1.8.4
 Authors@R: c(person(given='Cristiane', 
                     family='Taniguti', 
-                    email = 'cht47@cornell.edu', 
+                    email = 'ctaniguti@ufl.edu', 
                     role = c('cre', 'aut')),
+             person(given='Josue', 
+                    family='Chinchilla-Vargas', 
+                    email = 'josue.chinchilla@ufl.edu', 
+                    role = 'aut'),
+             person(given='Meng',
+                    family='Lin',
+                    role='ctb'),
              person(given='Jeekin', 
-                    family='Lau', 
+                    family='Lau',  
                     email = 'Jeekin.Lau@usda.gov', 
-                    role = c('ctb')),
+                    role = 'ctb'),
              person(given = "Oscar",
                     family = "Riera-Lizarazu",
-                    role = c("ctb"))
+                    role = "ctb"),
+             person('University', 'Florida',
+                    role='cph', 
+                    comment = "Breeding Insight")
              )
 Description: Provides functions and a shiny interface for estimating ploidy levels and detecting aneuploidy 
              in individuals using allele intensities or allele count data from high-throughput genotyping platforms, including 
@@ -39,7 +49,9 @@ Imports:
     shinyWidgets,
     shinydisconnect,
     shinyalert,
-    magrittr
+    magrittr,
+    changepoint,
+    data.table
 Encoding: UTF-8
 URL: https://github.com/Cristianetaniguti/Qploidy
 BugReports: https://github.com/Cristianetaniguti/Qploidy/issues
@@ -52,7 +64,9 @@ Suggests:
     rmdformats,
     knitr (>= 1.10),
     rmarkdown,
-    testthat (>= 3.0.0)
+    testthat (>= 3.0.0),
+    plotly,
+    AGHmatrix
 Config/testthat/edition: 3
 Language: en-US
 VignetteBuilder: knitr

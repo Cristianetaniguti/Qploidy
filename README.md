@@ -32,8 +32,8 @@ The methodology will not be effective under the following circumstances:
 - You intend to **combine datasets from different sequencing batches**.  
    - For example: If you extracted DNA and sequenced two plates (192 samples) as one batch, and later sequenced an additional three plates (288 samples) as a second batch, you would need to analyze the two batches **separately** in `Qploidy`. Combining all 480 samples into a single analysis will lead to incorrect results.  
 - You **do not have a subset of samples with known ploidy** or **lack a predominant ploidy** in your dataset.  
-- Your samples consist of **inbred lines** (homozygous individuals).  
-
+- Your samples consist of **inbred lines** (homozygous individuals).
+- Your samples consist of first-generation, colchicine-treated individuals in which genome duplication was directly induced.
 
 ## Installation
 

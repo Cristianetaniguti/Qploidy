@@ -40,7 +40,6 @@
 #' @param uniform_weight_grid Numeric vector. Mixture weights for the uniform component (when enabled). Default: c(0.01, 0.03, 0.05, 0.10, 0.15).
 #' @param param_count Optional named integer vector. Number of free parameters per distribution (for BIC penalty in BAF model selection). If NULL, defaults to 0 for all.
 #' @param count_grid_as_params Logical. If TRUE (default), adds +1 to BIC penalty for each hyperparameter tuned by grid search (bw, and uniform_weight if used).
-#' @param plot Logical. If TRUE, returns a ggplot object for the best BAF model only (default FALSE).
 #' @param correct_scale Logical. If TRUE (default), the BAF log-likelihood is corrected by the number of markers with valid BAF values in each window, so that windows with different numbers of markers contribute equally to the combined emission. Prevents windows with many markers from dominating the HMM via the BAF term alone.
 #' @param min_het_frac Numeric in [0,1]. Threshold for the fraction of BAF values in \code{het_range} considered heterozygous. If the observed heterozygous fraction exceeds this value, CN=1 is excluded from \code{cn_grid} during BAF model selection and per-window likelihood computation, as a meaningful proportion of heterozygous loci makes haploid (CN=1) implausible. Default \code{0.05}.
 #' @param het_range Numeric vector of length 2. BAF interval used to define heterozygous loci (default \code{c(0.2, 0.8)}). Used by the \code{min_het_frac} filter and by \code{plot_heterozygosity}.
@@ -320,6 +319,30 @@ hmm_estimate_CN <- function(
     warning("Some windows have no z-score values.")
   }
   if (is.null(win_df) || nrow(win_df) == 0) stop("No windows could be formed. Check input data and window parameters.")
+
+  # order windows first by chr then start
+  o <- order(win_df$Chr, win_df$Start)
+  win_df <- win_df[o, ]
+  W <- nrow(win_df) # W = number of windows
+
+  # extract BAF vectors per window (list) and z vector
+  baf_list <- vector("list", W)
+  for (i in seq_len(W)) {
+    wrows <- d[["Chr"]] == win_df$Chr[i] &
+      d[[win_col]]  == win_df$WindowID[i] &
+      d[["Position"]] >= win_df$Start[i] &
+      d[["Position"]] <= win_df$End[i]
+    baf_list[[i]] <- d[[baf_col]][wrows]
+    if (length(baf_list[[i]]) == 0 || all(is.na(baf_list[[i]]))) {
+      warning(sprintf("Window %d (Chr %s, WindowID %s) has no valid BAF values.",
+                      i, win_df$Chr[i], win_df$WindowID[i]))
+    }
+  }
+  z <- win_df$z_mean
+  if (length(z) == 0 || all(is.na(z))) stop("No valid z values found in any window.")
+
+  vmsg("Windows ready", verbose = verbose, level = 1, type = ">>")
+
   keep <- win_df$n_snps >= min_snps_per_window
   if (!any(keep)) stop("All windows dropped by min_snps_per_window filter. Try lowering min_snps_per_window or check input data.")
   # n_het is now filled later using vectorized dosages
@@ -327,22 +350,23 @@ hmm_estimate_CN <- function(
   if (sum(keep) == 1) {
     vmsg("Only one window remains after filtering. Assigning CN by BAF likelihood only", verbose = verbose, level = 1, type = ">>")
     # Use BAF likelihoods to assign CN
-    ll_baf_matrix <- do.call(rbind, lapply(baf_list, function(baf_vec) compute_baf_likelihoods(baf_vec,
-                                                                                               cn_grid,
-                                                                                               M = M,
-                                                                                               bw = selected_model$best$bw,
-                                                                                               plot = FALSE,
-                                                                                               dist = selected_model$best$dist,
-                                                                                               reflect = reflect,
-                                                                                               add_uniform = selected_model$best$add_uniform,
-                                                                                               uniform_weight = selected_model$best$uniform_weight,
-                                                                                               min_het_frac = min_het_frac,
-                                                                                               het_range = het_range)))[keep,,drop=FALSE]
-    cn_call <- cn_grid[apply(ll_baf_matrix, 1, which.max)]
+    ll_baf_matrix <- compute_baf_likelihoods(baf_list[[1]],
+                                             cn_grid,
+                                             M = M,
+                                             bw = selected_model$best$bw,
+                                             plot = FALSE,
+                                             dist = selected_model$best$dist,
+                                             reflect = reflect,
+                                             add_uniform = selected_model$best$add_uniform,
+                                             uniform_weight = selected_model$best$uniform_weight,
+                                             min_het_frac = min_het_frac,
+                                             het_range = het_range)
+
+    cn_call <- cn_grid[which.max(ll_baf_matrix$ll_vec)]
     post_max <- rep(1, 1)
     post_df <- as.data.frame(matrix(0, nrow=1, ncol=length(cn_grid)))
     names(post_df) <- paste0("post_CN", cn_grid)
-    post_df[1, which.max(ll_baf_matrix[1, ])] <- 1
+    post_df[1, which.max(ll_baf_matrix$prob_vec)] <- 1
     # n_het is now calculated using dosages
     dosages <- mapply(function(x, y) call_BAF_dosages(x,
                                                       cn = y,
@@ -401,29 +425,6 @@ hmm_estimate_CN <- function(
     return(structure(list(by_window = result, by_marker = d, params = params), class = "hmm_CN"))
   }
 
-  # order windows first by chr then start
-  o <- order(win_df$Chr, win_df$Start)
-  win_df <- win_df[o, ]
-  W <- nrow(win_df) # W = number of windows
-
-  # extract BAF vectors per window (list) and z vector
-  baf_list <- vector("list", W)
-  for (i in seq_len(W)) {
-    wrows <- d[["Chr"]] == win_df$Chr[i] &
-      d[[win_col]]  == win_df$WindowID[i] &
-      d[["Position"]] >= win_df$Start[i] &
-      d[["Position"]] <= win_df$End[i]
-    baf_list[[i]] <- d[[baf_col]][wrows]
-    if (length(baf_list[[i]]) == 0 || all(is.na(baf_list[[i]]))) {
-      warning(sprintf("Window %d (Chr %s, WindowID %s) has no valid BAF values.",
-                      i, win_df$Chr[i], win_df$WindowID[i]))
-    }
-  }
-  z <- win_df$z_mean
-  if (length(z) == 0 || all(is.na(z))) stop("No valid z values found in any window.")
-
-  vmsg("Windows ready", verbose = verbose, level = 1, type = ">>")
-
   # Generate BAF likelihoods and probabilities per window
   # Uses parameters from selected_model
   if(!z_only){
@@ -462,20 +463,20 @@ hmm_estimate_CN <- function(
                                                       dist = selected_model$best$dist,
                                                       add_uniform = selected_model$best$add_uniform,
                                                       uniform_weight = selected_model$best$uniform_weight),
-                                                      baf_list, ploidies_temp, SIMPLIFY = FALSE)
+                      baf_list, ploidies_temp, SIMPLIFY = FALSE)
 
     # For each window, count heterozygotes: dosage != 0 & dosage != ploidies_temp & dosage_prob > dosage_threshold
     vmsg("Counting heterozygotes per window", verbose = verbose, level = 1, type = ">>")
 
     n_het_before_thresh <- vapply(seq_along(dosages), function(i) {
       sum(dosages[[i]]$data$dosage != 0 &
-          dosages[[i]]$data$dosage != ploidies_temp[i], na.rm = TRUE)
+            dosages[[i]]$data$dosage != ploidies_temp[i], na.rm = TRUE)
     }, integer(1))
 
     n_het_window <- vapply(seq_along(dosages), function(i) {
       sum(dosages[[i]]$data$dosage != 0 &
-      dosages[[i]]$data$dosage != ploidies_temp[i] &
-      dosages[[i]]$data$max_prob > dosage_threshold, na.rm = TRUE)
+            dosages[[i]]$data$dosage != ploidies_temp[i] &
+            dosages[[i]]$data$max_prob > dosage_threshold, na.rm = TRUE)
     }, integer(1))
 
     # Warn about windows where all heterozygotes were discarded by the dosage_threshold filter

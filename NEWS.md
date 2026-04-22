@@ -1,3 +1,10 @@
+# Qploidy 1.8.5
+
+* Remove defunct code for Shiny interface - migrating the Breeding-Insight/QploidyApp
+* remove NonASCII characters
+* Better address results when number of windows is 1
+* Removing old vignette
+
 # Qploidy 1.8.4
 
 * Bugfix in `pca_plot()`: markers where `sd(na.rm = TRUE)` returns `NA` (e.g. only one non-NA sample) were silently retained as all-NA columns due to R's `NA > 0 = NA` subsetting behaviour; these are now correctly excluded before PCA.

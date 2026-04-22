@@ -42,6 +42,7 @@
 #'   Returns a list of these plots invisibly.
 #'
 #' @examples
+#' \dontrun{
 #' pca_plot(
 #'   input = "standardization.tsv.gz",
 #'   passport_file = "pca_ids.csv",
@@ -49,13 +50,14 @@
 #'   col2use = "R",
 #'   plot_title = "My Experiment"
 #' )
+#' }
+#'
 #' @importFrom dplyr left_join select
 #' @importFrom ggplot2 ggplot aes geom_point theme_minimal labs scale_color_hue scale_color_manual
 #' @importFrom stats prcomp
 #' @importFrom tidyr pivot_wider
 #' @importFrom tibble column_to_rownames
 #' @importFrom scales percent_format
-#' @importFrom AGHmatrix Gmatrix
 #'
 #' @author Josue Chinchilla-Vargas
 #'

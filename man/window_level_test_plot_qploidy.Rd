@@ -44,12 +44,14 @@ The resulting ggplot2 scatter plot shows normalized SNP depth per window along t
 colored by significance, with facets for each sample and chromosome.
 }
 \examples{
+\dontrun{
 window_level_test_plot_qploidy(
   qploidy_object = "standardization.tsv.gz",
   selected_samples = "J432",
   col2test = "z",
   window_size = 1e6
 )
+}
 
 }
 \author{

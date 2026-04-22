@@ -51,7 +51,7 @@ area_estimate_ploidy <- function(qploidy_standardization = NULL,
                                  area = 0.75,
                                  centromeres = NULL) {
 
-  defunct("Deprecated. Removed in version 1.8.0. Use hmm_estimate_CN or hmm_estimate_CN_multi")
+  .Defunct("Deprecated. Removed in version 1.8.0. Use hmm_estimate_CN or hmm_estimate_CN_multi")
   # Input checks
   if (!level %in% c("sample", "chromosome", "chromosome-arm")) {
     stop("Invalid level. Must be one of 'sample', 'chromosome', or 'chromosome-arm'.")

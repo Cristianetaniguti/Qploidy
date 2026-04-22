@@ -114,8 +114,6 @@ mixture before renormalization. Default FALSE.}
 \item{het_range}{Numeric vector of length 2. BAF interval used to define heterozygous loci (default \code{c(0.2, 0.8)}). Used by the \code{min_het_frac} filter and by \code{plot_heterozygosity}.}
 
 \item{dosage_threshold}{Numeric in [0,1]. Minimum posterior probability required for a dosage call to be counted as a heterozygote when computing the BAF emission weight (\code{w_baf}) per window. Markers whose maximum dosage posterior falls below this threshold are excluded from the heterozygote count. Default \code{0.6}.}
-
-\item{plot}{Logical. If TRUE, returns a ggplot object for the best BAF model only (default FALSE).}
 }
 \value{
 An object of class \code{hmm_CN}, a list with two elements:

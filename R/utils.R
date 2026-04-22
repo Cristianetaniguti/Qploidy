@@ -179,10 +179,10 @@ vmsg <- function(text, verbose = FALSE, level = 1, type = ">>", ...) {
   # Create indentation based on level
   indent <- switch(as.character(level),
     "0" = "",           # Section headers
-    "1" = "  ∙ ",       # Main steps (medium bullet)
+    "1" = "  * ",       # Main steps (medium bullet)
     "2" = "    - ",     # Details
     "3" = "      > ",   # Sub-details
-    paste0(paste(rep("  ", level), collapse = ""), "• ")  # Fallback for level > 3
+    paste0(paste(rep("  ", level), collapse = ""), "* ")  # Fallback for level > 3
   )
 
   # Format type label (only show for level 0)

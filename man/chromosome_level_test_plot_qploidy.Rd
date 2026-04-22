@@ -41,11 +41,13 @@ The resulting ggplot2 bar plot displays per-chromosome SNP depth for the sample 
 faceted by sample, with normalized percentages on the y-axis and significance indicated above bars.
 }
 \examples{
+\dontrun{
 chromosome_level_test_plot_qploidy(
-  qploidy_object = "standardization.tsv.gz",
+  input = "standardization.tsv.gz",
   selected_samples = "J432",
   col2test = "z"
 )
+}
 
 }
 \author{

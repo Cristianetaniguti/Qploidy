@@ -69,6 +69,7 @@ using either the "R", "z", or "ratio" column, and colors the samples based on a 
 variable from a passport file (CSV or TXT).
 }
 \examples{
+\dontrun{
 pca_plot(
   input = "standardization.tsv.gz",
   passport_file = "pca_ids.csv",
@@ -76,6 +77,8 @@ pca_plot(
   col2use = "R",
   plot_title = "My Experiment"
 )
+}
+
 }
 \author{
 Josue Chinchilla-Vargas

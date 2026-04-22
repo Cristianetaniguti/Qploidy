@@ -26,12 +26,14 @@
 #' @return A ggplot2 object representing window-level SNP depth comparison.
 #'
 #' @examples
+#' \dontrun{
 #' window_level_test_plot_qploidy(
 #'   qploidy_object = "standardization.tsv.gz",
 #'   selected_samples = "J432",
 #'   col2test = "z",
 #'   window_size = 1e6
 #' )
+#' }
 #'
 #' @importFrom dplyr select distinct bind_rows case_when
 #' @importFrom tidyr pivot_wider pivot_longer

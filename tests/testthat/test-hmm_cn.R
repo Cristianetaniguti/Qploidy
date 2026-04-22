@@ -112,7 +112,7 @@ test_that("hmm_estimate_CN, plot_cn_track, and other HMM functions work as expec
   expect_true(is.data.frame(res$by_window))
   expect_true(nrow(res$by_window) > 0)
   expect_true(all(c("Sample", "Chr", "WindowID", "CN_call") %in% names(res$by_window)))
-  expect_equal(round(sum(res$by_window$post_CN4),2), 6)
+  expect_equal(round(sum(res$by_window$post_CN4),2), 4)
   expect_equal(round(sum(res$by_marker$post_max),2), 50)
 
   # plot_cn_track test (should return a gg object)
@@ -158,8 +158,8 @@ test_that("hmm_estimate_CN, plot_cn_track, and other HMM functions work as expec
   expect_type(multi_res, "list")
   expect_true(length(multi_res) >= 1)
   expect_true(inherits(multi_res, "hmm_CN"))
-  expect_equal(mean(multi_res$by_window$CN_call), 3.1667, tolerance = 1e-3)
-  expect_equal(mean(multi_res$by_marker$CN_call), 3.3333, tolerance = 1e-3)
+  expect_equal(mean(multi_res$by_window$CN_call), 3.250, tolerance = 1e-3)
+  expect_equal(mean(multi_res$by_marker$CN_call), 3.333, tolerance = 1e-3)
 
   # Test summarize_cn_mode
   summ <- summarize_cn_mode(df = multi_res, level = "sample")

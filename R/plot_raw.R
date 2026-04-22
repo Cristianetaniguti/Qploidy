@@ -50,6 +50,7 @@
 #'   coloured area around each expected histogram peak. Default `0.75`.
 #' @param add_expected_peaks Logical. Draw vertical lines at expected ratio
 #'   peaks on histogram plots. Default `FALSE`.
+#' @param bar_colour Colour for histogram bars. Default `NA` (ggplot2 default).
 #'
 #' @return A `ggarrange` object (from **ggpubr**) stacking all requested plots,
 #'   annotated with the sample name at the top. Returns `NULL` invisibly if no

@@ -70,6 +70,8 @@ locus as homozygous. Loci with `ratio <= het_interval` or
 
 \item{bins}{Integer. Number of histogram bins. Default `100`.}
 
+\item{bar_colour}{Colour for histogram bars. Default `NA` (ggplot2 default).}
+
 \item{ploidy}{Integer. Expected ploidy; used to draw expected-peak lines on
 ratio histograms when `add_expected_peaks = TRUE`. Default `4`.}
 

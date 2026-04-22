@@ -8,7 +8,7 @@
 #'   2. An object of class 'qploidy_standardization' (from Qploidy standardization functions)
 #'   3. A character string: path to a .tsv[.gz] file with standardized Qploidy data
 #'   The function will validate and process the input according to its type.
-#' 
+#'
 #' @param geno.pos Optional. A data.frame with columns: MarkerName, Chromosome, Position. Required if input data.frame does not contain Chr and Position columns.
 #' @param selected_samples Character vector of sample names to compare against the population.
 #' @param col2test Column name to use for depth comparison. Options are "R" or "z".
@@ -25,11 +25,13 @@
 #' @return A ggplot2 object representing the chromosome-level SNP depth comparison.
 #'
 #' @examples
+#'\dontrun{
 #' chromosome_level_test_plot_qploidy(
-#'   qploidy_object = "standardization.tsv.gz",
+#'   input = "standardization.tsv.gz",
 #'   selected_samples = "J432",
 #'   col2test = "z"
 #' )
+#' }
 #'
 #' @importFrom dplyr select distinct bind_rows all_of
 #' @importFrom tidyr pivot_wider pivot_longer
@@ -37,9 +39,9 @@
 #' @importFrom ggplot2 ggplot aes geom_bar geom_text scale_fill_manual scale_color_manual guides facet_wrap
 #' @importFrom stats t.test p.adjust
 #' @importFrom scales percent_format
-#' 
+#'
 #' @author Josue Chinchilla-Vargas
-#' 
+#'
 #' @export
 chromosome_level_test_plot_qploidy <- function(
     input,

@@ -799,6 +799,11 @@ hmm_estimate_CN_multi <- function(qploidy_standarize_result,
 
   by_window <- bind_rows(by_window)
   by_marker <- bind_rows(by_marker)
+
+  idx <- which(colnames(by_window) == "post_max")
+  idx1 <- order(colnames(by_window)[(idx + 1):ncol(by_window)])
+  by_window <- by_window[,c(1:idx, idx+idx1)]
+
   rownames(by_window) <- NULL
   return(structure(list(by_window =by_window, by_marker = by_marker, params_samples = parameters), class = "hmm_CN"))
 }

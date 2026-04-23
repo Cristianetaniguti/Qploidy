@@ -354,3 +354,60 @@ define_z_limits <- function(z, z_window, cn_grid, exp_ploidy, z_range = NULL, ve
   mu <- mu[state_ids]
   return(mu)
 }
+
+
+#' Update a multi-sample hmm_CN_multi object with a new single-sample hmm_CN result
+#'
+#' Replaces or adds the results for a given sample in a multi-sample HMM CN object.
+#' If the sample already exists, its data and parameters are replaced; otherwise, the new sample is appended.
+#'
+#' @param hmm_CN_multi An object of class 'hmm_CN_multi' (list with by_window, by_marker, params_samples).
+#' @param hmm_CN An object of class 'hmm_CN' (single-sample result with by_window, by_marker, params).
+#'
+#' @return An updated hmm_CN_multi object with the new or replaced sample's results.
+#' @details
+#' This function is useful for incrementally building or updating a multi-sample HMM CN result object
+#' as new samples are processed. It ensures that only one entry per sample is present in each component.
+#'
+#' @export
+update_hmm_CN_multi <- function(hmm_CN_multi, hmm_CN){
+
+  if(!inherits(hmm_CN_multi, "hmm_CN") || !all(c("by_window", "by_marker", "params_samples") %in% names(hmm_CN_multi)))
+    stop("hmm_CN must be of class 'hmm_CN' with components: by_window, by_marker, params_samples")
+
+  if(!inherits(hmm_CN, "hmm_CN") || !all(c("by_window", "by_marker", "params") %in% names(hmm_CN)))
+    stop("hmm_CN must be of class 'hmm_CN' with components: by_window, by_marker, params")
+
+  hmm_CN_multi_new <- hmm_CN_multi
+
+  sample <- unique(hmm_CN$by_window$Sample)
+  sample1 <- unique(hmm_CN$by_marker$SampleName)
+  if(any(sample != sample1)) stop("Sample in hmm by window and by marker differ")
+
+  if(any(hmm_CN_multi$by_window$Sample %in% sample)){
+    idx <- which(hmm_CN_multi$by_window$Sample %in% sample)
+    hmm_CN_multi_new$by_window <- hmm_CN_multi$by_window[-idx,]
+    idx <- which(hmm_CN_multi$by_marker$SampleName %in% sample)
+    hmm_CN_multi_new$by_marker <- hmm_CN_multi$by_marker[-idx,]
+    idx <- which(names(hmm_CN_multi_new$params_samples) %in% sample)
+    hmm_CN_multi_new$params_samples <- hmm_CN_multi_new$params_samples[-idx]
+  }
+
+  if(length(sample) == 1) {
+    params <- list(hmm_CN$params)
+    names(params) <- sample
+  } else params <- hmm_CN$params
+
+  by_window <- bind_rows(list(hmm_CN_multi_new$by_window, hmm_CN$by_window))
+  by_marker <- bind_rows(list(hmm_CN_multi_new$by_marker, hmm_CN$by_marker))
+
+  idx <- which(colnames(by_window) == "post_max")
+  idx1 <- order(colnames(by_window)[(idx + 1):ncol(by_window)])
+  by_window <- by_window[,c(1:idx, idx+idx1)]
+
+  hmm_CN_multi_new$params_samples <- c(hmm_CN_multi_new$params_samples, params)
+  hmm_CN_multi_new$by_window <- by_window
+  hmm_CN_multi_new$by_marker <- by_marker
+
+  return(hmm_CN_multi_new)
+}

@@ -161,6 +161,19 @@ test_that("hmm_estimate_CN, plot_cn_track, and other HMM functions work as expec
   expect_equal(mean(multi_res$by_window$CN_call), 3.250, tolerance = 1e-3)
   expect_equal(mean(multi_res$by_marker$CN_call), 3.333, tolerance = 1e-3)
 
+  oneCN <- hmm_estimate_CN(
+    qploidy_standarize_result = simu_data_standardized,
+    sample_id = "Triploid1",
+    chr = 1,
+    segment_zscore = TRUE,
+    snps_per_window =10,
+    min_snps_per_window = 5,
+    cn_grid = c(2, 3, 4),
+    exp_ploidy = 3
+  )
+
+  updated_CN <- update_hmm_CN_multi(multi_res, oneCN)
+
   # Test summarize_cn_mode
   summ <- summarize_cn_mode(df = multi_res, level = "sample")
   expect_true(is.data.frame(summ))

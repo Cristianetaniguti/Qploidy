@@ -4,12 +4,14 @@
 \alias{update_hmm_CN_multi}
 \title{Update a multi-sample hmm_CN_multi object with a new single-sample hmm_CN result}
 \usage{
-update_hmm_CN_multi(hmm_CN_multi, hmm_CN)
+update_hmm_CN_multi(hmm_CN_multi, hmm_CN, rm_sample = FALSE)
 }
 \arguments{
 \item{hmm_CN_multi}{An object of class 'hmm_CN_multi' (list with by_window, by_marker, params_samples).}
 
 \item{hmm_CN}{An object of class 'hmm_CN' (single-sample result with by_window, by_marker, params).}
+
+\item{rm_sample}{Logical. If TRUE, removes the sample from hmm_CN_multi without adding the new hmm_CN results (useful for cleanup). Default FALSE.}
 }
 \value{
 An updated hmm_CN_multi object with the new or replaced sample's results.

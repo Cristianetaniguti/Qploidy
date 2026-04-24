@@ -1,7 +1,7 @@
 # Qploidy 1.8.6
 
 * Order columns of hmm_CN$by_window object when results from different samples are merged
-* Add update_hmm_CN to drop a specific sample results from a multi sample hmm_CN and replace by the results in a single sample hmm_CN
+* Add update_hmm_CN to drop a specific sample results from a multi sample hmm_CN and/or replace by the results in a single sample hmm_CN
 * R CMD checks okay
 
 # Qploidy 1.8.5

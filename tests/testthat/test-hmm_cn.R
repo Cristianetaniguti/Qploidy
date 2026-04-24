@@ -174,6 +174,11 @@ test_that("hmm_estimate_CN, plot_cn_track, and other HMM functions work as expec
 
   updated_CN <- update_hmm_CN_multi(multi_res, oneCN)
 
+  temp_dir <- tempdir()
+  formatted_date <- format(Sys.Date(), "%m_%d_%Y")
+
+  write_hmm_CN(updated_CN, prefix = paste0(temp_dir, "/", formatted_date))
+
   # Test summarize_cn_mode
   summ <- summarize_cn_mode(df = multi_res, level = "sample")
   expect_true(is.data.frame(summ))

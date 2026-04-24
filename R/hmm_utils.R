@@ -363,14 +363,15 @@ define_z_limits <- function(z, z_window, cn_grid, exp_ploidy, z_range = NULL, ve
 #'
 #' @param hmm_CN_multi An object of class 'hmm_CN_multi' (list with by_window, by_marker, params_samples).
 #' @param hmm_CN An object of class 'hmm_CN' (single-sample result with by_window, by_marker, params).
-#'
+#' @param rm_sample Logical. If TRUE, removes the sample from hmm_CN_multi without adding the new hmm_CN results (useful for cleanup). Default FALSE.
+#' 
 #' @return An updated hmm_CN_multi object with the new or replaced sample's results.
 #' @details
 #' This function is useful for incrementally building or updating a multi-sample HMM CN result object
 #' as new samples are processed. It ensures that only one entry per sample is present in each component.
 #'
 #' @export
-update_hmm_CN_multi <- function(hmm_CN_multi, hmm_CN){
+update_hmm_CN_multi <- function(hmm_CN_multi, hmm_CN, rm_sample = FALSE){
 
   if(!inherits(hmm_CN_multi, "hmm_CN") || !all(c("by_window", "by_marker", "params_samples") %in% names(hmm_CN_multi)))
     stop("hmm_CN must be of class 'hmm_CN' with components: by_window, by_marker, params_samples")
@@ -392,6 +393,8 @@ update_hmm_CN_multi <- function(hmm_CN_multi, hmm_CN){
     idx <- which(names(hmm_CN_multi_new$params_samples) %in% sample)
     hmm_CN_multi_new$params_samples <- hmm_CN_multi_new$params_samples[-idx]
   }
+
+  if(rm_sample) return(hmm_CN_multi_new)
 
   if(length(sample) == 1) {
     params <- list(hmm_CN$params)

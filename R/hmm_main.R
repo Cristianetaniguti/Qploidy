@@ -888,6 +888,61 @@ write_hmm_CN <- function(hmm_CN, prefix) {
 read_hmm_CN <- function(by_window_file, by_marker_file, params_file) {
   by_window <- fread(by_window_file, data.table = FALSE)
   by_marker <- fread(by_marker_file, data.table = FALSE)
+
+  # Input checks for by_window columns
+  required_cols_window <- c(
+    "Sample",      # Identifier for the sample
+    "Chr",         # Chromosome name
+    "WindowID",    # Unique identifier for the genomic window
+    "Start",       # Start position of the window in base pairs
+    "End",         # End position of the window in base pairs
+    "n_snps",      # Number of SNPs within the window
+    "n_het",       # Number of heterozygous SNPs within the window
+    "z",           # Z-score for the window
+    "w_baf",       # B-allele frequency HMM weight for the window
+    "CN_call",     # Copy number call for the window
+    "post_max"     # Maximum posterior probability for the copy number call
+  )
+  missing_cols_window <- setdiff(required_cols_window, colnames(by_window))
+  if (length(missing_cols_window) > 0) {
+    stop(sprintf(
+      "by_window file is missing required column(s): %s",
+      paste(missing_cols_window, collapse = ", ")
+    ))
+  }
+  # Check for at least one post_CN column
+  post_cn_cols <- grep("^post_CN[0-9]+$", colnames(by_window), value = TRUE)
+  if (length(post_cn_cols) == 0) {
+    stop("by_window file must contain at least one 'post_CN[number]' column (e.g., post_CN1, post_CN2, ...)")
+  }
+
+  # Input checks for by_marker columns
+  required_cols_marker <- c(
+    "Chr",        # Chromosome name
+    ".__w__",          # Window
+    "MarkerName", # Name of the marker
+    "SampleName", # Identifier for the sample
+    "X",          # X-coordinate for the marker
+    "Y",          # Y-coordinate for the marker
+    "R",          # Intensity value for the marker
+    "ratio",      # Ratio value for the marker
+    "geno",       # Genotype call for the marker
+    "baf",        # B-allele frequency for the marker
+    "z",          # Z-score for the marker
+    "Position",   # Genomic position of the marker
+    "outlier",    # Outlier status for the marker
+    "w_baf",      # Weighted B-allele frequency for the marker
+    "CN_call",    # Copy number call for the marker
+    "post_max"    # Maximum posterior probability for the copy number call
+  )
+  missing_cols_marker <- setdiff(required_cols_marker, colnames(by_marker))
+  if (length(missing_cols_marker) > 0) {
+    stop(sprintf(
+      "by_marker file is missing required column(s): %s",
+      paste(missing_cols_marker, collapse = ", ")
+    ))
+  }
+
   # Or make it flexible to handle both local files and URLs
   if (grepl("^http", params_file)) {
     params_obj <- readRDS(gzcon(url(params_file)))
@@ -895,12 +950,32 @@ read_hmm_CN <- function(by_window_file, by_marker_file, params_file) {
     params_obj <- readRDS(params_file)
   }
   # Multi-sample: params_obj is a list with params_samples, or just the params_samples list itself
-  if (is.list(params_obj) && (!is.null(params_obj$params_samples) || (is.null(names(params_obj)) && all(sapply(params_obj, function(x) is.list(x) && all(c("cn_grid", "mu", "sigma") %in% names(x))))))) {
+  required_params <- c(
+    "cn_grid", "distribution", "mu", "sigma", "A", "pi0", "bins", "bw", "loglik", "z_range",
+    "het_quantile", "baf_weight", "transition_jump", "z_only", "exp_ploidy", "rm_outliers",
+    "outlier_alpha", "segment_zscore", "snps_per_window", "min_snps_per_window", "add_uniform", "uniform_weight"
+  )
+
+  check_params_list <- function(param_list) {
+    missing <- setdiff(required_params, names(param_list))
+    if (length(missing) > 0) {
+      stop(sprintf(
+        "params_file is missing required item(s) in a parameter list: %s",
+        paste(missing, collapse = ", ")
+      ))
+    }
+    TRUE
+  }
+
+  if (is.list(params_obj) && (!is.null(params_obj$params_samples) || (is.null(names(params_obj)) && all(sapply(params_obj, function(x) is.list(x) && all(required_params %in% names(x))))))) {
     params_samples <- if (!is.null(params_obj$params_samples)) params_obj$params_samples else params_obj
+    # Check all internal lists
+    lapply(params_samples, check_params_list)
     structure(list(by_window = by_window, by_marker = by_marker, params_samples = params_samples), class = "hmm_CN")
-  } else if (is.list(params_obj) && !is.null(names(params_obj)) && all(c("cn_grid", "mu", "sigma") %in% names(params_obj))) {
+  } else if (is.list(params_obj) && !is.null(names(params_obj)) && all(required_params %in% names(params_obj))) {
+    check_params_list(params_obj)
     structure(list(by_window = by_window, by_marker = by_marker, params = params_obj), class = "hmm_CN")
   } else {
-    stop("params_file does not contain a recognizable params or params_samples object.")
+    stop("params_file does not contain a recognizable params or params_samples object with all required items.")
   }
 }

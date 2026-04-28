@@ -1,3 +1,7 @@
+# Qploidy 1.8.7
+
+* Adding input checks for read_hmm_CN function
+
 # Qploidy 1.8.6
 
 * Order columns of hmm_CN$by_window object when results from different samples are merged

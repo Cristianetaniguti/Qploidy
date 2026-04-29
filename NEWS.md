@@ -1,6 +1,7 @@
 # Qploidy 1.8.7
 
 * Adding input checks for read_hmm_CN function
+* bugfix update_hmm_CN_multi
 
 # Qploidy 1.8.6
 

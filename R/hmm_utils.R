@@ -364,7 +364,7 @@ define_z_limits <- function(z, z_window, cn_grid, exp_ploidy, z_range = NULL, ve
 #' @param hmm_CN_multi An object of class 'hmm_CN_multi' (list with by_window, by_marker, params_samples).
 #' @param hmm_CN An object of class 'hmm_CN' (single-sample result with by_window, by_marker, params).
 #' @param rm_sample Logical. If TRUE, removes the sample from hmm_CN_multi without adding the new hmm_CN results (useful for cleanup). Default FALSE.
-#' 
+#'
 #' @return An updated hmm_CN_multi object with the new or replaced sample's results.
 #' @details
 #' This function is useful for incrementally building or updating a multi-sample HMM CN result object
@@ -374,7 +374,7 @@ define_z_limits <- function(z, z_window, cn_grid, exp_ploidy, z_range = NULL, ve
 update_hmm_CN_multi <- function(hmm_CN_multi, hmm_CN, rm_sample = FALSE){
 
   if(!inherits(hmm_CN_multi, "hmm_CN") || !all(c("by_window", "by_marker", "params_samples") %in% names(hmm_CN_multi)))
-    stop("hmm_CN must be of class 'hmm_CN' with components: by_window, by_marker, params_samples")
+    stop("hmm_CN multi must be of class 'hmm_CN' with components: by_window, by_marker, params_samples")
 
   if(!inherits(hmm_CN, "hmm_CN") || !all(c("by_window", "by_marker", "params") %in% names(hmm_CN)))
     stop("hmm_CN must be of class 'hmm_CN' with components: by_window, by_marker, params")
@@ -388,8 +388,12 @@ update_hmm_CN_multi <- function(hmm_CN_multi, hmm_CN, rm_sample = FALSE){
   if(any(hmm_CN_multi$by_window$Sample %in% sample)){
     idx <- which(hmm_CN_multi$by_window$Sample %in% sample)
     hmm_CN_multi_new$by_window <- hmm_CN_multi$by_window[-idx,]
+  }
+  if(any(hmm_CN_multi$by_marker$SampleName %in% sample)){
     idx <- which(hmm_CN_multi$by_marker$SampleName %in% sample)
     hmm_CN_multi_new$by_marker <- hmm_CN_multi$by_marker[-idx,]
+  }
+  if(any(names(hmm_CN_multi_new$params_samples) %in% sample)){
     idx <- which(names(hmm_CN_multi_new$params_samples) %in% sample)
     hmm_CN_multi_new$params_samples <- hmm_CN_multi_new$params_samples[-idx]
   }

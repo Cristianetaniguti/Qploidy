@@ -1,6 +1,6 @@
-Package: Qploidy
-Title: Estimation of Ploidy and Detection of Aneuploidy Using Genotyping Data
-Version: 1.8.7
+Package: Qploidy2
+Title: Estimation of Large-Scale Copy Number Variation Using Genotyping Data
+Version: 1.9.0
 Authors@R: c(person(given='Cristiane', 
                     family='Taniguti', 
                     email = 'ctaniguti@ufl.edu', 
@@ -23,12 +23,13 @@ Authors@R: c(person(given='Cristiane',
                     role='cph', 
                     comment = "Breeding Insight")
              )
-Description: Provides functions and a shiny interface for estimating ploidy levels and detecting aneuploidy 
+Description: Provides functions for estimating copy number variation (CNV)  
              in individuals using allele intensities or allele count data from high-throughput genotyping platforms, including 
              single nucleotide polymorphism (SNP) arrays and sequencing-based technologies. Implements method described 
              in Taniguti et al. (2025) <doi:10.1002/tpg2.70044> an extended version of the 'PennCNV' 
              signal standardization method by Wang et al. (2007) <doi:10.1101/gr.6861907> for higher ploidy 
-             levels. Computes B-allele frequencies (BAF), z-scores, and identifies copy number variation patterns.
+             levels. Computes B-allele frequencies (BAF), z-scores, and identifies copy number variation patterns based on a Hidden Markov Model (HMM) approach. 
+             Provides functions for visualizing results and exporting CNV calls in VCF format.
 License: AGPL (>= 3)
 Depends: R (>= 3.6.0)
 biocViews:
@@ -48,8 +49,8 @@ Imports:
     scales,
     tibble
 Encoding: UTF-8
-URL: https://github.com/Cristianetaniguti/Qploidy
-BugReports: https://github.com/Cristianetaniguti/Qploidy/issues
+URL: https://github.com/Breeding-Insight/Qploidy2
+BugReports: https://github.com/Breeding-Insight/Qploidy2/issues
 LazyData: true
 RoxygenNote: 7.3.3
 Suggests: 

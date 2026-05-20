@@ -78,12 +78,17 @@ viterbi <- function(ll_em, logA, logpi0) {
 #'
 #' @keywords internal
 #' @noRd
-worker <- function(sid, obj, dots) {
+worker <- function(sid, obj, dots, data = NULL, geno.pos = NULL, use_values = c("BAF", "zscore")) {
   collected_warnings <- character(0)
   result <- withCallingHandlers(
     tryCatch({
-      do.call(hmm_estimate_CN,
-              c(list(obj, sample_id = sid), dots))
+      if (!is.null(obj)) {
+        do.call(hmm_estimate_CN,
+                c(list(qploidy_standarize_result = obj, sample_id = sid, use_values = use_values), dots))
+      } else {
+        do.call(hmm_estimate_CN,
+                c(list(qploidy_standarize_result = NULL, sample_id = sid, data = data, geno.pos = geno.pos, use_values = use_values), dots))
+      }
     }, error = function(e) {
       collected_warnings <<- c(
         collected_warnings,

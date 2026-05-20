@@ -1,6 +1,6 @@
 # Test suite for BAF_distributions.R functions
 library(testthat)
-library(Qploidy)
+library(Qploidy2)
 
 test_that("generate_baf_template returns valid template for all distributions", {
   cn <- 4

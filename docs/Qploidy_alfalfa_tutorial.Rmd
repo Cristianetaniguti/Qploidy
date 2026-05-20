@@ -1,0 +1,633 @@
+---
+title: "Qploidy2 - large-scale copy number estimation in alfalfa mapping population using DArTag genotyping data"
+author: "Breeding Insight - Cristiane Taniguti"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    theme: flatly
+    highlight: tango
+    css: BIcolors_template.css
+    includes:
+      in_header: header.html
+    toc: true
+    toc_depth: 3
+    toc_float:
+      collapsed: true
+      smooth_scroll: true
+    number_sections: true
+    code_folding: show
+    df_print: paged
+---
+
+```{r, echo=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.align = "center",
+  fig.width = 7,
+  fig.height = 4.5
+)
+```
+
+# Introduction
+
+This tutorial demonstrates a typical workflow for ploidy and aneuploidy estimation using the Qploidy2 R package. 
+We will cover data import, standardization, model selection, Hidden Markov Model (HMM)-based copy number estimation, visualization, and VCF export. 
+
+The dataset used here for our demonstration is an alfalfa mapping population genotyped using DArTag technology.
+Refer to [this publication](https://doi.org/10.5061/dryad.pc866t1vd) for more information about the dataset.
+
+To start, download the example dataset to your local directory:
+
+```{r}
+vcf_path_web <- "https://github.com/Breeding-Insight/BIGapp-PanelHub/raw/refs/heads/long_seq/alfalfa/GenoBrew_example/alfalfa_F1_marker_panel_dataset_publicly_available.vcf.gz"
+download.file(vcf_path_web, destfile = "alfalfa_F1_marker_panel_dataset_publicly_available.vcf.gz")
+vcf_path_local <- "alfalfa_F1_marker_panel_dataset_publicly_available.vcf.gz"
+```
+
+# Remarks
+
+The Qploidy standardization methodology is effective under the following conditions:
+
+* Your marker data originates from Axiom or Illumina genotyping arrays
+* Your marker data is derived from targeted sequencing platforms (e.g., DArTag, GTseq, AgriSeq)
+* Your marker data is derived from whole-genome sequencing platforms 
+* All DNA samples were prepared following the same library preparation protocol (check [this section](#check-for-batch-effect-before-standardization) for more details)
+For example: If you extracted DNA and sequenced two plates (192 samples) as one batch, 
+and later sequenced an additional three plates (288 samples) as a second batch, you would need 
+to analyze the two batches separately in Qploidy. Combining all 480 samples into a single analysis will lead to incorrect results due to batch effects.
+* You know the ploidy of at least a subset (rough minimum of 60 samples) or you know the most common ploidy in the dataset.
+The higher the number of samples with known or common ploidy, the better the results
+* Your dataset includes heterozygous samples
+
+The Qploidy2 B-allele frequency (BAF) model selection and HMM methodologies are effective under the following conditions:
+
+* The ratio or BAF distributions of your samples present clear peaks corresponding to different copy numbers
+* The total read depth or z-scores variations within a sample follows a normal distribution, with the mean shifting according to the copy number
+* The sample includes heterozygous loci, which are essential for BAF-based ploidy estimation. 
+Samples with heterozygosity lower than 5% will be considered haploid (CN = 1) and they cannot be distinguished from inbred lines with higher CN
+* If allele counts are based on a sequencing platform, the sequencing should have enough depth to capture dosages of the 
+highest possible copy number in the dataset
+* The number of markers is sufficient to provide a good resolution for the BAF distributions
+* The larger the amount of markers, the smaller the copy number variations that can be detected
+
+## Install
+
+* It requires R version superior to 3.6.0
+
+Install Qploidy2 (if not already installed):
+
+```{r, eval=FALSE}
+devtools::install_github("Breeding-Insight/Qploidy2")
+```
+
+# Input data
+
+`Qploidy2` receives three main objects named: 
+- marker-level data (`data`): should contain sample names, marker ID, allele counts/intensities ratio and total for all samples
+- marker positions (`geno.pos`): should contain marker IDs, and respective genomic chromosome and positions
+- genotype dosages (`genos`) - only required for standardization: contain samples names, marker ID, 
+and dosage/genotype considering expected ploidy. The samples in this file should be the ones with a known ploidy or the full dataset with 
+dosage called considering the predominant ploidy. 
+
+`Qploidy2` has functions to facilitate the conversion of standard file formats to these three objects. 
+In this tutorial we will show the `qploidy_read_vcf` function for VCF conversion. The VCF must contain the AD field for allele counts.
+Check function `?read_axiom` and `?read_illumina_array` if your data comes from genotyping arrays. 
+
+
+```{r}
+library(Qploidy2)
+
+# Read marker-level data from VCF
+data <- qploidy_read_vcf(vcf_path_local)
+head(data)
+
+# Read genotype dosages (optionally, restrict to samples with known ploidy)
+genos <- qploidy_read_vcf(vcf_path_local, geno = TRUE)
+head(genos)
+
+# Read marker positions
+geno.pos <- qploidy_read_vcf(vcf_path_local, geno.pos = TRUE)
+head(geno.pos)
+```
+
+# Check data initial status
+
+The `plot_raw` function provides diagnostic plots for metrics that will be considered by `Qploidy2` copy number estimation. 
+Here is a brief description of each from top to bottom:
+
+- Heterozygosity: y-axis = proportion of heterozygous loci in a genomic window with size defined by argument `window_size` (default = 2Mb);
+x-axis = genomic positions
+- Allele counts/intensities ratio (B/(A+B)): y-axis = ratio value; x-axis = genomic positions
+- Ratio histogram split by chromosome: y-axis = observation counts; x-axis = ratio value
+- Ratio histogram considering all markers of the samples: y-axis = observation counts; x-axis = ratio value
+- Read depth (sequencing platforms) or total intensities (array) in y-axis and genomic position in x-axis
+
+```{r, fig.width=11, fig.height=10, out.width="100%"}
+samples <- unique(data$SampleName)
+plot_raw(data = data, 
+         geno.pos = geno.pos,
+         sample = samples[1])
+```
+
+Check the plots for a few samples. If the histograms do not show clear peaks, consider applying `Qploidy` standardization.
+If you already have clear peaks and do not want to try to improve them, skip to item [`# BAF Model Selection`](#BAF-Model-Selection).
+
+## Check for batch effect before standardization
+
+Qploidy2 standardization assumes that each marker behaves consistently across samples, while allowing markers to differ from one another. 
+Depending on the genotyping platform, however, this assumption may not hold — particularly if DNA extraction protocols were modified or samples were processed in different plates or batches.
+
+For example, you may have extracted DNA at one time point and sequenced a plate with 96 samples in a given year, then used the stored DNA two years later to sequence an additional 96 samples. 
+Changes in DNA quality over time can affect probe performance, leading to systematic differences between batches. 
+In such cases, standardization should be performed separately for each batch.
+
+You can assess whether batch effects are present in your dataset using the following function:
+
+```{r}
+# provide a passport file (containing year of DNA extraction/plate number/ or any possible factor for a batch effect)
+# This example dataset doesn't have a passport available, we will simulate one just to exemplify the function usage:
+set.seed(123)
+samples <- unique(data$SampleName)
+passport_file <- data.frame(SampleName = samples, year_seq = sample(rep(c(2020, 2022, 2025), length(samples))))
+head(passport_file)
+```
+
+```{r}
+p <- pca_plot(input = data, 
+              geno.pos = geno.pos, 
+              passport_file = passport_file, 
+              group_column = "year_seq", 
+              sampleID_column = "SampleName",
+              col2use = "R")
+
+p$PC1xPC2
+
+```
+
+In this example, we did not detect evidence of batch effects, as samples did not cluster according to genotyping year. 
+Therefore, we can proceed with standardization using the combined dataset.
+
+## Initial screening for chromosome abnormalities (optional)
+
+For some genotyping platforms, total read depth is consistent across samples. 
+When this assumption holds for your dataset, deviations in a sample’s total depth relative to the population average can provide an initial indication of copy number variation.
+
+You can rapidly screen for candidate samples using the function below:
+
+```{r, fig.width=11, fig.height=10, out.width="100%"}
+chromosome_level_test_plot_qploidy(input = data, 
+                                   geno.pos = geno.pos, 
+                                   selected_samples = samples[1:12], # plot the first 12 
+                                   col2test = "R")
+```
+
+Before proceeding to the standardization step, consider removing abnormal chromosomes from your reference dataset (genos).
+
+## Overview of samples heterozygosity
+
+```{r}
+# interactive graphic if plotly package is installed
+p <- plot_heterozygosity(data, col2use = "ratio")
+p
+```
+
+This is an interactive graphic; hover your mouse over the cells to get information on sample name, heterozygosity percentage, and the number of markers used for this estimation.
+Heterozygosity is an important metric for Qploidy2, as it uses the allele ratio heterozygous peaks as part of the input data for estimating ploidy. Samples with heterozygosity lower than 5% will be considered haploid (CN = 1) and cannot be distinguished from inbred lines with higher CN.
+
+
+# Standardization
+
+Standardization of markers raw read counts or intensity data is essential for reducing technical noise 
+and improving the accuracy of ploidy estimation. Markers from diverse platforms have different 
+characteristics, and standardization helps to make them comparable. 
+
+The function has several parameters that can be adjusted based on the characteristics of your dataset.
+You can access a description of all parameters in `?standardize`, but here we will focus only on the most important ones:
+`ploidy.standardization` and `threshold.n.clusters`:
+
+**Parameters:**
+- `genos`: This data.frame defines which samples are your reference for the standardization. If you have samples with known ploidy, filter this object to keep only them. You can use the command:
+
+```{r, eval = FALSE}
+# Demonstration code, not applied to current dataset
+# known_tetraploids <- paste0("Sample",1:100)
+# str(known_tetraploids)
+# genos <- genos[which(genos$SampleName %in% known_tetraploids),]
+```
+
+If you are not sure about ploidy of at least 60 samples, just keep all them and define the most common ploidy as `ploidy.standardization`.
+
+- `ploidy.standardization`: Sets the predominant ploidy for the dataset defined in the object `genos` (e.g., 2 for diploid, 4 for tetraploid). This guides clustering and normalization, and should match the known or most frequent ploidy in your samples for best results.
+
+- `threshold.n.clusters`: Minimum number of genotype clusters required for a marker to be retained. The maximum is defined as the possible number of the dosages according to the ploidy
+defined on `ploidy.standardization` (ploidy + 1). Lower values requires imputation of dosage clusters for missing genotypes. The imputation is performed based on distance to other clusters, 
+so it is recommended to have at least 3 clusters for a good imputation. If too many markers are filtered, relax this threshold (e.g., to 4 for tetraploids) to retain more markers with imputed clusters.
+
+
+```{r}
+qploidy_standardization <- standardize(
+  data = data,
+  genos = genos,
+  geno.pos = geno.pos,
+  ploidy.standardization = 4, # Set to known or most frequent ploidy
+  threshold.n.clusters = 5,   # Minimum clusters for marker retention
+  n.cores = 2,
+  out_filename = "standardization.tsv.gz",
+  verbose = TRUE, 
+)
+
+# Check filtering summary
+qploidy_standardization
+```
+
+If too many markers are filtered, relax the cluster threshold:
+
+```{r}
+qploidy_standardization <- standardize(
+  data = data,
+  genos = genos,
+  geno.pos = geno.pos,
+  ploidy.standardization = 4,
+  threshold.n.clusters = 4,
+  n.cores = 2,
+  out_filename = "standardization.tsv.gz",
+  verbose = TRUE
+)
+qploidy_standardization
+```
+
+You can reload a saved standardization object:
+
+```{r, eval=FALSE}
+qploidy_standardization <- read_qploidy_standardization("standardization.tsv.gz")
+```
+
+See examples on how the standardization process works for a few markers in the dataset:
+
+```{r}
+markers <- unique(qploidy_standardization$data$MarkerName)
+six_markers <- qploidy_standardization$data[which(qploidy_standardization$data$MarkerName %in% markers[c(4,19,24,51,56,57)]),]
+plot_geno_by_marker(six_markers, alpha = 0.1)
+```
+
+# Quality Assessment and Visualization
+
+Visualize the effect of standardization for each sample and explore BAF and Z-score distributions:
+
+```{r}
+plot_qploidy_standardization(x = qploidy_standardization,
+                             sample = "J432",
+                             type = c("Ratio_hist_overall", "BAF_hist_overall"))
+
+plot_qploidy_standardization(x = qploidy_standardization,
+                             sample = "J432",
+                             type = c("zscore", "R"))
+```
+
+See `?plot_qploidy_standardization` for more plot types.
+
+# Chromosome-level screening for abnormalities based on Z-score (optional)
+
+You can use the same quick check we used before on the raw total depth (R) with the standardized z-scores. This is useful to identify samples with potential aneuploidies or large CNVs before 
+running the HMM, and also to select samples with known ploidy to guide the BAF model selection.
+
+```{r, fig.width=11, fig.height=10, out.width="100%"}
+chromosome_level_test_plot_qploidy(input = qploidy_standardization, 
+                                   selected_samples = samples[1:12], 
+                                   col2test = "z")
+```
+
+# BAF Model Selection
+
+Select the best BAF model for a sample. The approach implemented here for this step is based on [`nQuack`](https://github.com/mgaynor1/nQuack)
+methods. It tests different statistical distribution mixture models fitting for each tested ploidy on the BAF distributions and selects the best based on BIC.
+The idea is the same, but the implementation here differs. 
+`nQuack` has a robust EM algorithm able to return tailored parameters for the selected distribution to users. 
+`Qploidy2` does not use an EM algorithm but a grid of parameters to be tested, 
+which is less time- and computationally demanding but may not provide the best parameters for this step. 
+This does not compromise the quality of `Qploidy2` final results since an EM is implemented together with the HMM in the next step of our workflow.
+However, if you want to also have the best results in this step, we suggest running also `nQuack` to check the differences and provide this function with the best parameters.
+
+This step helps determine the most likely ploidy and mixture 
+model parameters for BAF. The selected model will be used in the HMM for copy number estimation. 
+You can select a sample with known ploidy (e.g., from the previous step) to guide the model selection, 
+or test multiple samples and compare results.
+
+## Applying to raw data
+
+```{r}
+sample_ratios <- data$ratio[data$SampleName == "J432"]
+selected_model_raw <- select_best_baf_model(baf_vec = sample_ratios,
+                                        cn_grid= c(2,3,4),
+                                        bw = c(0.02, 0.04,0.1),
+                                        plot = TRUE)
+
+selected_model_raw$plot
+head(selected_model_raw$grid_results)
+```
+
+For this dataset, standardization is required for better results. This step and other downstream steps only make this move evident.
+
+## Applying to standardized data
+
+```{r}
+selected_model <- select_best_baf_model(qploidy_standardization = qploidy_standardization, 
+                                        sample = "J432",
+                                        cn_grid= c(2,3,4),
+                                        bw = c(0.02, 0.04,0.1),
+                                        plot = TRUE)
+
+selected_model$plot
+head(selected_model$grid_results)
+```
+
+# HMM Copy Number Estimation (Single Sample)
+
+Estimate copy number for a sample using a Hidden Markov Model. 
+This step provides a robust approach that integrates BAF and Z-score (standardized total depth) 
+information across genomic regions to infer CNV segments. Find all parameters description in `?hmm_estimate_CN`.
+
+## Applying to raw data
+
+```{r}
+res_raw <- hmm_estimate_CN(data = data, 
+                       geno.pos = geno.pos,
+                       selected_model = selected_model_raw, 
+                       use_values = c("ratio","R"),
+                       sample_id = "J432",
+                       cn_grid =  c(2,3,4,5,6))
+
+# View results
+res_raw
+```
+
+Visualize the CNV track:
+
+```{r , fig.width=11, fig.height=10, out.width="100%"}
+p <- plot_cn_track(hmm_CN = res_raw, data = data, 
+                   geno.pos = geno.pos, 
+                   sample_id = "J432",
+                   show_window_lines = FALSE,
+                   z_by_mean = TRUE)
+
+# All panels together
+p$arranged
+```
+
+## Applying to standardized data
+
+```{r}
+res <- hmm_estimate_CN(qploidy_standarize_result = qploidy_standardization,
+                       selected_model = selected_model,
+                       sample_id = "J432",
+                       cn_grid =  c(2,3,4,5,6))
+
+# View results
+res
+```
+
+Visualize the CNV track:
+
+```{r , fig.width=11, fig.height=10, out.width="100%"}
+p <- plot_cn_track(hmm_CN = res,
+                   qploidy_standarize_result = qploidy_standardization,
+                   sample_id = "J432",
+                   show_window_lines = FALSE,
+                   z_by_mean = TRUE)
+
+# All panels together
+p$arranged
+```
+
+```{r}
+# Individual panels
+p$baf
+p$z
+p$cn
+p$baf_dist
+```
+
+Summarize results:
+
+```{r}
+summ_hmm_chr <- summarize_cn_mode(res, level = "chromosome")
+summ_hmm_sample <- summarize_cn_mode(res, level = "sample")
+```
+
+
+# HMM Copy Number Estimation (Multiple Samples)
+
+Run HMM for all samples in parallel. The model will be selected internally using `select_best_baf_model`; you just need to define the grids (`bw`, `add_uniform_grid`, and `uniform_weight_grid`) according to what you observed when running it on a single sample.
+
+**Note**: Running HMM for many samples can be computationally intensive. Adjust `n_cores` based on your resources and dataset size.
+
+## Applying to raw data
+
+```{r}
+multi_esti_raw <- hmm_estimate_CN_multi(data = data,
+                                    geno.pos = geno.pos,
+                                    use_values = c("ratio","R"),
+                                    sample_ids = "all",
+                                    n_cores = 2, 
+                                    cn_grid =  c(2,3,4,5,6),
+                                    bw = c(0.02, 0.04,0.1))
+```
+
+Visualize CNV tracks for multiple samples:
+
+```{r, fig.width=11, fig.height=10, out.width="100%"}
+compare_cn_track(hmm_CN = multi_esti_raw,
+                 samples_to_plot = samples[1:30],
+                 facet_ncol = 8)
+```
+
+Again, not the best results for this dataset. Standardization is required.
+
+## Applying to standardized data
+
+```{r}
+multi_esti <- hmm_estimate_CN_multi(qploidy_standarize_result = qploidy_standardization,
+                                    sample_ids = "all",
+                                    n_cores = 2, 
+                                    cn_grid =  c(2,3,4,5,6),
+                                    bw = c(0.02, 0.04,0.1))
+```
+
+Visualize CNV tracks for multiple samples:
+
+```{r, fig.width=11, fig.height=10, out.width="100%"}
+compare_cn_track(hmm_CN = multi_esti,
+                 samples_to_plot = samples[1:30],
+                 facet_ncol = 8)
+```
+
+```{r}
+# For a specific sample
+p <- plot_cn_track(hmm_CN = multi_esti,
+                   qploidy_standarize_result = qploidy_standardization,
+                   sample_id = "85-126",
+                   show_window_lines = TRUE)
+p$arranged
+```
+
+```{r}
+p$baf
+```
+
+# Re-standardization (Optional)
+
+If you want to improve BAF resolution (e.g., after identifying a subset of samples with known ploidy via HMM), re-standardize:
+
+```{r}
+re_qploidy_standardization <- re_standardize(
+  data = data,
+  geno.pos = geno.pos,
+  hmm_CN_multi  = multi_esti,
+  selected_model = selected_model,
+  threshold.geno.prob = 0.9,
+  ploidy.standardization = 4,
+  threshold.n.clusters = 4,
+  n.cores = 2,
+  out_filename = "re_standardization.tsv.gz",
+  verbose = TRUE
+)
+
+re_qploidy_standardization
+
+# Compare before and after
+plot_qploidy_standardization(x = qploidy_standardization,
+                             sample = "85-126",
+                             type = c("Ratio_hist_overall", "BAF_hist_overall"))
+plot_qploidy_standardization(x = re_qploidy_standardization,
+                             sample = "85-126",
+                             type = c("Ratio_hist_overall", "BAF_hist_overall"))
+```
+
+## Re-run the HMM with the new standardization
+
+```{r}
+
+one_sample <- re_qploidy_standardization$data[re_qploidy_standardization$data$SampleName == "J432", ]
+
+re_multi_esti <- hmm_estimate_CN_multi(
+  qploidy_standarize_result = re_qploidy_standardization,
+  sample_ids = "all",
+  n_cores = 2,
+  cn_grid =  c(2,3,4,5,6),
+  bw = c(0.02, 0.04,0.1), 
+  add_uniform_grid = TRUE, 
+  uniform_weight_grid = c(0.2, 0.5,0.95))
+
+# Same plots can be generated
+p_re <- plot_cn_track(hmm_CN = re_multi_esti,
+                      qploidy_standarize_result = qploidy_standardization,
+                      sample_id = "85-17",
+                      show_window_lines = TRUE)
+
+p <- plot_cn_track(hmm_CN = multi_esti,
+                   qploidy_standarize_result = qploidy_standardization,
+                   sample_id = "85-17",
+                   show_window_lines = TRUE)
+
+p$baf # before
+p_re$baf # after
+
+p$z # before
+p_re$z # after
+
+p$cn #before
+p_re$cn #after
+```
+
+There is no difference for this dataset. Evaluate these plots for your dataset and select the best standardization object to move forward.
+
+# Call dosages
+
+**Warning**: Beta version - Dosage call requires more testing and review.
+
+Qploidy2 uses the BAF distributions to call dosages. See an example:
+
+```{r}
+# res was generated by hmm_estimate_CN above, it contains only one sample 
+sample_name <- "85-17"
+baf <- multi_esti$by_marker$baf[multi_esti$by_marker$SampleName == sample_name]
+dosages_one_sample <- call_BAF_dosages(res$by_marker$baf, selected_model = selected_model, plot=TRUE)
+head(dosages_one_sample$data)
+
+dosages_one_sample$plot
+```
+
+Call dosages for all samples considering the copy number estimated:
+
+```{r}
+dosages <- call_hmm_dosages(hmm_CN = multi_esti, selected_model)
+head(dosages)
+```
+
+# Export VCF
+
+```{r}
+export_VCF(dosages, file = "alfalfa_Qploidy_CN_dosages.vcf")
+```
+
+You can read the VCF with vcfR and extract fields:
+
+```{r}
+library(vcfR)
+vcf <- read.vcfR("alfalfa_Qploidy_CN_dosages.vcf")
+vcf@gt[1:5,1:5]
+
+CN <- extract.gt(vcf, "CN")
+CN[1:5,1:5]
+
+GT <- extract.gt(vcf, "GT")
+GT[1:5,1:5]
+
+dosage_prob <- extract.gt(vcf, "PMD")
+dosage_prob[1:5,1:5]
+```
+
+# Batch Plotting (Optional)
+
+Generate CNV plots for all samples in batches:
+
+```{r, eval=FALSE}
+n_plots_by_page <- c(seq(1, length(samples), by = 40), length(samples))
+for(i in 1:(length(n_plots_by_page) -1)){
+  comp_p <- compare_cn_track(hmm_CN = multi_esti,
+                             samples_to_plot = samples[n_plots_by_page[[i]]:n_plots_by_page[i+1]],
+                             facet_ncol = 12)
+  ggsave(comp_p, filename = paste0("Samples_", n_plots_by_page[i], "_", n_plots_by_page[i +1], ".png"), height = 10, width = 11)
+}
+```
+
+
+# How to cite
+
+### Qploidy - Standardization 
+
+Taniguti, C. H., Lau, J., Hochhaus, T., Arias, D. C. L., Hokanson, S. C., Zlesak, D. C., Byrne, D. H.,
+Klein, P. E., & Riera-Lizarazu, O. (2025). Exploring chromosomal variations in garden roses: Insights 
+from high-density SNP array data and a new tool, Qploidy. The Plant Genome, e70044. 
+https://doi.org/10.1002/tpg2.70044
+
+### Qploidy2 - HMM and BAF model selection
+
+Manuscript in preparation. Please contact the author for more information.
+
+# Acknowledgments
+
+### Qploidy version 1.0.0 - Standardization 
+
+Funded in part by the Robert E. Basye Endowment in Rose Genetics, Dept. of Horticultural Sciences, 
+Texas A&M University, and USDA’s National Institute of Food and Agriculture (NIFA), Specialty Crop 
+Research Initiative (SCRI) projects: ‘‘Tools for Genomics-Assisted Breeding in Polyploids: Development 
+of a Community Resource’’ (Award No. 2020-51181-32156); and ‘‘Developing Sustainable Rose Landscapes via 
+Rose Rosette Disease Education, Socioeconomic Assessments, and Breeding RRD-Resistant Roses with Stable 
+Black Spot Resistance’’ (Award No. 2022-51181-38330).
+
+### Qploidy versions > 1.0.0 and Qploidy2 - HMM and BAF model selection
+
+Supported by [Breeding Insight](https://www.breedinginsight.org/).

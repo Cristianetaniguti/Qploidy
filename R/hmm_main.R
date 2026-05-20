@@ -731,14 +731,34 @@ hmm_estimate_CN <- function(
 #' @importFrom dplyr bind_rows
 #'
 #' @export
-hmm_estimate_CN_multi <- function(qploidy_standarize_result,
+hmm_estimate_CN_multi <- function(qploidy_standarize_result = NULL,
+                                  data = NULL,
+                                  geno.pos = NULL,
+                                  use_values = c("BAF", "zscore"),
                                   sample_ids = "all",
                                   n_cores = 2,
                                   parallel_type = "auto",
                                   ...) {
-  # sanity check
-  if (!inherits(qploidy_standarize_result, "qploidy_standardization")) {
-    stop("Input must be a qploidy_standardization object as returned by standardize().")
+  # sanity check: require either a standardization object or raw data + geno.pos
+  if (!is.null(qploidy_standarize_result)) {
+    if (!inherits(qploidy_standarize_result, "qploidy_standardization")) {
+      stop("Input must be a qploidy_standardization object as returned by standardize().")
+    }
+    all_samples <- unique(as.data.frame(qploidy_standarize_result$data)$SampleName)
+  } else {
+    if (is.null(data) || is.null(geno.pos)) {
+      stop("When qploidy_standarize_result is NULL, both 'data' and 'geno.pos' must be provided.")
+    }
+    req_data <- c("MarkerName", "SampleName", "ratio", "R")
+    req_gp   <- c("MarkerName", "Chromosome", "Position")
+    miss_d  <- setdiff(req_data, names(data))
+    miss_gp <- setdiff(req_gp,   names(geno.pos))
+    if (length(miss_d))  stop(paste("'data' is missing columns:",   paste(miss_d,  collapse = ", ")))
+    if (length(miss_gp)) stop(paste("'geno.pos' is missing columns:", paste(miss_gp, collapse = ", ")))
+    if (!identical(use_values, c("ratio", "R"))) {
+      stop("When qploidy_standarize_result is NULL, use_values must be c(\"ratio\", \"R\").")
+    }
+    all_samples <- unique(data$SampleName)
   }
 
   # resolve parallel backend
@@ -747,9 +767,6 @@ hmm_estimate_CN_multi <- function(qploidy_standarize_result,
     stop(sprintf("'parallel_type' must be one of: %s.", paste(allowed_types, collapse = ", ")))
   if (parallel_type == "auto")
     parallel_type <- if (.Platform$OS.type == "windows") "PSOCK" else "FORK"
-
-  df <- as.data.frame(qploidy_standarize_result$data)
-  all_samples <- unique(df$SampleName)
 
   if (identical(sample_ids, "all")) {
     sample_ids <- all_samples
@@ -781,7 +798,7 @@ hmm_estimate_CN_multi <- function(qploidy_standarize_result,
   # FORK workers inherit everything from the parent process — no export needed
 
   results_list <- parLapply(cl, sample_ids, worker,
-                            qploidy_standarize_result, dots)
+                            qploidy_standarize_result, dots, data, geno.pos, use_values)
 
   # Re-issue warnings collected inside workers on the main session
   for (worker_res in results_list) {

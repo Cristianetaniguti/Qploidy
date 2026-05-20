@@ -4,4 +4,4 @@
 
 pkgload::load_all(export_all = FALSE,helpers = FALSE,attach_testthat = FALSE)
 options( "golem.app.prod" = TRUE, shiny.autoload.r = FALSE)
-Qploidy::run_app() # add parameters here (if any)
+Qploidy2::run_app() # add parameters here (if any)

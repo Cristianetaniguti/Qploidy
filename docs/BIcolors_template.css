@@ -1,0 +1,493 @@
+/* Custom CSS for R Markdown - Accessible Brand Colors with Hamburger Menu */
+
+/* Root variables for brand colors */
+:root {
+  --brand-teal-dark: #2A6576;
+  --brand-teal-medium: #48A9C5;
+  --brand-teal-light: #B5DDE8;
+  --brand-green-dark: #1E5D28;
+  --brand-green-medium: #319B42;
+  --brand-green-light: #A3D9AC;
+  --text-dark: #434544;
+  --text-medium: #707372;
+  --background-light: #f0f0f0;
+  --background-white: #ffffff;
+  --code-bg-dark: #4a4a4a;
+}
+
+/* Main body styling */
+body {
+  color: var(--text-dark);
+  background-color: var(--background-white) !important;
+  font-family: 'Source Sans Pro', 'Helvetica Neue', Arial, sans-serif;
+  line-height: 1.6;
+}
+
+/* Hamburger Menu Button - RIGHT SIDE ONLY */
+.toc-toggle,
+#tocToggle {
+  display: none !important;
+  position: fixed !important;
+  top: 20px !important;
+  right: 20px !important;
+  left: auto !important;
+  z-index: 1001 !important;
+  background-color: var(--brand-teal-medium) !important;
+  color: white !important;
+  border: none !important;
+  border-radius: 8px !important;
+  padding: 10px !important;
+  cursor: pointer !important;
+  box-shadow: 0 2px 8px rgba(29, 153, 153, 0.3) !important;
+  transition: all 0.3s ease !important;
+}
+
+.toc-toggle:hover,
+#tocToggle:hover {
+  background-color: var(--brand-teal-dark) !important;
+  transform: scale(1.05) !important;
+}
+
+.toc-toggle span,
+#tocToggle span {
+  display: block !important;
+  width: 25px !important;
+  height: 3px !important;
+  background-color: white !important;
+  margin: 5px 0 !important;
+  transition: 0.3s !important;
+  border-radius: 2px !important;
+}
+
+/* Animate hamburger to X */
+.toc-toggle.active span:nth-child(1),
+#tocToggle.active span:nth-child(1) {
+  transform: rotate(-45deg) translate(-5px, 6px) !important;
+}
+
+.toc-toggle.active span:nth-child(2),
+#tocToggle.active span:nth-child(2) {
+  opacity: 0 !important;
+}
+
+.toc-toggle.active span:nth-child(3),
+#tocToggle.active span:nth-child(3) {
+  transform: rotate(45deg) translate(-5px, -6px) !important;
+}
+
+/* TOC Overlay for mobile */
+.toc-overlay {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 999;
+}
+
+.toc-overlay.active {
+  display: block;
+}
+
+/* Container layout */
+.container-fluid {
+  background-color: var(--background-white) !important;
+  box-sizing: border-box !important;
+}
+
+.main-container,
+.col-md-9,
+#main {
+  margin-left: 0 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  float: none !important;
+}
+
+/* TOC menu with logo inside - UPDATED with proper transitions */
+.tocify-wrapper {
+  background-color: var(--background-white) !important; /* Changed to white */
+  border: 1px solid var(--brand-teal-light) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 2px 8px rgba(29, 153, 153, 0.1) !important;
+  padding: 0 !important;
+  width: 220px !important;
+  min-width: 220px !important;
+  position: fixed !important;
+  top: 20px !important;
+  left: 20px !important;
+  z-index: 1000 !important;
+  max-height: calc(100vh - 40px) !important;
+  overflow-y: auto !important;
+  transition: all 0.3s ease !important;
+}
+
+#TOC {
+  background-color: var(--background-white) !important; /* Changed to white */
+  border: 1px solid var(--brand-teal-light);
+  border-radius: 8px;
+  padding: 1rem;
+  position: fixed !important;
+  top: 20px !important;
+  left: 20px !important;
+  width: 220px !important;
+  min-width: 220px !important;
+  z-index: 1000 !important;
+  max-height: calc(100vh - 40px) !important;
+  overflow-y: auto !important;
+  transition: all 0.3s ease !important;
+}
+
+/* TOC Links - update hover states for white background */
+#TOC a:hover, #TOC a:focus {
+  color: var(--brand-teal-dark);
+  background-color: var(--background-light) !important; /* Light gray on white */
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+}
+
+.tocify-item a:hover,
+.tocify-item a:focus {
+  color: var(--brand-teal-dark) !important;
+  background-color: var(--background-light) !important; /* Light gray on white */
+  border-radius: 4px !important;
+}
+
+/* Add logo inside TOC wrapper */
+.tocify-wrapper::before,
+#TOC::before {
+  content: "";
+  display: block;
+  width: 60px;
+  height: 60px;
+  margin: 15px auto 20px auto;
+  background-image: url('BreedingInsight.png');
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+#TOC::before {
+  margin: 0 auto 20px auto;
+}
+
+/* TOC Content */
+.tocify {
+  padding: 0 15px 15px 15px !important;
+  background-color: transparent !important;
+}
+
+/* TOC Links */
+#TOC a {
+  color: var(--text-medium);
+  border-bottom: none;
+}
+
+#TOC a:hover, #TOC a:focus {
+  color: var(--brand-teal-dark);
+  background-color: var(--background-white);
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+}
+
+.tocify-item a {
+  color: var(--text-medium) !important;
+  border-bottom: none !important;
+  padding: 4px 8px !important;
+  display: block !important;
+  text-decoration: none !important;
+}
+
+.tocify-item a:hover,
+.tocify-item a:focus {
+  color: var(--brand-teal-dark) !important;
+  background-color: var(--background-white) !important;
+  border-radius: 4px !important;
+}
+
+/* TOC Active Items */
+.tocify-wrapper .tocify .tocify-item.active > a,
+.tocify-wrapper .tocify .tocify-item.active a,
+#toc .tocify-item.active > a,
+.list-group-item.active,
+.list-group-item.active:focus,
+.list-group-item.active:hover {
+  background-color: var(--brand-green-medium) !important;
+  border-color: var(--brand-green-medium) !important;
+  color: white !important;
+}
+
+/* Headers - teal for h1, h2 and green for lower levels */
+h1, h2 {
+  color: var(--brand-teal-dark);
+  font-weight: 600;
+}
+
+h3, h4, h5, h6 {
+  color: var(--brand-green-dark);
+  font-weight: 600;
+}
+
+h1 {
+  border-bottom: 3px solid var(--brand-teal-light);
+  padding-bottom: 0.5rem;
+}
+
+h2 {
+  border-left: 4px solid var(--brand-green-dark);
+  padding-left: 1rem;
+}
+
+h3 {
+  border-left: 4px solid var(--brand-green-medium);
+  padding-left: 1rem;
+}
+
+/* Links */
+a {
+  color: var(--brand-teal-dark);
+  text-decoration: none;
+  border-bottom: 1px solid var(--brand-teal-light);
+  transition: all 0.2s ease;
+}
+
+a:hover, a:focus {
+  color: var(--brand-green-dark);
+  border-bottom-color: var(--brand-green-medium);
+  outline: 2px solid transparent;
+}
+
+/* Code blocks */
+pre {
+  background-color: var(--background-white);
+  border: 1px solid var(--brand-teal-light);
+  border-left: 4px solid var(--brand-green-medium);
+  border-radius: 4px;
+  padding: 1rem;
+  overflow-x: auto !important;
+}
+
+pre code {
+  background-color: transparent !important;
+  color: inherit !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  font-weight: normal !important;
+}
+
+/* Inline code styling */
+p code, li code, td code, span code {
+  background-color: var(--code-bg-dark) !important;
+  color: white !important;
+  padding: 2px 6px !important;
+  border-radius: 4px !important;
+  font-family: 'Fira Code', 'Monaco', 'Consolas', monospace !important;
+  font-size: 0.9em !important;
+  font-weight: 500 !important;
+  text-decoration: none !important;
+  border-bottom: none !important;
+}
+
+/* Code in headers */
+h1 code, h2 code, h3 code, h4 code, h5 code, h6 code {
+  background-color: transparent !important;
+  color: var(--brand-teal-light) !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  font-family: 'Fira Code', 'Monaco', 'Consolas', monospace !important;
+  font-size: 0.9em !important;
+  font-weight: 600 !important;
+  text-decoration: none !important;
+  border-bottom: none !important;
+}
+
+/* Code in TOC */
+#TOC code,
+.tocify code,
+.tocify-wrapper code,
+.tocify-item code,
+.list-group-item code,
+nav code {
+  background-color: transparent !important;
+  color: var(--brand-teal-light) !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  font-family: 'Fira Code', 'Monaco', 'Consolas', monospace !important;
+  font-size: 0.85em !important;
+  font-weight: 500 !important;
+  text-decoration: none !important;
+  border-bottom: none !important;
+}
+
+/* Tables */
+.table {
+  background-color: var(--background-white);
+  table-layout: auto !important;
+  word-wrap: break-word !important;
+}
+
+.table th {
+  background-color: var(--brand-teal-medium);
+  color: white;
+  font-weight: 600;
+}
+
+.table-striped > tbody > tr:nth-of-type(odd) {
+  background-color: var(--background-light);
+}
+
+/* Buttons */
+.btn-primary {
+  background-color: var(--brand-teal-medium);
+  border-color: var(--brand-teal-dark);
+}
+
+.btn-primary:hover, .btn-primary:focus {
+  background-color: var(--brand-teal-dark);
+  border-color: var(--brand-green-dark);
+}
+
+.code-folding-btn,
+.btn-default {
+  background-color: var(--brand-green-medium) !important;
+  color: white !important;
+  border: 1px solid var(--brand-green-dark) !important;
+}
+
+.code-folding-btn:hover,
+.btn-default:hover {
+  background-color: var(--brand-green-dark) !important;
+  color: white !important;
+}
+
+.dropdown-toggle {
+  background-color: var(--brand-green-medium) !important;
+  color: white !important;
+  border: 1px solid var(--brand-green-dark) !important;
+}
+
+.dropdown-toggle:hover,
+.dropdown-toggle:focus {
+  background-color: var(--brand-green-dark) !important;
+  color: white !important;
+}
+
+/* Blockquotes */
+blockquote {
+  border-left: 5px solid var(--brand-green-medium);
+  background-color: var(--background-light);
+  color: var(--text-medium);
+}
+
+/* Focus indicators for accessibility */
+*:focus {
+  outline: 2px solid var(--brand-green-medium);
+  outline-offset: 2px;
+}
+
+/* RESPONSIVE BEHAVIOR - HAMBURGER MENU - UPDATED */
+
+/* Small screens - show hamburger, hide TOC by default */
+@media (max-width: 1200px) {
+  .toc-toggle,
+  #tocToggle {
+    display: block !important;
+  }
+
+  /* Hide TOC by default on small screens */
+  .tocify-wrapper,
+  #TOC {
+    transform: translateX(-100%) !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+  }
+
+  /* Show TOC when active (hamburger clicked) */
+  .tocify-wrapper.active,
+  #TOC.active {
+    transform: translateX(0) !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+
+  .container-fluid {
+    padding-left: 15px !important;
+    padding-right: 15px !important;
+    margin-left: 0 !important;
+  }
+}
+
+/* Large screens - hide hamburger, show TOC, normal layout */
+@media (min-width: 1201px) {
+  .toc-toggle {
+    display: none !important;
+  }
+
+  /* Always show TOC on large screens */
+  .tocify-wrapper,
+  #TOC {
+    transform: translateX(0) !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+
+  /* Push content to the right of the fixed sidebar */
+  body {
+    margin-left: 260px !important;
+  }
+
+  .container-fluid {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    padding-left: 20px !important;
+    padding-right: 20px !important;
+  }
+}
+
+/* Extra large screens - keep full width layout, no centering that breaks fixed sidebar */
+@media (min-width: 1400px) {
+  .container-fluid {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    padding-left: 30px !important;
+    padding-right: 40px !important;
+  }
+}
+
+/* High contrast */
+@media (prefers-contrast: high) {
+  :root {
+    --brand-teal-dark: #0f5f5f;
+    --brand-green-dark: #1f5f1f;
+    --brand-teal-light: #2d8888;
+    --text-dark: #000000;
+    --code-bg-dark: #2a2a2a;
+  }
+}
+
+/* Funding logos - RIGHT ALIGNED */
+body::after {
+  content: "";
+  display: block;
+  width: 100%;
+  height: 120px;
+  margin: 0px 0 20px 0;
+  padding: 20px;
+  border-top: 2px solid var(--background-light);
+  background-image:
+    url('usda-logo-color.png'),
+    url('IFAS.jpg');
+  background-size: 150px 80px, 150px 80px;
+  background-repeat: no-repeat, no-repeat;
+  background-position:
+    calc(100% - 200px) center,
+    calc(100% - 50px) center;
+  box-sizing: border-box;
+}

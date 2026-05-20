@@ -321,8 +321,5 @@ pca_plot <- function(
       title = paste0("PCA: PC2 vs PC3 | ", title_suffix)
     )
 
-  print(p1)
-  print(p2)
-  print(p3)
-  return(list(p1, p2, p3))
+  return(list(PC1xPC2=p1, PC1xPC3 = p2, PC2xPC3 = p3))
 }

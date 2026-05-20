@@ -1,80 +1,57 @@
 <!-- badges: start -->
 [![Development](https://img.shields.io/badge/development-active-blue.svg)](https://img.shields.io/badge/development-active-blue.svg)
 [![License: GPL v3](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![R-CMD-check](https://github.com/Cristianetaniguti/Qploidy/workflows/R-CMD-check/badge.svg)](https://github.com/Cristianetaniguti/Qploidy/actions)
+[![R-CMD-check](https://github.com/Breeding-Insight/Qploidy2/workflows/R-CMD-check/badge.svg)](https://github.com/Breeding-Insight/Qploidy2/actions)
 ![](https://img.shields.io/badge/RRID-SCR_026724-yellow.svg)
-[![codecov](https://codecov.io/gh/Cristianetaniguti/Qploidy/graph/badge.svg?token=DQBM227JSY)](https://codecov.io/gh/Cristianetaniguti/Qploidy)
-[![CRAN version](https://www.r-pkg.org/badges/version/Qploidy)](https://CRAN.R-project.org/package=Qploidy)
-[![CRAN downloads](https://cranlogs.r-pkg.org/badges/grand-total/Qploidy)](https://CRAN.R-project.org/package=Qploidy)
+[![codecov](https://codecov.io/gh/Breeding-Insight/Qploidy2/graph/badge.svg?token=DQBM227JSY)](https://codecov.io/gh/Breeding-Insight/Qploidy2)
 
 <!-- badges: end -->
 
-# Qploidy 
+# Qploidy2
 
-<img src="https://github.com/Cristianetaniguti/Qploidy/assets/7572527/88ef9fad-7f86-4a84-9e1a-5dd4625dd1c8" align="right" width="230"/>
+<img src="inst/app/www/Qploidy2_logo.png" align="right" width="230"/>
 
 
-**`Qploidy`** is an R package designed for ploidy and aneuploidy estimation using genotyping platform data. 
+**`Qploidy2`** is an R package designed for large-scale copy number variation, ploidy and aneuploidy estimation using genotyping platforms data. 
 
-### When does the `Qploidy` methodology work?
+`Qploidy2` builds upon the original [`Qploidy`](https://github.com/Cristianetaniguti/Qploidy) package. While `Qploidy` focused on signal standardization to reduce noise for ploidy estimation and relied heavily on visual inspection of diagnostic plots, `Qploidy2` introduces a multipoint approach using a Hidden Markov Model (HMM). This advanced method combines information from standardized allele ratios and total depth/intensities to provide automated and robust copy number estimation.
 
-The `Qploidy` approach is effective under the following conditions:  
-- Your marker data originates from **Axiom** or **Illumina genotyping arrays**.  
-- Your marker data is derived from **targeted sequencing platforms** (e.g., DArTag, GTseq, AgriSeq).  
-- All DNA samples were prepared following the **same library preparation protocol**.  
-- You know the **ploidy** of at least a subset of 60 samples *or* you know the **most common ploidy** in the dataset.  
-- Your dataset includes **heterozygous samples**.  
-
-### When does the `Qploidy` methodology NOT work?
-
-The methodology will not be effective under the following circumstances:  
-- Your marker data comes from **RADseq** or **GBS** (Genotyping-by-Sequencing) platforms.  
-- You intend to **combine datasets from different sequencing batches**.  
-   - For example: If you extracted DNA and sequenced two plates (192 samples) as one batch, and later sequenced an additional three plates (288 samples) as a second batch, you would need to analyze the two batches **separately** in `Qploidy`. Combining all 480 samples into a single analysis will lead to incorrect results.  
-- You **do not have a subset of samples with known ploidy** or **lack a predominant ploidy** in your dataset.  
-- Your samples consist of **inbred lines** (homozygous individuals).
-- Your samples consist of first-generation, colchicine-treated individuals in which genome duplication was directly induced.
+The package offers flexible implementation: you can access Qploidy's original standardization methods within `Qploidy2`, or apply the HMM directly to your data without standardization if noise reduction isn't needed.
 
 ## Installation
 
 ``` r
-# Install the latest stable version from CRAN
-install.packages("Qploidy")
-
 # Install the development version from GitHub
 #install.packages("devtools")
-devtools::install_github("cristianetaniguti/Qploidy")
-```
-
-## Access Shiny interface
-
-``` r
-library(Qploidy)
-run_app()
+devtools::install_github("Breeding-Insight/Qploidy2")
 ```
 
 ## Documentation
 
-* [`Qploidy` tutorial](https://cristianetaniguti.github.io/Qploidy/Qploidy.html) for directions on how to run
+* [Tutorial](https://github.com/Breeding-Insight/Qploidy2/Qploidy_alfalfa_tutorial.html) - large-scale copy number estimation in alfalfa mapping population using DArTag sequencing data
 
 ## Contributing
 
-Contributions are welcome! If you'd like to contribute, please fork the repository and submit a pull request. For major changes, open an issue first to discuss your ideas.
+Contributions are welcome! If you'd like to contribute, please fork the repository and submit a pull request to the development branch. For major changes, open an issue first to discuss your ideas.
 
 ## Bug Reports
 
-If you find a bug or want an enhancement, please submit an issue [here](https://github.com/Cristianetaniguti/Qploidy/issues).
+If you find a bug or want an enhancement, please submit an issue [here](https://github.com/Breeding-Insight/Qploidy2/issues).
 
 ## How to cite
 
-Taniguti, C. H., Lau, J., Hochhaus, T., Arias, D. C. L., Hokanson, S. C., Zlesak, D. C., Byrne, D. H., Klein, P. E., & Riera-Lizarazu, O. (2025). Exploring chromosomal variations in garden roses: Insights from high-density SNP array data and a new tool, Qploidy. The Plant Genome, e70044. https://doi.org/10.1002/tpg2.70044
+* `Qploidy` standardization approach
+
+Taniguti, C. H., Lau, J., Hochhaus, T., Arias, D. C. L., Hokanson, S. C., Zlesak, D. C., Byrne, D. H., Klein, P. E., & Riera-Lizarazu, O. (2025). Exploring chromosomal variations in garden roses: Insights from high-density SNP array data and a new tool, Qploidy2. The Plant Genome, e70044. https://doi.org/10.1002/tpg2.70044
+
+* `Qploidy2` HMM copy number estimation - manuscript in preparation
 
 ## Acknowledgments
 
-### Version 1.0.0
+### Qploidy - version 1.0.0
 
 This work is funded in part by the Robert E. Basye Endowment in Rose Genetics, Dept. of Horticultural Sciences, Texas A&M University, and USDA’s National Institute of Food and Agriculture (NIFA), Specialty Crop Research Initiative (SCRI) projects: ‘‘Tools for Genomics-Assisted Breeding in Polyploids: Development of a Community Resource’’ (Award No. 2020-51181-32156); and ‘‘Developing Sustainable Rose Landscapes via Rose Rosette Disease Education, Socioeconomic Assessments, and Breeding RRD-Resistant Roses with Stable Black Spot Resistance’’ (Award No. 2022-51181-38330).
 
-### Versions > 1.0.0
+### Qploidy versions > 1.0.0 and Qploidy2
 
 Supported by [Breeding Insight](https://www.breedinginsight.org/).

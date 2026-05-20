@@ -1,3 +1,9 @@
+# Qploidy2 1.9.0
+
+* Fork from Cristianetaniguti/Qploidy@development
+* Re-branding with Qploidy2
+* Adding updated vignettes 
+
 # Qploidy 1.8.7
 
 * Adding input checks for read_hmm_CN function

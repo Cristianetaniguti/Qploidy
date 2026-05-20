@@ -1,6 +1,6 @@
 # Test suite for hmm_estimate_CN and plot_cn_track
 library(testthat)
-library(Qploidy)
+library(Qploidy2)
 
 test_that("hmm_estimate_CN, plot_cn_track, and other HMM functions work as expected", {
   set.seed(123)

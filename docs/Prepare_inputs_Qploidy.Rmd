@@ -1,0 +1,477 @@
+---
+title: "Prepare Inputs for Qploidy"
+date: "Last update: 2025-04-21"
+output:
+  html_document:
+    theme: flatly
+    highlight: tango
+    css: BIcolors_template.css
+    includes:
+      in_header: header.html
+    toc: true
+    toc_depth: 3
+    toc_float:
+      collapsed: true
+      smooth_scroll: true
+    number_sections: true
+    code_folding: show
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This vignette describes how to prepare the input files for use with `Qploidy`, an R package designed for ploidy, aneuploidy and large-scale copy number variation
+ estimation using genotyping platform data. 
+
+Before describing the inputs, it is important to understand the conditions under which the `Qploidy` methodology is effective, as well as 
+its limitations. 
+This understanding will help you determine whether `Qploidy` is the right tool for your dataset and research objectives.
+
+# Prerequisites
+
+### When does the `Qploidy` methodology work?
+
+The `Qploidy` approach is effective under the following conditions:  
+- Your marker data originates from **Axiom** or **Illumina genotyping arrays**.  
+- Your marker data is derived from **targeted sequencing platforms** (e.g.,
+  DArTag, GTseq, AgriSeq).  
+- Your marker data is derived from **whole-genome sequencing** (make sure you have 
+  sufficient coverage for accurate copy number estimation and you filter your data appropriately).
+- All DNA samples were prepared following the **same library preparation
+  protocol**.  
+- You know the **ploidy** of at least a subset of 60 samples *or* you know the
+  **most common ploidy** in the dataset.  
+- Your dataset includes **heterozygous samples**.  
+
+### When does the `Qploidy` methodology NOT work?
+
+The methodology will not be effective under the following circumstances:  
+- Your marker data comes from **RADseq** or **GBS** (Genotyping-by-Sequencing)
+  platforms (sparse and inconsistent marker coverage across samples makes the signal standardization unreliable).  
+- You intend to **combine datasets from different sequencing batches**.  
+   - For example: If you extracted DNA and sequenced two plates (192 samples)
+     as one batch, and later sequenced an additional three plates (288 samples)
+     as a second batch, you would need to analyze the two batches **separately**
+     in `Qploidy`. Combining all 480 samples into a single analysis will lead
+     to incorrect results. See section "Check for batch effect" in the tutorial 
+     "Aneuploid Detection in Alfalfa F1 Population" for more details.
+- You **do not have a subset of samples with known ploidy** or **lack a
+  predominant ploidy** in your dataset.  
+    - Qploidy may still work depending on the quality of the data. Give it a try, but it is not guaranteed.
+- Your samples consist exclusively of **inbred lines** (homozygous individuals), as dosage calling relies 
+  on the segregation of allele intensities, which does not occur in fully homozygous lines.
+- Your samples consist of first-generation, colchicine-treated individuals in which genome duplication was 
+  directly induced, as the complete duplication of the genome doesn't generate all possible dosages of a polyploid. 
+  Use progenies of these individuals instead, as they will segregate for all possible dosages.
+
+# Installation
+
+To install the `Qploidy` package, you can use the following commands:
+
+```{r, eval=FALSE}
+# Install the latest stable version from CRAN
+install.packages("Qploidy")
+
+# Install the development version from GitHub
+#install.packages("devtools")
+devtools::install_github("cristianetaniguti/Qploidy")
+```
+
+# Input files
+
+`Qploidy` requires three main `data.frames` that we call:
+
+- Data (`data`): contains the allele intensities or read counts for each marker and sample.
+- Dosages (`genos`): contains the genotype dosages for each marker and sample of known ploidy or for all samples if overall ploidy is being used.
+- Genomic positions (`genos.pos`): contains the genomic positions for each marker.
+
+If you have standard format files, `Qploidy` provides functions to read them and convert them into these three required `data.frames`.
+
+In this vignette, we demonstrate file format conversion using simulated data which mimics standard formats from:
+- VCF (Variant Call Format) file
+- Axiom array summary file
+- Illumina array summary file
+
+## `Data` data.frame format
+
+### From VCF file
+
+The required FORMAT in a VCF for Qploidy is the AD (Allele Depth) field, which 
+contains the read counts for the reference and alternative alleles.
+Let's generate our simulated VCF file. This file contains 500 markers and 60
+samples, with a mix of tetraploid, diploid, and triploid samples. The tetraploid
+samples are used as the reference for standardization because they are the most
+common ploidy in the dataset. 
+
+```{r}
+library(Qploidy)
+
+# Simulate a VCF file with 500 markers and 60 samples
+simulate_vcf(
+  seed = 1234, file_path = "vcf_example_simulated.vcf",
+  n_tetraploid = 35, n_diploid = 5, n_triploid = 10,
+  n_markers = 500
+)
+```
+
+```{r}
+data <- qploidy_read_vcf(vcf_file = "vcf_example_simulated.vcf")
+head(data)
+```
+
+The resulting `data` data.frame contains the following columns: `MarkerName` and `SampleName` (identifiers), `X` and `Y` (allele signal 
+intensities for the reference and alternative alleles, respectively), `R` (total signal intensity, i.e. `X + Y`), and `ratio` (the B-allele 
+frequency, i.e. `Y / R`).
+
+
+### From Axiom array summary file
+
+In case your samples were genotyped using the Axiom array platform, you should
+have a `summary` file or `.CEL` files. If you have `.CEL` files, you can convert
+them into a `summary` file using the `apt-probeset-genotype` plugin available in
+the Analysis Power Tools (APT) platform from Thermo Fisher Scientific (Waltham,
+MA). A `summary` file is composed of a header that can have many lines and a body that 
+looks like this:
+
+```{r, echo=FALSE}
+temp1 <- tempfile(fileext = ".txt")
+simulate_axiom_summary(seed = 1234, file_path = temp1)
+temp1 <- read.table(temp1, header = TRUE)
+head(temp1)
+```
+
+In `Qploidy`, use the `read_axiom` function to read the `summary` file. It skips
+the header and reads the body of the file. The function will return a data frame.
+
+```{r, eval=FALSE}
+data <- read_axiom("AxiomGT1_summary.txt")
+head(data)
+```
+
+```
+   MarkerName     SampleName         X         Y        R     ratio
+1 AX-86752740      Lemon_Fiz  977.7548  793.4656 1771.220 0.4479768
+2 AX-86752740   High_Voltage 1292.2205  582.7886 1875.009 0.3108191
+3 AX-86752740    Lemon_Fiz.1  919.8055  870.9619 1790.767 0.4863624
+4 AX-86752740 High_Voltage.1 1368.1266  645.9481 2014.075 0.3207170
+5 AX-86752740     Brite_Eyes  238.5416 1242.7593 1481.301 0.8389648
+6 AX-86752740 Morden_Blush.1  302.1575 1542.4037 1844.561 0.8361900
+```
+
+### From Illumina array 
+
+In case you have a Illumina array summary file, `Qploidy` expects the
+following format:
+
+```
+[Header]
+GSGT Version    2.0.5
+Processing Date 4/17/2023 9:31 AM
+Content         specieX.bpm
+Num SNPs        26251
+Total SNPs      26251
+Num Samples     100
+Total Samples   100
+
+[Data]
+SNP Name   Sample ID   GC Score   Theta   X      Y      X Raw   Y Raw   Log R Ratio
+mk-1       SAMP-2      0.6814     0.247   0.023  0.009  504     100     0.5211668
+mk-10      SAMP-2      0.9204     0.000   0.006  0.000  346     27      -1.021583
+mk-100     SAMP-2      0.1695     0.367   0.030  0.020  576     158     1.177404
+mk-101     SAMP-2      0.8655     0.222   0.026  0.010  538     102     0.3459635
+mk-103     SAMP-2      0.8932     0.000   0.019  0.000  465     18      0.7578704
+mk-104     SAMP-2      0.5146     0.175   0.041  0.012  675     114     1.016254
+mk-105     SAMP-2      0.8060     0.450   0.018  0.015  458     132     0.4305636
+mk-106     SAMP-2      0.0000     0.386   0.002  0.002  315     57      NaN
+mk-107     SAMP-2      0.4804     0.495   0.026  0.025  534     189     1.0151
+```
+
+Verify if your file looks like this one. If confirmed, you can use the `read_illumina_array`
+function to read the data. If you include more than one file, the function will
+merge them into a single data frame. 
+
+```{r, eval=FALSE}
+data <- read_illumina_array(
+  "data/illumina/Set1.txt", # This is a example code, data not available
+  "data/illumina/Set2.txt",
+  "data/illumina/Set3.txt"
+)
+head(data)
+```
+
+```
+MarkerName     SampleName     X     Y     R     ratio
+1        CT1         S1-2_1 0.023 0.009 0.032 0.2812500
+2       CT10         S1-2_1 0.006 0.000 0.006 0.0000000
+3      CT100         S1-2_1 0.030 0.020 0.050 0.4000000
+4      CT101         S1-2_1 0.026 0.010 0.036 0.2777778
+5      CT103         S1-2_1 0.019 0.000 0.019 0.0000000
+6      CT104         S1-2_1 0.041 0.012 0.053 0.2264151
+```
+
+## `Genos` data.frame format
+
+The samples contained in the `genos` data frame will depend on the chosen path below.
+
+### Define Reference Samples - Choose Path (1) or (2)
+
+`Qploidy` applies a standardization method to allele intensities or read counts to enable 
+the comparison of copy numbers across the genome of a sample. To achieve this, it requires 
+a set of reference samples. There are two ways to select these reference samples:
+
+1. **If you have a subset of samples with known ploidy**, your `genos` data.frame should only
+contain the genotype dosages for this subset of samples. You will use this subset as the reference in the `Qploidy` standardization step.
+2. **If you know the most common ploidy among your samples**, the `genos` data.frame should contain the genotype dosages for all samples. 
+You can initially run `Qploidy` using all samples as the reference. From this first run, you can identify samples with the 
+common ploidy, then select this subset to use as the reference in a second run of `Qploidy`. Check section `re-standardization` in the 
+tutorial "Ploidy Estimated in a Mixed Population" for more details.
+
+Below are the steps to proceed for each case, tagged as (1) and (2):
+
+### (1) Using a Subset with Known Ploidy
+
+For this method, you will need to separate your subset of samples with known ploidy:
+
+In our simulated example, the sample names tell us which ploidy they are. Let's
+create a vector with the tetraploid samples for us to use later:
+
+```{r}
+# All samples
+all_samples <- unique(data$SampleName)
+all_samples
+tetraploid_samples <- all_samples[grep("Tetraploid", all_samples)]
+tetraploid_samples
+```
+
+### (2) Using the Most Common Ploidy
+
+For this method, you will use the entire dataset as the reference during the first 
+round of the `Qploidy` run:
+
+```{r, eval=FALSE}
+data_reference <- data
+```
+
+### (1) and (2) Run Dosage Caller
+
+To proceed, you need to determine the dosage for all reference samples. If you haven’t done 
+this yet, you can use any suitable dosage caller.  
+
+- For **array data**, we recommend using the 
+[`fitPoly`]( https://CRAN.R-project.org/package=fitPoly) package.  
+- For **sequencing data**, we suggest using the 
+[`updog`](https://github.com/dcgerard/updog) or 
+[`polyRAD`](https://github.com/lvclark/polyRAD) packages.  
+
+These packages determine dosages by analyzing the distribution of allele intensities or read 
+counts across all samples for each marker, using an informed ploidy model. You will provide 
+either the **most common ploidy in your population** or the **known ploidy of your selected subset** 
+as the informed ploidy.  
+
+- **Path (2):** If you provide the most common ploidy, samples with different ploidy levels may 
+receive incorrect dosages. However, these samples can be filtered out in the next step.  
+
+**Warning:**  
+Depending on the number of samples and markers, this step may take a significant amount of time to 
+complete. It is highly recommended to run it on a high-performance computing system where you can 
+utilize multiple cores and avoid issues with excessive RAM usage.
+
+### VCF file
+
+* If the VCF file already contains dosage/genotype (GT) information called for the subset/most 
+common ploidy:
+
+```{r}
+genos <- qploidy_read_vcf("vcf_example_simulated.vcf", geno = TRUE)
+dim(genos)
+
+genos.pos <- qploidy_read_vcf("vcf_example_simulated.vcf", geno.pos = TRUE)
+head(genos.pos)
+```
+
+If your VCF lacks the GT information for your reference samples, perform dosage 
+calling using the AD field as described in the next section. After that, you can create 
+the `genos` data frame with the dosage information and the `genos.pos` data frame with 
+the genomic positions of the markers.
+
+* If the VCF file lacks marker names in the `ID` column of the fixed portion, 
+  the `MarkerName` column will contain `NAs`. To resolve this, you can use the 
+  following code to concatenate the chromosome and position as marker names:
+
+```{r, eval=FALSE}
+genos.pos$MarkerName <- paste0(genos.pos$Chromosome, "_", genos.pos$Position)
+head(genos.pos)
+```
+
+
+#### (1) Filter the genos object to keep only the known ploidy samples subset
+
+```{r}
+genos <- genos[which(genos$SampleName %in% tetraploid_samples), ]
+```
+
+* If the VCF file doesn't contain dosage/genotype information (GT format field) called 
+for the subset/most common ploidy:
+
+```{r}
+library(tidyr)
+
+# Prepare inputs for updog
+## Approach (1)
+# tobe_genotyped <- data[which(data$SampleName %in% tetraploid_samples),]
+
+## Approach (2)
+tobe_genotyped <- data
+
+ref <- pivot_wider(tobe_genotyped[, 1:3], names_from = SampleName, values_from = X)
+ref <- as.matrix(ref)
+rownames_ref <- ref[, 1]
+ref <- ref[, -1]
+ref <- apply(ref, 2, as.numeric)
+rownames(ref) <- rownames_ref
+
+size <- pivot_wider(tobe_genotyped[, c(1, 2, 5)], names_from = SampleName, values_from = R)
+size <- as.matrix(size)
+rownames_size <- size[, 1]
+size <- size[, -1]
+size <- apply(size, 2, as.numeric)
+rownames(size) <- rownames_size
+
+size[1:10, 1:10]
+ref[1:10, 1:10]
+```
+
+```{r}
+library(updog)
+multidog_obj <- multidog(
+  refmat = ref,
+  sizemat = size,
+  model = "norm", # It depends on your population structure
+  ploidy = 4, # Most common ploidy in your population
+  nc = 2
+) # Change the parameters accordingly!!
+
+genos <- data.frame(
+  MarkerName = multidog_obj$inddf$snp,
+  SampleName = multidog_obj$inddf$ind,
+  geno = multidog_obj$inddf$geno,
+  prob = multidog_obj$inddf$maxpostprob
+)
+
+head(genos)
+```
+
+Notice that, if you are following approach (2), diploid and triploid sample genotypes will be incorrectly called as tetraploids. However, because 
+they are not the most common samples in the dataset, they should not interfere significantly with the dosage calling of the tetraploids. You can
+go back to this step after a first round of ploidy evaluation and call the dosages of the tetraploids only.
+
+### Array data
+
+Here we show an option of genotype calling for array data using fitpoly software:
+
+```{r, eval=FALSE}
+library(fitPoly)
+saveMarkerModels(
+  ploidy = 4, # Most common ploidy among Texas Garden Roses collection
+  data = data_reference, # output of the previous function
+  filePrefix = "fitpoly_output/texas_roses", # Define the path and prefix for the result files
+  ncores = 2
+) # Change it accordingly to your system!!!!
+
+library(vroom) # Package to speed up reading files
+fitpoly_scores <- vroom("fitpoly_output/texas_roses_scores.dat")
+
+genos <- data.frame(
+  MarkerName = fitpoly_scores$MarkerName,
+  SampleName = fitpoly_scores$SampleName,
+  geno = fitpoly_scores$maxgeno,
+  prob = fitpoly_scores$maxP
+)
+head(genos)
+```
+
+```
+   MarkerName  SampleName geno      prob
+1 AX-86752740 1000 Wishes    2 0.7831438
+2 AX-86752740  10004-N008    2 0.9892338
+3 AX-86752740  10037_N046    2 0.9844171
+4 AX-86752740  10038-N001    2 0.9916813
+5 AX-86752740  10043_N019    2 0.9871057
+6 AX-86752740  10043_N049    2 0.9955792
+```
+
+Unlike a VCF file, a `summary` file does not contain the genomic positions of the markers.
+You will need to provide this information in a separate file, as shown in the following example.
+
+```{r, eval=FALSE}
+# File containing markers genomic positions
+genos.pos_file <- read.table("geno.pos_roses_texas.txt", header = T)
+head(genos.pos_file)
+```
+
+```
+            SNP      probes chr      pos
+1 Affx-86843634 AX-86752747   6   255852
+2 Affx-86842821 AX-86752763   6 62032267
+3 Affx-86839613 AX-86752769   5  9169310
+4 Affx-86838724 AX-86752790   1 44259488
+5 Affx-86840823 AX-86752809   7 12991931
+6 Affx-86842443 AX-86752817   2 53861719
+```
+
+```{r, eval=FALSE}
+# Edit for Qploidy input format
+genos.pos <- data.frame(
+  MarkerName = genos.pos_file$probes,
+  Chromosome = genos.pos_file$chr,
+  Position = genos.pos_file$pos
+)
+head(genos.pos)
+```
+
+```
+   MarkerName Chromosome Position
+1 AX-86752747          6   255852
+2 AX-86752763          6 62032267
+3 AX-86752769          5  9169310
+4 AX-86752790          1 44259488
+5 AX-86752809          7 12991931
+6 AX-86752817          2 53861719
+```
+
+By the end of this tutorial you should have the three required data frames (`data`, `genos`, and `genos.pos`) ready to be used 
+as input for `Qploidy`. You are now ready to run the analysis. Choose the tutorial that best fit your purpose to go next:
+
+- [Aneuploid Detection with DArTag Markers in Alfalfa F1 Population](link_to_tutorial)
+- [Copy Number Estimation in a Mixed Ploidy Population of Saccharomices sp. using WGS data](link_to_tutorial)
+- [Large-scale Copy Number Variation Identification in a F1 Garden Roses Population using Axiom Array Data](link_to_tutorial)
+
+# How to cite
+
+### Version 1.0.0 - Standardization 
+
+Taniguti, C. H., Lau, J., Hochhaus, T., Arias, D. C. L., Hokanson, S. C., Zlesak, D. C., Byrne, D. H.,
+ Klein, P. E., & Riera-Lizarazu, O. (2025). Exploring chromosomal variations in garden roses: Insights 
+ from high-density SNP array data and a new tool, Qploidy. The Plant Genome, e70044. 
+ https://doi.org/10.1002/tpg2.70044
+
+### Versions > 1.0.0 - HMM and BAF model selection
+
+Manuscript in preparation. Please contact the author for more information.
+
+# Acknowledgments
+
+### Version 1.0.0 - Standardization 
+
+Funded in part by the Robert E. Basye Endowment in Rose Genetics, Dept. of Horticultural Sciences, 
+Texas A&M University, and USDA’s National Institute of Food and Agriculture (NIFA), Specialty Crop 
+Research Initiative (SCRI) projects: ‘‘Tools for Genomics-Assisted Breeding in Polyploids: Development 
+of a Community Resource’’ (Award No. 2020-51181-32156); and ‘‘Developing Sustainable Rose Landscapes via 
+Rose Rosette Disease Education, Socioeconomic Assessments, and Breeding RRD-Resistant Roses with Stable 
+Black Spot Resistance’’ (Award No. 2022-51181-38330).
+
+### Versions > 1.0.0 - HMM and BAF model selection
+
+Supported by [Breeding Insight](https://www.breedinginsight.org/).

@@ -39,6 +39,8 @@ Visit `GenoBrew` GitHub [repository](https://github.com/Breeding-Insight/GenoBre
 and [tutorial](https://scribehow.com/viewer/GenoBrew_Interactive_Marker_Panel_Evaluation_CNV_Visualization_and_Curation__4uWloBuPT1WlnCvW2UWiTg) 
 for more information.
 
+![GenoBrew Demo](inst/app/www/GenoBrew_demo.gif)
+
 ## Contributing
 
 Contributions are welcome! If you'd like to contribute, please fork the repository and submit a pull request to the development branch. For major changes, open an issue first to discuss your ideas.

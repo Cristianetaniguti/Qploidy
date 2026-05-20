@@ -5,7 +5,10 @@
 \title{Run hmm_estimate_CN in parallel for multiple samples (using parLapply)}
 \usage{
 hmm_estimate_CN_multi(
-  qploidy_standarize_result,
+  qploidy_standarize_result = NULL,
+  data = NULL,
+  geno.pos = NULL,
+  use_values = c("BAF", "zscore"),
   sample_ids = "all",
   n_cores = 2,
   parallel_type = "auto",
@@ -14,6 +17,12 @@ hmm_estimate_CN_multi(
 }
 \arguments{
 \item{qploidy_standarize_result}{An object of class qploidy_standardization as returned by standardize().}
+
+\item{data}{Optional data.frame with raw input data (MarkerName, SampleName, ratio, R) if qploidy_standarize_result is not provided.}
+
+\item{geno.pos}{Optional data.frame with marker genomic positions (MarkerName, Chromosome, Position) if qploidy_standarize_result is not provided.}
+
+\item{use_values}{Character vector of column names to use for CN estimation. If qploidy_standarize_result is provided, these should match the columns in qploidy_standarize_result$data (e.g., c("BAF", "zscore")). If qploidy_standarize_result is NULL, use_values must be c("ratio", "R") and these columns must be present in the provided 'data'.}
 
 \item{sample_ids}{Character vector of sample IDs to analyze, or "all" for all samples in the data.}
 

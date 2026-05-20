@@ -721,6 +721,9 @@ hmm_estimate_CN <- function(
 #' Returns a combined data.frame with results for all samples.
 #'
 #' @param qploidy_standarize_result An object of class qploidy_standardization as returned by standardize().
+#' @param data Optional data.frame with raw input data (MarkerName, SampleName, ratio, R) if qploidy_standarize_result is not provided.
+#' @param use_values Character vector of column names to use for CN estimation. If qploidy_standarize_result is provided, these should match the columns in qploidy_standarize_result$data (e.g., c("BAF", "zscore")). If qploidy_standarize_result is NULL, use_values must be c("ratio", "R") and these columns must be present in the provided 'data'.
+#' @param geno.pos Optional data.frame with marker genomic positions (MarkerName, Chromosome, Position) if qploidy_standarize_result is not provided.
 #' @param sample_ids Character vector of sample IDs to analyze, or "all" for all samples in the data.
 #' @param n_cores Number of cores to use (default: 2).
 #' @param parallel_type Character. Parallel backend to use: \code{"FORK"}, \code{"PSOCK"}, or \code{"auto"} (default). \code{"auto"} selects \code{"FORK"} on Unix/macOS (faster; workers inherit the parent environment automatically) and \code{"PSOCK"} on Windows (the only option available there). Use \code{"PSOCK"} explicitly if you need cross-platform reproducibility or are debugging worker crashes.

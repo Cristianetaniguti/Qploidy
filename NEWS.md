@@ -3,6 +3,7 @@
 * Fork from Cristianetaniguti/Qploidy@development
 * Re-branding with Qploidy2
 * Adding updated vignettes 
+* Allow `hmm_estimate_CN_multi` to run with raw data (not standardized)
 
 # Qploidy 1.8.7
 

@@ -789,7 +789,7 @@ hmm_estimate_CN_multi <- function(qploidy_standarize_result = NULL,
     clusterEvalQ(cl, {
       options(warn = 1)
       library(methods)
-      library(Qploidy)
+      library(Qploidy2)
       NULL
     })
     clusterExport(cl,

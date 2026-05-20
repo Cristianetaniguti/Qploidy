@@ -483,11 +483,13 @@ body::after {
   border-top: 2px solid var(--background-light);
   background-image:
     url('usda-logo-color.png'),
-    url('IFAS.jpg');
-  background-size: 150px 80px, 150px 80px;
-  background-repeat: no-repeat, no-repeat;
+    url('IFAS.jpg'),
+    url('cornell_seal_simple_web_b31b1b.png');
+  background-size: 150px 80px, 150px 80px, 100px 80px;
+  background-repeat: no-repeat, no-repeat, no-repeat;
   background-position:
-    calc(100% - 200px) center,
-    calc(100% - 50px) center;
+    calc(100% - 530px) center,
+    calc(100% - 360px) center,
+    calc(100% - 240px) center;
   box-sizing: border-box;
 }

@@ -1,6 +1,7 @@
 ---
-title: "Qploidy2 - large-scale copy number estimation in alfalfa mapping population using DArTag genotyping data"
-author: "Breeding Insight - Cristiane Taniguti"
+title: "Qploidy2 Tutorial"
+subtitle: "Large-scale copy number estimation in alfalfa mapping population using DArTag genotyping data"
+author: "Breeding Insight"
 date: "`r Sys.Date()`"
 output:
   html_document:
@@ -72,7 +73,7 @@ highest possible copy number in the dataset
 * The number of markers is sufficient to provide a good resolution for the BAF distributions
 * The larger the amount of markers, the smaller the copy number variations that can be detected
 
-## Install
+# Install
 
 * It requires R version superior to 3.6.0
 
@@ -176,7 +177,7 @@ When this assumption holds for your dataset, deviations in a sample’s total de
 
 You can rapidly screen for candidate samples using the function below:
 
-```{r, fig.width=11, fig.height=10, out.width="100%"}
+```{r, fig.width=6, fig.height=5, out.width="100%"}
 chromosome_level_test_plot_qploidy(input = data, 
                                    geno.pos = geno.pos, 
                                    selected_samples = samples[1:12], # plot the first 12 
@@ -288,12 +289,12 @@ plot_qploidy_standardization(x = qploidy_standardization,
 
 See `?plot_qploidy_standardization` for more plot types.
 
-# Chromosome-level screening for abnormalities based on Z-score (optional)
+## Chromosome-level screening for abnormalities based on Z-score (optional)
 
 You can use the same quick check we used before on the raw total depth (R) with the standardized z-scores. This is useful to identify samples with potential aneuploidies or large CNVs before 
 running the HMM, and also to select samples with known ploidy to guide the BAF model selection.
 
-```{r, fig.width=11, fig.height=10, out.width="100%"}
+```{r, fig.width=6, fig.height=5, out.width="100%"}
 chromosome_level_test_plot_qploidy(input = qploidy_standardization, 
                                    selected_samples = samples[1:12], 
                                    col2test = "z")
@@ -459,7 +460,7 @@ Visualize CNV tracks for multiple samples:
 
 ```{r, fig.width=11, fig.height=10, out.width="100%"}
 compare_cn_track(hmm_CN = multi_esti,
-                 samples_to_plot = samples[1:30],
+                 samples_to_plot = samples[31:50],
                  facet_ncol = 8)
 ```
 
@@ -467,7 +468,7 @@ compare_cn_track(hmm_CN = multi_esti,
 # For a specific sample
 p <- plot_cn_track(hmm_CN = multi_esti,
                    qploidy_standarize_result = qploidy_standardization,
-                   sample_id = "85-126",
+                   sample_id = "85-182",
                    show_window_lines = TRUE)
 p$arranged
 ```
@@ -498,19 +499,16 @@ re_qploidy_standardization
 
 # Compare before and after
 plot_qploidy_standardization(x = qploidy_standardization,
-                             sample = "85-126",
+                             sample = "85-295",
                              type = c("Ratio_hist_overall", "BAF_hist_overall"))
 plot_qploidy_standardization(x = re_qploidy_standardization,
-                             sample = "85-126",
+                             sample = "85-295",
                              type = c("Ratio_hist_overall", "BAF_hist_overall"))
 ```
 
 ## Re-run the HMM with the new standardization
 
 ```{r}
-
-one_sample <- re_qploidy_standardization$data[re_qploidy_standardization$data$SampleName == "J432", ]
-
 re_multi_esti <- hmm_estimate_CN_multi(
   qploidy_standarize_result = re_qploidy_standardization,
   sample_ids = "all",
@@ -520,28 +518,68 @@ re_multi_esti <- hmm_estimate_CN_multi(
   add_uniform_grid = TRUE, 
   uniform_weight_grid = c(0.2, 0.5,0.95))
 
+# CNV profiles before
+compare_cn_track(hmm_CN = multi_esti,
+                 samples_to_plot = samples[91:110],
+                 facet_ncol = 8)
+
+# CNV profiles after
+compare_cn_track(hmm_CN = re_multi_esti,
+                 samples_to_plot = samples[91:110],
+                 facet_ncol = 8)
+```
+
+```{r, fig.width=11, fig.height=10, out.width="100%"}
 # Same plots can be generated
 p_re <- plot_cn_track(hmm_CN = re_multi_esti,
-                      qploidy_standarize_result = qploidy_standardization,
-                      sample_id = "85-17",
+                      qploidy_standarize_result = re_qploidy_standardization,
+                      sample_id = "85-295",
                       show_window_lines = TRUE)
 
 p <- plot_cn_track(hmm_CN = multi_esti,
                    qploidy_standarize_result = qploidy_standardization,
-                   sample_id = "85-17",
+                   sample_id = "85-295",
                    show_window_lines = TRUE)
 
-p$baf # before
-p_re$baf # after
-
-p$z # before
-p_re$z # after
-
-p$cn #before
-p_re$cn #after
+p$arranged #before
+p_re$arranged #after
 ```
 
-There is no difference for this dataset. Evaluate these plots for your dataset and select the best standardization object to move forward.
+For this dataset, there are a few changes for some samples like the one showed above. 
+Chromosome 7 is pointed with higher number (5) of copies in the first round standardization and with 
+the re-standardization it is presented as 4 copies. This instability still leaves doubts about 
+the CNV of this particular chromosome. You can further explore tweaking the other parameters, 
+for example, increasing the number of markers in the windows to better fit the mixed models on the BAF distributions:
+
+```{r, fig.width=11, fig.height=10, out.width="100%"}
+
+res_tweak <- hmm_estimate_CN(qploidy_standarize_result = re_qploidy_standardization,
+                       selected_model = selected_model,
+                       sample_id = "85-295",
+                       min_snps_per_window = 60,
+                       cn_grid =  c(2,3,4,5,6))
+
+p <- plot_cn_track(hmm_CN = res_tweak,
+                   qploidy_standarize_result = re_qploidy_standardization,
+                   sample_id = "85-295",
+                   show_window_lines = TRUE)
+
+p$arranged
+```
+
+Explore more parameters consulting `?hmm_estimate_CN`.
+
+Once you get to a conclusion with results better explain the patterns, you can update your multi-sample
+HMM object by using the functions:
+
+```{r}
+final_res <- update_hmm_CN_multi(multi_esti, 
+                                 res_tweak, 
+                                 rm_sample = FALSE)
+```
+
+If you decide that the results for this sample is inconclusive, 
+you can set the `rm_sample` parameter to `TRUE` to remove it from your final results.
 
 # Call dosages
 
@@ -552,8 +590,15 @@ Qploidy2 uses the BAF distributions to call dosages. See an example:
 ```{r}
 # res was generated by hmm_estimate_CN above, it contains only one sample 
 sample_name <- "85-17"
-baf <- multi_esti$by_marker$baf[multi_esti$by_marker$SampleName == sample_name]
-dosages_one_sample <- call_BAF_dosages(res$by_marker$baf, selected_model = selected_model, plot=TRUE)
+baf <- final_res$by_marker$baf[final_res$by_marker$SampleName == sample_name]
+
+selected_model <- select_best_baf_model(baf_vec =  baf, 
+                                        sample = sample_name,
+                                        cn_grid= c(2,3,4),
+                                        bw = c(0.02, 0.04,0.1),
+                                        plot = TRUE)
+
+dosages_one_sample <- call_BAF_dosages(baf, selected_model = selected_model, plot=TRUE)
 head(dosages_one_sample$data)
 
 dosages_one_sample$plot
@@ -562,7 +607,7 @@ dosages_one_sample$plot
 Call dosages for all samples considering the copy number estimated:
 
 ```{r}
-dosages <- call_hmm_dosages(hmm_CN = multi_esti, selected_model)
+dosages <- call_hmm_dosages(hmm_CN = final_res, selected_model)
 head(dosages)
 ```
 
@@ -589,14 +634,14 @@ dosage_prob <- extract.gt(vcf, "PMD")
 dosage_prob[1:5,1:5]
 ```
 
-# Batch Plotting (Optional)
+# Plotting all samples in batches (Optional)
 
 Generate CNV plots for all samples in batches:
 
 ```{r, eval=FALSE}
 n_plots_by_page <- c(seq(1, length(samples), by = 40), length(samples))
 for(i in 1:(length(n_plots_by_page) -1)){
-  comp_p <- compare_cn_track(hmm_CN = multi_esti,
+  comp_p <- compare_cn_track(hmm_CN = final_res,
                              samples_to_plot = samples[n_plots_by_page[[i]]:n_plots_by_page[i+1]],
                              facet_ncol = 12)
   ggsave(comp_p, filename = paste0("Samples_", n_plots_by_page[i], "_", n_plots_by_page[i +1], ".png"), height = 10, width = 11)
@@ -619,7 +664,7 @@ Manuscript in preparation. Please contact the author for more information.
 
 # Acknowledgments
 
-### Qploidy version 1.0.0 - Standardization 
+### Qploidy version 1.0.0 
 
 Funded in part by the Robert E. Basye Endowment in Rose Genetics, Dept. of Horticultural Sciences, 
 Texas A&M University, and USDA’s National Institute of Food and Agriculture (NIFA), Specialty Crop 
@@ -628,6 +673,6 @@ of a Community Resource’’ (Award No. 2020-51181-32156); and ‘‘Developing
 Rose Rosette Disease Education, Socioeconomic Assessments, and Breeding RRD-Resistant Roses with Stable 
 Black Spot Resistance’’ (Award No. 2022-51181-38330).
 
-### Qploidy versions > 1.0.0 and Qploidy2 - HMM and BAF model selection
+### Qploidy versions > 1.0.0 and Qploidy2 
 
 Supported by [Breeding Insight](https://www.breedinginsight.org/).

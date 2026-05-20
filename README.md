@@ -2,7 +2,6 @@
 [![Development](https://img.shields.io/badge/development-active-blue.svg)](https://img.shields.io/badge/development-active-blue.svg)
 [![License: GPL v3](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![R-CMD-check](https://github.com/Breeding-Insight/Qploidy2/workflows/R-CMD-check/badge.svg)](https://github.com/Breeding-Insight/Qploidy2/actions)
-![](https://img.shields.io/badge/RRID-SCR_026724-yellow.svg)
 [![codecov](https://codecov.io/gh/Breeding-Insight/Qploidy2/graph/badge.svg?token=DQBM227JSY)](https://codecov.io/gh/Breeding-Insight/Qploidy2)
 
 <!-- badges: end -->
@@ -28,7 +27,7 @@ devtools::install_github("Breeding-Insight/Qploidy2")
 
 ## Documentation
 
-* [Tutorial](https://github.com/Breeding-Insight/Qploidy2/Qploidy_alfalfa_tutorial.html) - large-scale copy number estimation in alfalfa mapping population using DArTag sequencing data
+* [Tutorial](https://Breeding-Insight.github.io/Qploidy2/Qploidy_alfalfa_tutorial.html) - large-scale copy number estimation in alfalfa mapping population using DArTag sequencing data
 
 ## Contributing
 

@@ -662,6 +662,12 @@ https://doi.org/10.1002/tpg2.70044
 
 Manuscript in preparation. Please contact the author for more information.
 
+### nQuack - BAF model selection
+
+Gaynor, M., Landis, J., O'Connor, T., Laport, R., Doyle, J., Soltis, D., Ponciano, J., & Soltis, P. (2024). 
+"nQuack: An R package for predicting ploidal level from sequence data using site-based heterozygosity." 
+Applications in Plant Sciences, 12(4), e11606. doi:10.1002/aps3.11606
+
 # Acknowledgments
 
 ### Qploidy version 1.0.0 

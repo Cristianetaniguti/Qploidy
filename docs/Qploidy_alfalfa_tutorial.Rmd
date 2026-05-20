@@ -410,13 +410,25 @@ p$cn
 p$baf_dist
 ```
 
+See the results in a `data.frame` format:
+
+```{r}
+head(res$by_window)
+head(res$by_marker)
+head(res$params)
+```
+
 Summarize results:
 
 ```{r}
+# By chromosome
 summ_hmm_chr <- summarize_cn_mode(res, level = "chromosome")
-summ_hmm_sample <- summarize_cn_mode(res, level = "sample")
-```
+summ_hmm_chr
 
+# By sample
+summ_hmm_sample <- summarize_cn_mode(res, level = "sample")
+summ_hmm_sample
+```
 
 # HMM Copy Number Estimation (Multiple Samples)
 
@@ -428,12 +440,12 @@ Run HMM for all samples in parallel. The model will be selected internally using
 
 ```{r}
 multi_esti_raw <- hmm_estimate_CN_multi(data = data,
-                                    geno.pos = geno.pos,
-                                    use_values = c("ratio","R"),
-                                    sample_ids = "all",
-                                    n_cores = 2, 
-                                    cn_grid =  c(2,3,4,5,6),
-                                    bw = c(0.02, 0.04,0.1))
+                                        geno.pos = geno.pos,
+                                        use_values = c("ratio","R"),
+                                        sample_ids = "all",
+                                        n_cores = 2, 
+                                        cn_grid =  c(2,3,4,5,6),
+                                        bw = c(0.02, 0.04,0.1))
 ```
 
 Visualize CNV tracks for multiple samples:
@@ -569,6 +581,8 @@ p$arranged
 
 Explore more parameters consulting `?hmm_estimate_CN`.
 
+# Refine results for a single sample
+
 Once you get to a conclusion with results better explain the patterns, you can update your multi-sample
 HMM object by using the functions:
 
@@ -580,6 +594,48 @@ final_res <- update_hmm_CN_multi(multi_esti,
 
 If you decide that the results for this sample is inconclusive, 
 you can set the `rm_sample` parameter to `TRUE` to remove it from your final results.
+
+# Export HMM results
+
+The resulted objects from function `update_hmm_CN_multi`, 
+`hmm_estimate_CN`, and `hmm_estimate_CN_multi` are all classified as 
+
+```{r}
+class(res_tweak) # result from hmm_estimate_CN
+class(multi_esti) # result from hmm_estimate_CN_multi
+class(re_multi_esti) # result from hmm_estimate_CN_multi after re-standardization
+class(final_res)  # result from update_hmm_CN_multi
+```
+
+Therefore, all of them can be exported by the function:
+
+```{r}
+write_hmm_CN(final_res, prefix = "alfalfa_example")
+```
+
+You will see three generated files:
+
+- "[prefix]_by_marker.csv.gz"
+- "[prefix]_by_window.csv.gz"
+- "[prefix]_params.rds"
+
+You can read them back to R using the `read_hmm_CN` function:
+
+```{r, eval=FALSE}
+final_res <- read_hmm_CN(by_window_file = "alfalfa_example_by_window.csv.gz",
+                         by_marker_file = "alfalfa_example_by_marker.csv.gz",
+                         params_file = "alfalfa_example_params.rds")
+```
+
+# Interactive curation of results
+
+The resulted files from `write_hmm_CN` can be uploaded on `GenoBrew` Shiny interface.
+The tab `CNV profiles` allow you to interactively inspect the BAF, z-score and CN calls plots,
+re-run the HMM adjusting parameters for specific samples and update the results.
+
+Visit `GenoBrew` GitHub [repository](https://github.com/Breeding-Insight/GenoBrew) 
+and [tutorial](https://scribehow.com/viewer/GenoBrew_Interactive_Marker_Panel_Evaluation_CNV_Visualization_and_Curation__4uWloBuPT1WlnCvW2UWiTg) 
+for more information.
 
 # Call dosages
 
@@ -658,11 +714,11 @@ Klein, P. E., & Riera-Lizarazu, O. (2025). Exploring chromosomal variations in g
 from high-density SNP array data and a new tool, Qploidy. The Plant Genome, e70044. 
 https://doi.org/10.1002/tpg2.70044
 
-### Qploidy2 - HMM and BAF model selection
+### Qploidy2 - HMM and grid approach BAF model selection
 
 Manuscript in preparation. Please contact the author for more information.
 
-### nQuack - BAF model selection
+### nQuack - EM approach BAF model selection
 
 Gaynor, M., Landis, J., O'Connor, T., Laport, R., Doyle, J., Soltis, D., Ponciano, J., & Soltis, P. (2024). 
 "nQuack: An R package for predicting ploidal level from sequence data using site-based heterozygosity." 

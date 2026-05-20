@@ -29,6 +29,16 @@ devtools::install_github("Breeding-Insight/Qploidy2")
 
 * [Tutorial](https://Breeding-Insight.github.io/Qploidy2/Qploidy_alfalfa_tutorial.html) - large-scale copy number estimation in alfalfa mapping population using DArTag sequencing data
 
+## Interactive visualization and curation of results
+
+The resulted files from Qploidy2 `write_hmm_CN` function can be uploaded on `GenoBrew` Shiny interface.
+The tab `CNV profiles` allow you to interactively inspect the BAF, z-score and CN calls plots,
+re-run the HMM adjusting parameters for specific samples and update the results.
+
+Visit `GenoBrew` GitHub [repository](https://github.com/Breeding-Insight/GenoBrew) 
+and [tutorial](https://scribehow.com/viewer/GenoBrew_Interactive_Marker_Panel_Evaluation_CNV_Visualization_and_Curation__4uWloBuPT1WlnCvW2UWiTg) 
+for more information.
+
 ## Contributing
 
 Contributions are welcome! If you'd like to contribute, please fork the repository and submit a pull request to the development branch. For major changes, open an issue first to discuss your ideas.

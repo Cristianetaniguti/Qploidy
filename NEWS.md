@@ -1,3 +1,7 @@
+# Qploidy2 1.9.1
+
+* Add `GenoBrew` links 
+
 # Qploidy2 1.9.0
 
 * Fork from Cristianetaniguti/Qploidy@development

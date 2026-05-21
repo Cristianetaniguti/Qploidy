@@ -1,5 +1,5 @@
 <!-- badges: start -->
-[![Development](https://img.shields.io/badge/development-active-blue.svg)](https://img.shields.io/badge/development-active-blue.svg)
+[![Development](https://img.shields.io/badge/development-inactive-darkblue.svg)](https://img.shields.io/badge/development-inactive-darkblue.svg)
 [![License: GPL v3](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![R-CMD-check](https://github.com/Cristianetaniguti/Qploidy/workflows/R-CMD-check/badge.svg)](https://github.com/Cristianetaniguti/Qploidy/actions)
 ![](https://img.shields.io/badge/RRID-SCR_026724-yellow.svg)
@@ -9,10 +9,14 @@
 
 <!-- badges: end -->
 
+> [!IMPORTANT]
+> **We moved and improved!** Check out **Qploidy2** at: https://github.com/Breeding-Insight/Qploidy2
+
 # Qploidy 
 
 <img src="https://github.com/Cristianetaniguti/Qploidy/assets/7572527/88ef9fad-7f86-4a84-9e1a-5dd4625dd1c8" align="right" width="230"/>
 
+**We moved and improved!** Check out **Qploidy2** at: https://github.com/Breeding-Insight/Qploidy2
 
 **`Qploidy`** is an R package designed for ploidy and aneuploidy estimation using genotyping platform data. 
 
@@ -46,20 +50,9 @@ install.packages("Qploidy")
 devtools::install_github("cristianetaniguti/Qploidy")
 ```
 
-## Access Shiny interface
-
-``` r
-library(Qploidy)
-run_app()
-```
-
 ## Documentation
 
 * [`Qploidy` tutorial](https://cristianetaniguti.github.io/Qploidy/Qploidy.html) for directions on how to run
-
-## Contributing
-
-Contributions are welcome! If you'd like to contribute, please fork the repository and submit a pull request. For major changes, open an issue first to discuss your ideas.
 
 ## Bug Reports
 

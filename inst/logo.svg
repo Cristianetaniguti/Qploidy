@@ -527,7 +527,7 @@
        fx="271.52805"
        fy="415.18536"
        r="98.841003"
-       gradientTransform="matrix(0.84181555,-0.80582195,0.81181841,0.84807985,-459.90659,42.445274)"
+       gradientTransform="matrix(0.92020583,-0.92215425,0.92600041,0.92404387,-528.59844,42.493608)"
        gradientUnits="userSpaceOnUse" />
     <radialGradient
        inkscape:collect="always"
@@ -779,13 +779,13 @@
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
      inkscape:zoom="0.94752309"
-     inkscape:cx="342.99956"
-     inkscape:cy="467.00709"
+     inkscape:cx="342.47187"
+     inkscape:cy="720.82676"
      inkscape:document-units="mm"
      inkscape:current-layer="layer1"
      showgrid="false"
      inkscape:window-width="1920"
-     inkscape:window-height="962"
+     inkscape:window-height="961"
      inkscape:window-x="1920"
      inkscape:window-y="25"
      inkscape:window-maximized="1"
@@ -808,6 +808,15 @@
      inkscape:label="Layer 1"
      inkscape:groupmode="layer"
      id="layer1">
+    <path
+       style="fill:#ffffff;fill-opacity:1;stroke:#000000;stroke-width:2.265;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+       d="m 104.51163,31.533744 -97.7068448,57.2634 0.37798,111.503016 97.7068448,55.94047 97.13987,-56.31845 0.189,-111.125036 z"
+       id="path850-8-1-3-9-5-9-5-1-3-0"
+       inkscape:connector-curvature="0"
+       sodipodi:nodetypes="ccccccc"
+       inkscape:export-xdpi="150"
+       inkscape:export-ydpi="150"
+       inkscape:export-filename="app/www/Qploidy2_logo.png" />
     <path
        style="fill:url(#radialGradient1719-3);fill-opacity:1;stroke:#000000;stroke-width:2.26500058;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
        d="m 104.51163,31.533744 -97.7068446,57.2634 0.37798,111.503016 97.7068446,55.94047 97.13987,-56.31845 0.189,-111.125036 z"

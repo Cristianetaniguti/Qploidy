@@ -51,18 +51,18 @@ If you find a bug or want an enhancement, please submit an issue [here](https://
 
 ## How to cite
 
-### Qploidy - Standardization 
+### Qploidy - for Standardization 
 
 Taniguti, C. H., Lau, J., Hochhaus, T., Arias, D. C. L., Hokanson, S. C., Zlesak, D. C., Byrne, D. H.,
 Klein, P. E., & Riera-Lizarazu, O. (2025). Exploring chromosomal variations in garden roses: Insights 
 from high-density SNP array data and a new tool, Qploidy. The Plant Genome, e70044. 
 https://doi.org/10.1002/tpg2.70044
 
-### Qploidy2 - HMM and grid approach BAF model selection
+### Qploidy2 - for HMM and grid approach BAF model selection
 
 Manuscript in preparation. Please contact the author for more information.
 
-### nQuack - EM approach BAF model selection
+### nQuack - for EM approach BAF model selection
 
 Gaynor, M., Landis, J., O'Connor, T., Laport, R., Doyle, J., Soltis, D., Ponciano, J., & Soltis, P. (2024). 
 "nQuack: An R package for predicting ploidal level from sequence data using site-based heterozygosity." 

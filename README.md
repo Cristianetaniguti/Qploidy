@@ -12,40 +12,36 @@
 > [!IMPORTANT]
 > **We moved and improved!** Check out **Qploidy2** at: https://github.com/Breeding-Insight/Qploidy2
 
-# Qploidy 
+# Qploidy
 
 <img src="https://github.com/Cristianetaniguti/Qploidy/assets/7572527/88ef9fad-7f86-4a84-9e1a-5dd4625dd1c8" align="right" width="230"/>
 
-**We moved and improved!** Check out **Qploidy2** at: https://github.com/Breeding-Insight/Qploidy2
 
-**`Qploidy`** is an R package designed for ploidy and aneuploidy estimation using genotyping platform data. 
+**`Qploidy`** is an R package designed for ploidy and aneuploidy estimation using genotyping platform data.
 
 ### When does the `Qploidy` methodology work?
 
-The `Qploidy` approach is effective under the following conditions:  
-- Your marker data originates from **Axiom** or **Illumina genotyping arrays**.  
-- Your marker data is derived from **targeted sequencing platforms** (e.g., DArTag, GTseq, AgriSeq).  
-- All DNA samples were prepared following the **same library preparation protocol**.  
-- You know the **ploidy** of at least a subset of 60 samples *or* you know the **most common ploidy** in the dataset.  
-- Your dataset includes **heterozygous samples**.  
+The `Qploidy` approach is effective under the following conditions:
+- Your marker data originates from **Axiom** or **Illumina genotyping arrays**.
+- Your marker data is derived from **targeted sequencing platforms** (e.g., DArTag, GTseq, AgriSeq).
+- All DNA samples were prepared following the **same library preparation protocol**.
+- You know the **ploidy** of at least a subset of 60 samples *or* you know the **most common ploidy** in the dataset.
+- Your dataset includes **heterozygous samples**.
 
 ### When does the `Qploidy` methodology NOT work?
 
-The methodology will not be effective under the following circumstances:  
-- Your marker data comes from **RADseq** or **GBS** (Genotyping-by-Sequencing) platforms.  
-- You intend to **combine datasets from different sequencing batches**.  
-   - For example: If you extracted DNA and sequenced two plates (192 samples) as one batch, and later sequenced an additional three plates (288 samples) as a second batch, you would need to analyze the two batches **separately** in `Qploidy`. Combining all 480 samples into a single analysis will lead to incorrect results.  
-- You **do not have a subset of samples with known ploidy** or **lack a predominant ploidy** in your dataset.  
-- Your samples consist of **inbred lines** (homozygous individuals).  
+The methodology will not be effective under the following circumstances:
+- Your marker data comes from **RADseq** or **GBS** (Genotyping-by-Sequencing) platforms.
+- You intend to **combine datasets from different sequencing batches**.
+   - For example: If you extracted DNA and sequenced two plates (192 samples) as one batch, and later sequenced an additional three plates (288 samples) as a second batch, you would need to analyze the two batches **separately** in `Qploidy`. Combining all 480 samples into a single analysis will lead to incorrect results.
+- You **do not have a subset of samples with known ploidy** or **lack a predominant ploidy** in your dataset.
+- Your samples consist of **inbred lines** (homozygous individuals).
 
 
 ## Installation
 
 ``` r
-# Install the latest stable version from CRAN
-install.packages("Qploidy")
-
-# Install the development version from GitHub
+# Install from GitHub
 #install.packages("devtools")
 devtools::install_github("cristianetaniguti/Qploidy")
 ```

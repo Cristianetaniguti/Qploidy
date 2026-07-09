@@ -103,11 +103,3 @@ Merging logic:
   - The function merges filtered genotype and signal data, estimates cluster centers, computes BAFs in parallel,
     and calculates Z-scores. Results are merged into a single output data.frame containing BAF, Z-score, and genotype info.
 }
-\examples{
-# Example usage:
-# data <- ... # see vignette for example data
-# genos <- ...
-# geno.pos <- ...
-# result <- standardize(data, genos, geno.pos, ploidy.standardization=2, threshold.n.clusters=3, n.cores=2)
-
-}

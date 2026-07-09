@@ -1,6 +1,6 @@
 ---
 title: "Qploidy"
-date: "Last update: 2025-04-21"
+date: "Last update: 2026-07-09"
 vignette: >
   %\VignetteIndexEntry{Qploidy}
   %\VignetteEngine{knitr::rmarkdown}
@@ -13,6 +13,11 @@ output:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
+
+> [!IMPORTANT]
+> **We moved and improved!** Check out **Qploidy2** at: 
+[https://github.com/Breeding-Insight/Qploidy2](https://github.com/Breeding-Insight/Qploidy2)
+
 
 This vignette describes how to use `Qploidy`, an R package designed for ploidy
 and aneuploidy estimation using genotyping platform data. For a detailed
@@ -870,18 +875,24 @@ New plots for roses real data after round 1 and 2 of standardization:
 
 ![Round 2](fig6.jpg)
 
-
 # How to cite
 
-Taniguti, C.H; Lau, J.; Hochhaus, T.; Lopez Arias, D. C.; Hokanson, S.C.; Zlesak, D. C.; Byrne, D. H.; 
-Klein, P.E. and Riera-Lizarazu, O. Exploring Chromosomal Variations in Garden Roses: Insights from 
-High-density SNP Array Data and a New Tool, Qploidy. 2025. Submitted.
+Taniguti, C. H., Lau, J., Hochhaus, T., Arias, D. C. L., Hokanson, S. C., Zlesak, D. C., Byrne, D. H.,
+ Klein, P. E., & Riera-Lizarazu, O. (2025). Exploring chromosomal variations in garden roses: Insights 
+ from high-density SNP array data and a new tool, Qploidy. The Plant Genome, e70044. 
+ https://doi.org/10.1002/tpg2.70044
 
 # Acknowledgments
 
-This work is funded in part by the Robert E. Basye Endowment in Rose Genetics, Dept. of Horticultural 
-Sciences, Texas A&M University, and USDA’s National Institute of Food and Agriculture (NIFA), 
-Specialty Crop Research Initiative (SCRI) projects: ‘‘Tools for Genomics-Assisted Breeding in 
-Polyploids: Development of a Community Resource’’ (Award No. 2020-51181-32156); and ‘‘Developing 
-Sustainable Rose Landscapes via Rose Rosette Disease Education, Socioeconomic Assessments, and 
-Breeding RRD-Resistant Roses with Stable Black Spot Resistance’’ (Award No. 2022-51181-38330).
+### Version 1.0.0
+
+Funded in part by the Robert E. Basye Endowment in Rose Genetics, Dept. of Horticultural Sciences, 
+Texas A&M University, and USDA’s National Institute of Food and Agriculture (NIFA), Specialty Crop 
+Research Initiative (SCRI) projects: ‘‘Tools for Genomics-Assisted Breeding in Polyploids: Development 
+of a Community Resource’’ (Award No. 2020-51181-32156); and ‘‘Developing Sustainable Rose Landscapes via 
+Rose Rosette Disease Education, Socioeconomic Assessments, and Breeding RRD-Resistant Roses with Stable 
+Black Spot Resistance’’ (Award No. 2022-51181-38330).
+
+### Versions > 1.0.0
+
+Supported by [Breeding Insight](https://www.breedinginsight.org/).

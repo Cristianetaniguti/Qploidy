@@ -10,13 +10,11 @@
 <!-- badges: end -->
 
 > [!IMPORTANT]
-> **We moved and improved!** Check out **Qploidy2** at: https://github.com/Breeding-Insight/Qploidy2
+> **We moved and improved!** Check out **Qploidy2** at: [https://github.com/Breeding-Insight/Qploidy2](https://github.com/Breeding-Insight/Qploidy2)
 
 # Qploidy 
 
 <img src="https://github.com/Cristianetaniguti/Qploidy/assets/7572527/88ef9fad-7f86-4a84-9e1a-5dd4625dd1c8" align="right" width="230"/>
-
-**We moved and improved!** Check out **Qploidy2** at: https://github.com/Breeding-Insight/Qploidy2
 
 **`Qploidy`** is an R package designed for ploidy and aneuploidy estimation using genotyping platform data. 
 

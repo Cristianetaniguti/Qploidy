@@ -496,12 +496,6 @@ rm_outlier <- function(data, alpha=0.05){
 #' @importFrom parallel makeCluster stopCluster clusterExport parLapply clusterEvalQ
 #' @importFrom stats sd
 #'
-#' @examples
-#' # Example usage:
-#' # data <- ... # see vignette for example data
-#' # genos <- ...
-#' # geno.pos <- ...
-#' # result <- standardize(data, genos, geno.pos, ploidy.standardization=2, threshold.n.clusters=3, n.cores=2)
 #'
 #' @export
 standardize <- function(data = NULL,

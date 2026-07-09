@@ -1,3 +1,9 @@
+# Qploidy 1.5.3
+
+* Remove HMM functions (exclusive to Qploidy2)
+* Add migration notice
+* Change maintainer email
+
 # Qploidy 1.5.2
 
 * Z-score calculation is now only applied to markers not filtered by genotype probabilities and missing data

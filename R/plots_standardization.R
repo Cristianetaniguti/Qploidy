@@ -1,4 +1,5 @@
-globalVariables(c("Chr", "baf", "z", "ratio", "median", "window", "prop_het"))
+globalVariables(c("Chr", "baf", "z", "ratio", "median", "window", "prop_het",
+                  "Xb", "Yb", ".__hl__"))
 
 #' Plot BAF
 #'

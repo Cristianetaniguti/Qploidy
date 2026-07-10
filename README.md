@@ -68,4 +68,4 @@ This work is funded in part by the Robert E. Basye Endowment in Rose Genetics, D
 
 ### Versions > 1.0.0
 
-Supported by [Breeding Insight](https://www.breedinginsight.org/).
+Supported by [Breeding Insight](https://breedinginsight.org/).

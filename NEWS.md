@@ -1,3 +1,9 @@
+# Qploidy 1.5.4
+
+* Fix links
+* Fix Unicode character
+* Add Taniguti to wordlist
+
 # Qploidy 1.5.3
 
 * Remove HMM functions (exclusive to Qploidy2)

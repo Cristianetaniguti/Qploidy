@@ -895,4 +895,4 @@ Black Spot Resistance’’ (Award No. 2022-51181-38330).
 
 ### Versions > 1.0.0
 
-Supported by [Breeding Insight](https://www.breedinginsight.org/).
+Supported by [Breeding Insight](https://breedinginsight.org/).

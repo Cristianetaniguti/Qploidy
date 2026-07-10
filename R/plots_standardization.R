@@ -868,7 +868,7 @@ all_resolutions_plots <- function(
 #' @param df A `data.frame` containing at least columns `X` and `Y`. If
 #'   `sample = "all"` or a specific sample is to be highlighted, `df` should also
 #'   contain a `SampleName` column.
-#' @param ploidy Integer (≥ 2). Ploidy used to compute and draw dosage guide lines.
+#' @param ploidy Integer (>= 2). Ploidy used to compute and draw dosage guide lines.
 #' @param sample Character. Either `"all"` to color all samples by `SampleName`,
 #'   or the name of a single sample to highlight. Default: `"all"`.
 #' @param highlight_color Color used for the highlighted sample when
@@ -1021,7 +1021,7 @@ plot_xy_with_ploidy_guides <- function(df, ploidy = 2,
 #'   - `R` (numeric): total read depth.
 #'   - `SampleName` (character/factor): sample label used for coloring.
 #'   Optional column `ratio` may be present and used when `fallback_to_ratio = TRUE`.
-#' @param ploidy Integer (≥ 2). Ploidy used to compute dosage guide lines.
+#' @param ploidy Integer (>= 2). Ploidy used to compute dosage guide lines.
 #' @param fallback_to_ratio Logical. If `TRUE`, fill `NA` values in `baf` with
 #'   corresponding values from `ratio` (when available). Default: `FALSE`.
 #' @param normalize_depth Logical. If `TRUE`, place all points on a common radius

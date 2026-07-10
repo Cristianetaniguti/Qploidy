@@ -22,7 +22,7 @@ plot_baf_with_ploidy_guides(
 - `SampleName` (character/factor): sample label used for coloring.
 Optional column `ratio` may be present and used when `fallback_to_ratio = TRUE`.}
 
-\item{ploidy}{Integer (≥ 2). Ploidy used to compute dosage guide lines.}
+\item{ploidy}{Integer (>= 2). Ploidy used to compute dosage guide lines.}
 
 \item{fallback_to_ratio}{Logical. If `TRUE`, fill `NA` values in `baf` with
 corresponding values from `ratio` (when available). Default: `FALSE`.}

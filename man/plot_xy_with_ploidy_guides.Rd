@@ -17,7 +17,7 @@ plot_xy_with_ploidy_guides(
 `sample = "all"` or a specific sample is to be highlighted, `df` should also
 contain a `SampleName` column.}
 
-\item{ploidy}{Integer (≥ 2). Ploidy used to compute and draw dosage guide lines.}
+\item{ploidy}{Integer (>= 2). Ploidy used to compute and draw dosage guide lines.}
 
 \item{sample}{Character. Either `"all"` to color all samples by `SampleName`,
 or the name of a single sample to highlight. Default: `"all"`.}

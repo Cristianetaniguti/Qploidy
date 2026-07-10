@@ -2,6 +2,10 @@
 
 0 errors | 0 warnings | 0 note
 
-* Remove HMM functions (exclusive to Qploidy2)
-* Add migration notice
-* Change maintainer email
+This update:
+* Fixes links
+* Fixes Unicode character
+* Adds Taniguti to wordlist
+* Removes HMM functions (exclusive to Qploidy2)
+* Adds migration notice
+* Changes maintainer email
